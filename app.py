@@ -173,174 +173,182 @@ st.markdown("""
 # 初期化
 if 'page' not in st.session_state:
     st.session_state.page = "着地予測ダッシュボード"
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'username' not in st.session_state:
+    st.session_state.username = ""
 
 # --------------------------------------------------------------------------------
-# 認証機能の実装
+# シンプルな認証機能
 # --------------------------------------------------------------------------------
-try:
-    with open('config.yaml') as file:
-        config = yaml.load(file, Loader=SafeLoader)
-except FileNotFoundError:
-    # パスワードのハッシュ化
-    hashed_passwords = stauth.Hasher(['password']).generate()
-    default_password_hash = hashed_passwords[0] if isinstance(hashed_passwords, list) else hashed_passwords
-    config = {
-        'cookie': {
-            'expiry_days': 30,
-            'key': 'financial_auth_key',
-            'name': 'financial_auth'
-        },
-        'credentials': {
-            'usernames': {
-                'admin': {
-                    'email': 'admin@example.com',
-                    'name': '管理者',
-                    'password': default_password_hash
-                }
-            }
-        },
-        'preauthorized': {
-            'emails': ['admin@example.com']
-        }
-    }
-    with open('config.yaml', 'w') as file:
-        yaml.dump(config, file, default_flow_style=False)
-
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days'],
-)
-
-# ログインフォームの表示
-name, authentication_status, username = authenticator.login('main')
-
-# 認証ステータスに基づいて処理を分岐
-if authentication_status:
-    # ログイン成功時
-    
-    # 初期化
-    if 'processor' not in st.session_state:
-        st.session_state.processor = DataProcessor()
-    processor = st.session_state.processor
-    
-    # サイドバー
-    st.sidebar.markdown("""
-    <div style='text-align: center; padding: 1rem 0;'>
-        <h1 style='color: #1f77b4; margin: 0; font-size: 1.8rem;'>📊</h1>
-        <h2 style='color: #2c3e50; margin: 0.5rem 0 0 0; font-size: 1.3rem;'>財務予測<br>シミュレーター</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.sidebar.markdown("---")
-    
-    # ユーザー情報とログアウト
-    st.sidebar.markdown(f"**👤 {name}**")
-    authenticator.logout('ログアウト', 'sidebar')
-    
-    st.sidebar.markdown("---")
-    
-    # 会社選択
-    companies = processor.get_companies()
-    if companies.empty:
-        st.sidebar.error("会社データがありません")
-        st.session_state.page = "システム設定"
-        selected_comp_name = ""
-    else:
-        comp_names = companies['name'].tolist()
-        selected_comp_name = st.sidebar.selectbox(
-            "🏢 会社を選択",
-            comp_names,
-            key="comp_select"
-        )
-        selected_comp_id = int(companies[companies['name'] == selected_comp_name]['id'].iloc[0])
-        st.session_state.selected_comp_id = selected_comp_id
-        st.session_state.selected_comp_name = selected_comp_name
-    
-        # 期選択
-        periods = processor.get_company_periods(selected_comp_id)
-        if periods.empty:
-            st.sidebar.warning("期データがありません")
-            selected_period_num = 0
+def check_password():
+    """パスワードチェック関数"""
+    def password_entered():
+        """パスワードが入力されたときの処理"""
+        if st.session_state["password"] == st.secrets.get("password", "admin123"):
+            st.session_state.authenticated = True
+            st.session_state.username = "admin"
+            del st.session_state["password"]  # パスワードを削除
         else:
-            period_options = [
-                f"第{row['period_num']}期 ({row['start_date']} 〜 {row['end_date']})"
-                for _, row in periods.iterrows()
-            ]
-            selected_period_str = st.sidebar.selectbox(
-                "📅 期を選択",
-                period_options,
-                key="period_select"
+            st.session_state.authenticated = False
+
+    if not st.session_state.authenticated:
+        # ログイン画面
+        st.markdown("""
+        <div style='text-align: center; padding: 2rem;'>
+            <h1 style='color: #1f77b4; font-size: 3rem; margin-bottom: 1rem;'>📊</h1>
+            <h1 style='color: #2c3e50;'>財務予測シミュレーター</h1>
+            <p style='color: #7f8c8d; font-size: 1.1rem;'>ログインして開始してください</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.text_input(
+                "パスワード",
+                type="password",
+                key="password",
+                on_change=password_entered,
+                placeholder="パスワードを入力してください"
             )
-            selected_period_num = int(selected_period_str.split('第')[1].split('期')[0])
-            periods.columns = [c.lower() for c in periods.columns]
             
-            period_match = periods[periods['period_num'] == selected_period_num]
-            if not period_match.empty:
-                if 'id' in period_match.columns:
-                    selected_period_id = int(period_match['id'].iloc[0])
-                else:
-                    selected_period_id = int(period_match.iloc[0, 0])
-                    
-                st.session_state.selected_period_id = selected_period_id
-                st.session_state.selected_period_num = selected_period_num
-                st.session_state.start_date = period_match['start_date'].iloc[0]
-                st.session_state.end_date = period_match['end_date'].iloc[0]
+            if "password" in st.session_state:
+                st.error("❌ パスワードが正しくありません")
+        
+        return False
+    else:
+        return True
+
+# 認証チェック
+if not check_password():
+    st.stop()
+
+# ログイン成功 - メインアプリケーション
+
+# 初期化
+if 'processor' not in st.session_state:
+    st.session_state.processor = DataProcessor()
+processor = st.session_state.processor
+
+# サイドバー
+st.sidebar.markdown("""
+<div style='text-align: center; padding: 1rem 0;'>
+    <h1 style='color: #1f77b4; margin: 0; font-size: 1.8rem;'>📊</h1>
+    <h2 style='color: #2c3e50; margin: 0.5rem 0 0 0; font-size: 1.3rem;'>財務予測<br>シミュレーター</h2>
+</div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("---")
+
+# ユーザー情報とログアウト
+st.sidebar.markdown(f"**👤 {st.session_state.username}**")
+if st.sidebar.button("ログアウト", type="secondary"):
+    st.session_state.authenticated = False
+    st.session_state.username = ""
+    st.rerun()
+
+st.sidebar.markdown("---")
+
+# 会社選択
+companies = processor.get_companies()
+if companies.empty:
+    st.sidebar.error("会社データがありません")
+    st.session_state.page = "システム設定"
+    selected_comp_name = ""
+else:
+    comp_names = companies['name'].tolist()
+    selected_comp_name = st.sidebar.selectbox(
+        "🏢 会社を選択",
+        comp_names,
+        key="comp_select"
+    )
+    selected_comp_id = int(companies[companies['name'] == selected_comp_name]['id'].iloc[0])
+    st.session_state.selected_comp_id = selected_comp_id
+    st.session_state.selected_comp_name = selected_comp_name
+
+    # 期選択
+    periods = processor.get_company_periods(selected_comp_id)
+    if periods.empty:
+        st.sidebar.warning("期データがありません")
+        selected_period_num = 0
+    else:
+        period_options = [
+            f"第{row['period_num']}期 ({row['start_date']} 〜 {row['end_date']})"
+            for _, row in periods.iterrows()
+        ]
+        selected_period_str = st.sidebar.selectbox(
+            "📅 期を選択",
+            period_options,
+            key="period_select"
+        )
+        selected_period_num = int(selected_period_str.split('第')[1].split('期')[0])
+        periods.columns = [c.lower() for c in periods.columns]
+        
+        period_match = periods[periods['period_num'] == selected_period_num]
+        if not period_match.empty:
+            if 'id' in period_match.columns:
+                selected_period_id = int(period_match['id'].iloc[0])
             else:
-                st.error("選択された期が見つかりません")
-                selected_period_id = None
+                selected_period_id = int(period_match.iloc[0, 0])
+                
+            st.session_state.selected_period_id = selected_period_id
+            st.session_state.selected_period_num = selected_period_num
+            st.session_state.start_date = period_match['start_date'].iloc[0]
+            st.session_state.end_date = period_match['end_date'].iloc[0]
+        else:
+            st.error("選択された期が見つかりません")
+            selected_period_id = None
+
+    # 予測シナリオ
+    st.sidebar.markdown("### 🎯 予測シナリオ")
+    st.session_state.scenario = st.sidebar.radio(
+        "シナリオを選択",
+        ["現実", "楽観", "悲観"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
     
-        # 予測シナリオ
-        st.sidebar.markdown("### 🎯 予測シナリオ")
-        st.session_state.scenario = st.sidebar.radio(
-            "シナリオを選択",
-            ["現実", "楽観", "悲観"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
+    # シナリオ設定
+    if 'scenario_rates' not in st.session_state:
+        st.session_state.scenario_rates = {
+            "現実": 0.0,
+            "楽観": 0.1,
+            "悲観": -0.1
+        }
+    
+    if st.session_state.scenario != "現実":
+        st.sidebar.markdown("---")
+        rate_key = f"{st.session_state.scenario}_rate"
+        initial_rate = st.session_state.scenario_rates[st.session_state.scenario] * 100
         
-        # シナリオ設定
-        if 'scenario_rates' not in st.session_state:
-            st.session_state.scenario_rates = {
-                "現実": 0.0,
-                "楽観": 0.1,
-                "悲観": -0.1
-            }
+        new_rate = st.sidebar.number_input(
+            f"📈 {st.session_state.scenario}シナリオ増減率 (%)",
+            value=initial_rate,
+            min_value=-100.0,
+            max_value=100.0,
+            step=1.0,
+            key=rate_key
+        ) / 100.0
         
-        if st.session_state.scenario != "現実":
-            st.sidebar.markdown("---")
-            rate_key = f"{st.session_state.scenario}_rate"
-            initial_rate = st.session_state.scenario_rates[st.session_state.scenario] * 100
-            
-            new_rate = st.sidebar.number_input(
-                f"📈 {st.session_state.scenario}シナリオ増減率 (%)",
-                value=initial_rate,
-                min_value=-100.0,
-                max_value=100.0,
-                step=1.0,
-                key=rate_key
-            ) / 100.0
-            
-            st.session_state.scenario_rates[st.session_state.scenario] = new_rate
-    
-        # 実績データ最終月
-        months = processor.get_fiscal_months(selected_comp_id, st.session_state.get('selected_period_id'))
-        current_month = st.sidebar.selectbox(
-            "📆 実績データ最終月",
-            months,
-            key="month_select"
-        )
-        st.session_state.current_month = current_month
-    
-        # 表示設定
-        st.sidebar.markdown("### ⚙️ 表示設定")
-        st.session_state.display_mode = st.sidebar.radio(
-            "表示モード",
-            ["要約", "詳細"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
+        st.session_state.scenario_rates[st.session_state.scenario] = new_rate
+
+    # 実績データ最終月
+    months = processor.get_fiscal_months(selected_comp_id, st.session_state.get('selected_period_id'))
+    current_month = st.sidebar.selectbox(
+        "📆 実績データ最終月",
+        months,
+        key="month_select"
+    )
+    st.session_state.current_month = current_month
+
+    # 表示設定
+    st.sidebar.markdown("### ⚙️ 表示設定")
+    st.session_state.display_mode = st.sidebar.radio(
+        "表示モード",
+        ["要約", "詳細"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
     
     st.sidebar.markdown("---")
     
@@ -1165,17 +1173,6 @@ if authentication_status:
                         st.dataframe(periods_list, use_container_width=True)
                     else:
                         st.info("登録されている会計期間がありません")
-    
+
     else:
         st.warning("⚠️ 会計期間が選択されていません。システム設定から登録してください。")
-
-elif authentication_status == False:
-    st.error('❌ ユーザー名/パスワードが間違っています')
-elif authentication_status == None:
-    st.markdown("""
-    <div style='text-align: center; padding: 2rem;'>
-        <h1 style='color: #1f77b4; font-size: 3rem; margin-bottom: 1rem;'>📊</h1>
-        <h1 style='color: #2c3e50;'>財務予測シミュレーター</h1>
-        <p style='color: #7f8c8d; font-size: 1.1rem;'>ログインして開始してください</p>
-    </div>
-    """, unsafe_allow_html=True)
