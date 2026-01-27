@@ -533,9 +533,11 @@ else:
                         return ['background-color: #e3f2fd; font-weight: bold'] * len(row)
                     return [''] * len(row)
                 
-                styled_df = pl_display.drop(columns=['タイプ']).style\
+                # タイプ列を使ってスタイルを適用してから削除
+                styled_df = pl_display.style\
+                    .apply(highlight_summary, axis=1)\
                     .format(format_currency, subset=[c for c in pl_display.columns if c not in ['項目名', 'タイプ']])\
-                    .apply(highlight_summary, axis=1)
+                    .hide(axis="columns", subset=['タイプ'])
                 
                 st.dataframe(styled_df, use_container_width=True, height=600)
             
