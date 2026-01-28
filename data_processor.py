@@ -517,13 +517,33 @@ class DataProcessor:
     def add_company(self, company_name):
         """会社を追加"""
         try:
+            sys.stderr.write(f"💾 add_company() 開始: '{company_name}'\n")
+            sys.stderr.write(f"   use_postgres: {self.use_postgres}\n")
+            sys.stderr.flush()
+            
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO companies (name) VALUES (?)", (company_name,))
+            
+            if self.use_postgres:
+                sys.stderr.write("   PostgreSQLモードでINSERT実行\n")
+                cursor.execute("INSERT INTO companies (name) VALUES (%s)", (company_name,))
+            else:
+                sys.stderr.write("   SQLiteモードでINSERT実行\n")
+                cursor.execute("INSERT INTO companies (name) VALUES (?)", (company_name,))
+            
             conn.commit()
+            sys.stderr.write("   コミット成功\n")
+            sys.stderr.flush()
             conn.close()
+            
+            sys.stderr.write("✅ add_company() 成功\n")
+            sys.stderr.flush()
             return True
-        except:
+        except Exception as e:
+            sys.stderr.write(f"❌ add_company() 失敗: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
             return False
 
     def get_company_periods(self, comp_id):
