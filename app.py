@@ -134,7 +134,7 @@ st.markdown("""
     
     /* インフォボックス */
     .info-box {
-        background-color: #e3f2fd;
+        background-color: #024270;
         padding: 1rem;
         border-left: 4px solid #1f77b4;
         border-radius: 4px;
