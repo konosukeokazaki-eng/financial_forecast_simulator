@@ -609,10 +609,23 @@ class DataProcessor:
             cursor = conn.cursor()
             
             for month, amount in values_dict.items():
-                cursor.execute(
-                    "INSERT OR REPLACE INTO actual_data (fiscal_period_id, item_name, month, amount, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                    (fiscal_period_id, item_name, month, float(amount))
-                )
+                if self.use_postgres:
+                    # PostgreSQL用のUPSERT
+                    cursor.execute(
+                        """
+                        INSERT INTO actual_data (fiscal_period_id, item_name, month, amount, updated_at) 
+                        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (fiscal_period_id, item_name, month) 
+                        DO UPDATE SET amount = EXCLUDED.amount, updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (fiscal_period_id, item_name, month, float(amount))
+                    )
+                else:
+                    # SQLite用のUPSERT
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO actual_data (fiscal_period_id, item_name, month, amount, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        (fiscal_period_id, item_name, month, float(amount))
+                    )
             
             conn.commit()
             return True
@@ -633,10 +646,23 @@ class DataProcessor:
             cursor = conn.cursor()
             
             for month, amount in values_dict.items():
-                cursor.execute(
-                    "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                    (fiscal_period_id, scenario, item_name, month, float(amount))
-                )
+                if self.use_postgres:
+                    # PostgreSQL用のUPSERT
+                    cursor.execute(
+                        """
+                        INSERT INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount, updated_at) 
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (fiscal_period_id, scenario, item_name, month) 
+                        DO UPDATE SET amount = EXCLUDED.amount, updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (fiscal_period_id, scenario, item_name, month, float(amount))
+                    )
+                else:
+                    # SQLite用のUPSERT
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        (fiscal_period_id, scenario, item_name, month, float(amount))
+                    )
             
             conn.commit()
             return True
@@ -665,22 +691,40 @@ class DataProcessor:
 
     def save_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name, values_dict):
         """補助科目を保存"""
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             
             for month, amount in values_dict.items():
-                cursor.execute(
-                    "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                    (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
-                )
+                if self.use_postgres:
+                    # PostgreSQL用のUPSERT
+                    cursor.execute(
+                        """
+                        INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount, updated_at) 
+                        VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (fiscal_period_id, scenario, parent_item, sub_account_name, month) 
+                        DO UPDATE SET amount = EXCLUDED.amount, updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
+                    )
+                else:
+                    # SQLite用のUPSERT
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
+                    )
             
             conn.commit()
-            conn.close()
             return True
         except Exception as e:
             print(f"Error saving sub account: {e}")
+            if conn:
+                conn.rollback()
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def delete_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name):
         """補助科目を削除"""
