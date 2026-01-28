@@ -643,24 +643,25 @@ class DataProcessor:
                     # PostgreSQL用のUPSERT
                     cursor.execute(
                         """
-                        INSERT INTO actual_data (fiscal_period_id, item_name, month, amount, updated_at) 
-                        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) 
+                        VALUES (%s, %s, %s, %s)
                         ON CONFLICT (fiscal_period_id, item_name, month) 
-                        DO UPDATE SET amount = EXCLUDED.amount, updated_at = CURRENT_TIMESTAMP
+                        DO UPDATE SET amount = EXCLUDED.amount
                         """,
                         (fiscal_period_id, item_name, month, float(amount))
                     )
                 else:
                     # SQLite用のUPSERT
                     cursor.execute(
-                        "INSERT OR REPLACE INTO actual_data (fiscal_period_id, item_name, month, amount, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        "INSERT OR REPLACE INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
                         (fiscal_period_id, item_name, month, float(amount))
                     )
             
             conn.commit()
             return True
         except Exception as e:
-            print(f"Error saving actual data: {e}")
+            sys.stderr.write(f"Error saving actual data: {e}\n")
+            sys.stderr.flush()
             if conn:
                 conn.rollback()
             return False
@@ -672,9 +673,10 @@ class DataProcessor:
         """予測データを保存"""
         conn = None
         try:
-            print(f"💾 予測データ保存開始: {item_name}, シナリオ: {scenario}")
-            print(f"   use_postgres: {self.use_postgres}")
-            print(f"   データ件数: {len(values_dict)}")
+            sys.stderr.write(f"💾 予測データ保存開始: {item_name}, シナリオ: {scenario}\n")
+            sys.stderr.write(f"   use_postgres: {self.use_postgres}\n")
+            sys.stderr.write(f"   データ件数: {len(values_dict)}\n")
+            sys.stderr.flush()
             
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -685,28 +687,30 @@ class DataProcessor:
                     # PostgreSQL用のUPSERT
                     cursor.execute(
                         """
-                        INSERT INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount, updated_at) 
-                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        INSERT INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) 
+                        VALUES (%s, %s, %s, %s, %s)
                         ON CONFLICT (fiscal_period_id, scenario, item_name, month) 
-                        DO UPDATE SET amount = EXCLUDED.amount, updated_at = CURRENT_TIMESTAMP
+                        DO UPDATE SET amount = EXCLUDED.amount
                         """,
                         (fiscal_period_id, scenario, item_name, month, float(amount))
                     )
                 else:
-                    # SQLite用のUPSERT
+                    # SQLite用のUPSERT（updated_atなし）
                     cursor.execute(
-                        "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) VALUES (?, ?, ?, ?, ?)",
                         (fiscal_period_id, scenario, item_name, month, float(amount))
                     )
                 saved_count += 1
             
             conn.commit()
-            print(f"✅ 保存成功: {saved_count}件のデータを保存しました")
+            sys.stderr.write(f"✅ 保存成功: {saved_count}件のデータを保存しました\n")
+            sys.stderr.flush()
             return True
         except Exception as e:
-            print(f"❌ Error saving forecast data: {e}")
+            sys.stderr.write(f"❌ Error saving forecast data: {e}\n")
             import traceback
             traceback.print_exc()
+            sys.stderr.flush()
             if conn:
                 conn.rollback()
             return False
@@ -740,24 +744,25 @@ class DataProcessor:
                     # PostgreSQL用のUPSERT
                     cursor.execute(
                         """
-                        INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount, updated_at) 
-                        VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) 
+                        VALUES (%s, %s, %s, %s, %s, %s)
                         ON CONFLICT (fiscal_period_id, scenario, parent_item, sub_account_name, month) 
-                        DO UPDATE SET amount = EXCLUDED.amount, updated_at = CURRENT_TIMESTAMP
+                        DO UPDATE SET amount = EXCLUDED.amount
                         """,
                         (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
                     )
                 else:
                     # SQLite用のUPSERT
                     cursor.execute(
-                        "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) VALUES (?, ?, ?, ?, ?, ?)",
                         (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
                     )
             
             conn.commit()
             return True
         except Exception as e:
-            print(f"Error saving sub account: {e}")
+            sys.stderr.write(f"Error saving sub account: {e}\n")
+            sys.stderr.flush()
             if conn:
                 conn.rollback()
             return False
