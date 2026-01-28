@@ -43,26 +43,6 @@ class DataProcessor:
             print(f"📁 SQLiteデータベース: {self.db_path}")
         
         self._init_db()
-    
-    def _test_postgres_connection(self):
-        """PostgreSQL接続をテスト"""
-        try:
-            import psycopg2
-            from urllib.parse import urlparse
-            
-            result = urlparse(self.conn_string)
-            conn = psycopg2.connect(
-                database=result.path[1:],
-                user=result.username,
-                password=result.password,
-                host=result.hostname,
-                port=result.port
-            )
-            conn.close()
-            return True
-        except Exception as e:
-            print(f"   接続テスト失敗: {e}")
-            return False
         
         # 標準的な勘定科目リスト (要件定義書の3.1に準拠)
         self.all_items = [
@@ -161,6 +141,26 @@ class DataProcessor:
             "特別損失合計": ["特別損失", "特別損失合計"],
             "法人税、住民税及び事業税": ["法人税", "法人税等", "法人税、住民税及び事業税"]
         }
+    
+    def _test_postgres_connection(self):
+        """PostgreSQL接続をテスト"""
+        try:
+            import psycopg2
+            from urllib.parse import urlparse
+            
+            result = urlparse(self.conn_string)
+            conn = psycopg2.connect(
+                database=result.path[1:],
+                user=result.username,
+                password=result.password,
+                host=result.hostname,
+                port=result.port
+            )
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"   接続テスト失敗: {e}")
+            return False
     
     def _get_connection(self):
         """データベース接続を取得"""
