@@ -999,18 +999,41 @@ else:
                 st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
                 
                 if 'imported_df' not in st.session_state:
-                    st.session_state.imported_df, info = processor.import_yayoi_excel(temp_path, preview_only=True)
+                    # fiscal_period_idを渡す
+                    st.session_state.imported_df, info = processor.import_yayoi_excel(
+                        temp_path, 
+                        st.session_state.selected_period_id,
+                        preview_only=True
+                    )
                     st.session_state.show_import_button = True
                     
                 if st.session_state.show_import_button:
-                    st.subheader("📋 インポートデータ プレビュー")
+                    st.subheader("📋 インポートデータ プレビュー（直接編集可能）")
                     
-                    imported_df = st.session_state.imported_df
-                    st.dataframe(
-                        imported_df.style.format(format_currency),
+                    st.markdown("""
+                    <div class="info-box">
+                        <strong>✏️ 編集:</strong> セルをダブルクリックして値を直接修正できます。
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # 編集可能なデータエディタを使用
+                    edited_df = st.data_editor(
+                        st.session_state.imported_df,
                         use_container_width=True,
-                        height=400
+                        height=400,
+                        num_rows="fixed",  # 行の追加・削除は不可
+                        disabled=["項目名"],  # 項目名列は編集不可
+                        column_config={
+                            col: st.column_config.NumberColumn(
+                                format="¥%d",
+                                min_value=-999999999,
+                                max_value=999999999
+                            ) for col in st.session_state.imported_df.columns if col != '項目名'
+                        }
                     )
+                    
+                    # 編集後のデータを保存
+                    st.session_state.imported_df = edited_df
                     
                     st.markdown("""
                     <div class="warning-box">
