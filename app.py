@@ -502,7 +502,7 @@ if st.session_state.page == "システム設定":
                 if st.form_submit_button("➕ 期を追加", type="primary"):
                     if start_date and end_date:
                         if start_date < end_date:
-                            success = processor.add_period(comp_id_for_period, period_num, str(start_date), str(end_date))
+                            success = processor.add_fiscal_period(comp_id_for_period, period_num, str(start_date), str(end_date))
                             if success:
                                 st.success(f"✅ 第{period_num}期を追加しました")
                                 st.rerun()
