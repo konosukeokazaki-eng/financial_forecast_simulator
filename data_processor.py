@@ -801,20 +801,34 @@ class DataProcessor:
         
         return df
 
-    def import_yayoi_excel(self, file_path, preview_only=False):
+    def import_yayoi_excel(self, file_path, fiscal_period_id, preview_only=False):
         """
         弥生会計Excelからデータをインポート
         preview_only=True の場合はプレビュー用のDataFrameを返す
         """
         try:
+            # 会計期の情報を取得
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT start_date, end_date FROM fiscal_periods WHERE id = ?",
+                (fiscal_period_id,)
+            )
+            result = cursor.fetchone()
+            conn.close()
+            
+            if not result:
+                return pd.DataFrame(), "会計期が見つかりません"
+            
+            start_date_str, end_date_str = result
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+            
+            # 会計年度の開始月を取得
+            fiscal_start_month = start_date.month
+            fiscal_start_year = start_date.year
+            
             xls = pd.ExcelFile(file_path)
-            
-            # 全シートの最初の会社IDと期数を取得（仮に最初のシート名から推測）
-            # 実際の実装では、ユーザーに選択させる必要がある場合もある
-            
-            # ここでは簡易的に、セッションから会社IDと期数を取得する想定
-            # 実際の呼び出し元でこれらを渡すように修正が必要
-            
             imported_data = {item: {} for item in self.all_items}
             
             for sheet_name in xls.sheet_names:
@@ -826,12 +840,18 @@ class DataProcessor:
                 for r in range(min(20, len(df))):
                     for c in range(len(df.columns)):
                         val = str(df.iloc[r, c])
-                        # 月のパターンを検出
+                        # 月のパターンを検出 (例: "8月度", "9月度")
                         match = re.search(r'(\d{1,2})月', val)
                         if match:
                             month_num = int(match.group(1))
-                            # 年度を推定（簡易的に現在年）
-                            year = datetime.now().year
+                            
+                            # 会計年度に基づいて年を決定
+                            # 開始月以降は当年、開始月より前は翌年
+                            if month_num >= fiscal_start_month:
+                                year = fiscal_start_year
+                            else:
+                                year = fiscal_start_year + 1
+                            
                             month_str = f"{year}-{month_num:02d}"
                             month_cols[month_str] = c
                 
