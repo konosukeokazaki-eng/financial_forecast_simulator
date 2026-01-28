@@ -146,7 +146,8 @@ class DataProcessor:
                 port=result.port
             )
         else:
-            return self._get_connection()
+            import sqlite3
+            return sqlite3.connect(self.db_path)
     
     def _execute_query(self, query, params=None):
         """クエリを実行（PostgreSQLとSQLiteの互換性対応）"""
