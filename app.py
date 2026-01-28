@@ -502,7 +502,7 @@ else:
                 st.markdown(f"""
                 <div class="summary-card-blue">
                     <div class="card-title">売上高</div>
-                    <div class="card-value">¥{int(sales_total/1000000):,}M</div>
+                    <div class="card-value">¥{int(sales_total):,}</div>
                     <div class="card-subtitle">期末着地予測</div>
                 </div>
                 """, unsafe_allow_html=True)
