@@ -455,14 +455,10 @@ class DataProcessor:
 
     def get_company_periods(self, comp_id):
         """指定会社の会計期一覧を取得"""
-        conn = self._get_connection()
-        df = self._read_sql_query(
+        return self._read_sql_query(
             "SELECT * FROM fiscal_periods WHERE comp_id = ? ORDER BY period_num DESC",
-            conn,
             params=(comp_id,)
         )
-        conn.close()
-        return df
 
     def add_fiscal_period(self, comp_id, period_num, start_date, end_date):
         """会計期を追加"""
@@ -534,15 +530,10 @@ class DataProcessor:
 
     def load_actual_data(self, fiscal_period_id):
         """実績データを読み込み"""
-        conn = self._get_connection()
-        try:
-            df = self._read_sql_query(
-                "SELECT item_name as 項目名, month, amount FROM actual_data WHERE fiscal_period_id = ?",
-                conn,
-                params=(fiscal_period_id,)
-            )
-        finally:
-            conn.close()
+        df = self._read_sql_query(
+            "SELECT item_name as 項目名, month, amount FROM actual_data WHERE fiscal_period_id = ?",
+            params=(fiscal_period_id,)
+        )
         
         if df.empty:
             return pd.DataFrame({'項目名': self.all_items}).fillna(0)
@@ -560,15 +551,10 @@ class DataProcessor:
 
     def load_forecast_data(self, fiscal_period_id, scenario):
         """予測データを読み込み"""
-        conn = self._get_connection()
-        try:
-            df = self._read_sql_query(
-                "SELECT item_name as 項目名, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?",
-                conn,
-                params=(fiscal_period_id, scenario)
-            )
-        finally:
-            conn.close()
+        df = self._read_sql_query(
+            "SELECT item_name as 項目名, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?",
+            params=(fiscal_period_id, scenario)
+        )
         
         if df.empty:
             return pd.DataFrame({'項目名': self.all_items}).fillna(0)
@@ -634,25 +620,17 @@ class DataProcessor:
 
     def load_sub_accounts(self, fiscal_period_id, scenario):
         """補助科目データを読み込み"""
-        conn = self._get_connection()
-        df = self._read_sql_query(
+        return self._read_sql_query(
             "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ?",
-            conn,
             params=(fiscal_period_id, scenario)
         )
-        conn.close()
-        return df
 
     def get_sub_accounts_for_parent(self, fiscal_period_id, scenario, parent_item):
         """特定親項目の補助科目を取得"""
-        conn = self._get_connection()
-        df = self._read_sql_query(
+        return self._read_sql_query(
             "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ?",
-            conn,
             params=(fiscal_period_id, scenario, parent_item)
         )
-        conn.close()
-        return df
 
     def save_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name, values_dict):
         """補助科目を保存"""
