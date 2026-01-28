@@ -17,11 +17,21 @@ class DataProcessor:
             try:
                 db_config = st.secrets['database']
                 self.conn_string = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
-                self.use_postgres = True
-                print("✅ PostgreSQL接続を使用します")
+                
+                # 接続テスト
+                test_conn = self._test_postgres_connection()
+                if test_conn:
+                    self.use_postgres = True
+                    print("✅ PostgreSQL接続成功 - Supabaseを使用します")
+                    print(f"   ホスト: {db_config['host']}")
+                else:
+                    print("⚠️ PostgreSQL接続テスト失敗 - SQLiteにフォールバック")
+                    self.use_postgres = False
             except Exception as e:
-                print(f"⚠️ PostgreSQL接続に失敗、SQLiteにフォールバック: {e}")
+                print(f"⚠️ PostgreSQL設定エラー、SQLiteにフォールバック: {e}")
                 self.use_postgres = False
+        else:
+            print("ℹ️ Supabase設定なし - SQLiteを使用します")
         
         # SQLiteの場合
         if not self.use_postgres:
@@ -30,8 +40,29 @@ class DataProcessor:
                 self.db_path = os.path.join(base_dir, "financial_data.db")
             else:
                 self.db_path = db_path
+            print(f"📁 SQLiteデータベース: {self.db_path}")
         
         self._init_db()
+    
+    def _test_postgres_connection(self):
+        """PostgreSQL接続をテスト"""
+        try:
+            import psycopg2
+            from urllib.parse import urlparse
+            
+            result = urlparse(self.conn_string)
+            conn = psycopg2.connect(
+                database=result.path[1:],
+                user=result.username,
+                password=result.password,
+                host=result.hostname,
+                port=result.port
+            )
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"   接続テスト失敗: {e}")
+            return False
         
         # 標準的な勘定科目リスト (要件定義書の3.1に準拠)
         self.all_items = [
