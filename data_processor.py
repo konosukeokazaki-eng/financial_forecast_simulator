@@ -4,14 +4,33 @@ import numpy as np
 import re
 import os
 from datetime import datetime, timedelta
+import streamlit as st
 
 class DataProcessor:
     def __init__(self, db_path=None):
-        if db_path is None:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            self.db_path = os.path.join(base_dir, "financial_data.db")
-        else:
-            self.db_path = db_path
+        # データベース接続の設定
+        self.use_postgres = False
+        self.conn_string = None
+        
+        # Streamlit Secretsからデータベース設定を取得
+        if hasattr(st, 'secrets') and 'database' in st.secrets:
+            try:
+                db_config = st.secrets['database']
+                self.conn_string = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
+                self.use_postgres = True
+                print("✅ PostgreSQL接続を使用します")
+            except Exception as e:
+                print(f"⚠️ PostgreSQL接続に失敗、SQLiteにフォールバック: {e}")
+                self.use_postgres = False
+        
+        # SQLiteの場合
+        if not self.use_postgres:
+            if db_path is None:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                self.db_path = os.path.join(base_dir, "financial_data.db")
+            else:
+                self.db_path = db_path
+        
         self._init_db()
         
         # 標準的な勘定科目リスト (要件定義書の3.1に準拠)
@@ -111,10 +130,55 @@ class DataProcessor:
             "特別損失合計": ["特別損失", "特別損失合計"],
             "法人税、住民税及び事業税": ["法人税", "法人税等", "法人税、住民税及び事業税"]
         }
+    
+    def _get_connection(self):
+        """データベース接続を取得"""
+        if self.use_postgres:
+            import psycopg2
+            from urllib.parse import urlparse
+            
+            result = urlparse(self.conn_string)
+            return psycopg2.connect(
+                database=result.path[1:],
+                user=result.username,
+                password=result.password,
+                host=result.hostname,
+                port=result.port
+            )
+        else:
+            return self._get_connection()
+    
+    def _execute_query(self, query, params=None):
+        """クエリを実行（PostgreSQLとSQLiteの互換性対応）"""
+        if self.use_postgres:
+            # PostgreSQL用にプレースホルダーを変換 (? → %s)
+            query = query.replace('?', '%s')
+        
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            conn.commit()
+            return cursor
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
 
     def _init_db(self):
         """データベーステーブルの初期化 (要件定義書の2.3に準拠)"""
-        conn = sqlite3.connect(self.db_path)
+        if self.use_postgres:
+            self._init_postgres_db()
+        else:
+            self._init_sqlite_db()
+    
+    def _init_sqlite_db(self):
+        """SQLiteデータベースの初期化"""
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # 2.3.1 会社マスタ
@@ -219,18 +283,167 @@ class DataProcessor:
         
         conn.commit()
         conn.close()
+    
+    def _init_postgres_db(self):
+        """PostgreSQLデータベースの初期化"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        # 2.3.1 会社マスタ
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS companies (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_name ON companies(name)')
+        
+        # 2.3.2 会計期マスタ
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS fiscal_periods (
+            id SERIAL PRIMARY KEY,
+            comp_id INTEGER NOT NULL,
+            period_num INTEGER NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (comp_id) REFERENCES companies (id),
+            UNIQUE(comp_id, period_num),
+            CHECK (start_date < end_date)
+        )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_comp_period ON fiscal_periods(comp_id, period_num)')
+        
+        # 2.3.3 実績データ
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS actual_data (
+            id SERIAL PRIMARY KEY,
+            fiscal_period_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            month TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
+            UNIQUE(fiscal_period_id, item_name, month)
+        )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_item ON actual_data(fiscal_period_id, item_name)')
+        
+        # 2.3.4 予測データ
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS forecast_data (
+            id SERIAL PRIMARY KEY,
+            fiscal_period_id INTEGER NOT NULL,
+            scenario TEXT NOT NULL,
+            item_name TEXT NOT NULL,
+            month TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
+            UNIQUE(fiscal_period_id, scenario, item_name, month),
+            CHECK (scenario IN ('現実', '楽観', '悲観'))
+        )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_scenario ON forecast_data(fiscal_period_id, scenario)')
+        
+        # 2.3.5 補助科目
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sub_accounts (
+            id SERIAL PRIMARY KEY,
+            fiscal_period_id INTEGER NOT NULL,
+            scenario TEXT NOT NULL,
+            parent_item TEXT NOT NULL,
+            sub_account_name TEXT NOT NULL,
+            month TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
+            UNIQUE(fiscal_period_id, scenario, parent_item, sub_account_name, month)
+        )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_parent ON sub_accounts(fiscal_period_id, parent_item)')
+        
+        # 2.3.6 勘定科目属性
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS item_attributes (
+            id SERIAL PRIMARY KEY,
+            fiscal_period_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            is_variable INTEGER DEFAULT 0,
+            variable_rate REAL DEFAULT 0.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
+            UNIQUE(fiscal_period_id, item_name),
+            CHECK (is_variable IN (0, 1)),
+            CHECK (variable_rate >= 0 AND variable_rate <= 1)
+        )
+        ''')
+        
+        conn.commit()
+        conn.close()
+    
+    def _read_sql_query(self, query, params=None):
+        """SQLクエリを実行してDataFrameを返す（PostgreSQLとSQLiteの互換性対応）"""
+        if self.use_postgres:
+            # PostgreSQL用にプレースホルダーを変換 (? → %s)
+            query = query.replace('?', '%s')
+        
+        conn = self._get_connection()
+        try:
+            if params:
+                df = self._read_sql_query(query, conn, params=params)
+            else:
+                df = self._read_sql_query(query, conn)
+            return df
+        finally:
+            conn.close()
+    
+    def _sort_months(self, df, fiscal_period_id):
+        """会計期の開始月を考慮して月をソート"""
+        try:
+            # 会計期情報を取得
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT start_date, end_date FROM fiscal_periods WHERE id = ?",
+                (fiscal_period_id,)
+            )
+            result = cursor.fetchone()
+            conn.close()
+            
+            if not result:
+                return df
+            
+            start_date_str, end_date_str = result
+            
+            # YYYY-MM形式の月をdatetimeに変換してソート
+            if 'month' in df.columns:
+                df['_month_dt'] = pd.to_datetime(df['month'] + '-01')
+                df = df.sort_values('_month_dt').drop(columns=['_month_dt'])
+            
+            return df
+        except Exception as e:
+            print(f"Error sorting months: {e}")
+            return df
 
     def get_companies(self):
         """会社一覧を取得"""
-        conn = sqlite3.connect(self.db_path)
-        df = pd.read_sql_query("SELECT * FROM companies ORDER BY name", conn)
-        conn.close()
-        return df
+        return self._read_sql_query("SELECT * FROM companies ORDER BY name")
 
     def add_company(self, company_name):
         """会社を追加"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute("INSERT INTO companies (name) VALUES (?)", (company_name,))
             conn.commit()
@@ -241,8 +454,8 @@ class DataProcessor:
 
     def get_company_periods(self, comp_id):
         """指定会社の会計期一覧を取得"""
-        conn = sqlite3.connect(self.db_path)
-        df = pd.read_sql_query(
+        conn = self._get_connection()
+        df = self._read_sql_query(
             "SELECT * FROM fiscal_periods WHERE comp_id = ? ORDER BY period_num DESC",
             conn,
             params=(comp_id,)
@@ -253,7 +466,7 @@ class DataProcessor:
     def add_fiscal_period(self, comp_id, period_num, start_date, end_date):
         """会計期を追加"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (?, ?, ?, ?)",
@@ -267,7 +480,7 @@ class DataProcessor:
 
     def get_period_info(self, period_id):
         """会計期情報を取得"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM fiscal_periods WHERE id = ?", (period_id,))
         row = cursor.fetchone()
@@ -284,7 +497,7 @@ class DataProcessor:
 
     def get_company_id_from_period_id(self, fiscal_period_id):
         """会計期IDから会社IDを取得"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT comp_id FROM fiscal_periods WHERE id = ?", (fiscal_period_id,))
         result = cursor.fetchone()
@@ -320,18 +533,24 @@ class DataProcessor:
 
     def load_actual_data(self, fiscal_period_id):
         """実績データを読み込み"""
-        conn = sqlite3.connect(self.db_path)
-        df = pd.read_sql_query(
-            "SELECT item_name as 項目名, month, amount FROM actual_data WHERE fiscal_period_id = ?",
-            conn,
-            params=(fiscal_period_id,)
-        )
-        conn.close()
+        conn = self._get_connection()
+        try:
+            df = self._read_sql_query(
+                "SELECT item_name as 項目名, month, amount FROM actual_data WHERE fiscal_period_id = ?",
+                conn,
+                params=(fiscal_period_id,)
+            )
+        finally:
+            conn.close()
         
         if df.empty:
             return pd.DataFrame({'項目名': self.all_items}).fillna(0)
         
         df = df.drop_duplicates(subset=['項目名', 'month'], keep='last')
+        
+        # 月を正しくソート（会計期順）
+        df = self._sort_months(df, fiscal_period_id)
+        
         pivot_df = df.pivot(index='項目名', columns='month', values='amount').reset_index()
         
         all_items_df = pd.DataFrame({'項目名': self.all_items})
@@ -340,18 +559,24 @@ class DataProcessor:
 
     def load_forecast_data(self, fiscal_period_id, scenario):
         """予測データを読み込み"""
-        conn = sqlite3.connect(self.db_path)
-        df = pd.read_sql_query(
-            "SELECT item_name as 項目名, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?",
-            conn,
-            params=(fiscal_period_id, scenario)
-        )
-        conn.close()
+        conn = self._get_connection()
+        try:
+            df = self._read_sql_query(
+                "SELECT item_name as 項目名, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?",
+                conn,
+                params=(fiscal_period_id, scenario)
+            )
+        finally:
+            conn.close()
         
         if df.empty:
             return pd.DataFrame({'項目名': self.all_items}).fillna(0)
         
         df = df.drop_duplicates(subset=['項目名', 'month'], keep='last')
+        
+        # 月を正しくソート（会計期順）
+        df = self._sort_months(df, fiscal_period_id)
+        
         pivot_df = df.pivot(index='項目名', columns='month', values='amount').reset_index()
         
         all_items_df = pd.DataFrame({'項目名': self.all_items})
@@ -360,8 +585,9 @@ class DataProcessor:
 
     def save_actual_item(self, fiscal_period_id, item_name, values_dict):
         """実績データを保存"""
+        conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             
             for month, amount in values_dict.items():
@@ -371,16 +597,21 @@ class DataProcessor:
                 )
             
             conn.commit()
-            conn.close()
             return True
         except Exception as e:
             print(f"Error saving actual data: {e}")
+            if conn:
+                conn.rollback()
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def save_forecast_item(self, fiscal_period_id, scenario, item_name, values_dict):
         """予測データを保存"""
+        conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             
             for month, amount in values_dict.items():
@@ -390,16 +621,20 @@ class DataProcessor:
                 )
             
             conn.commit()
-            conn.close()
             return True
         except Exception as e:
             print(f"Error saving forecast data: {e}")
+            if conn:
+                conn.rollback()
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def load_sub_accounts(self, fiscal_period_id, scenario):
         """補助科目データを読み込み"""
-        conn = sqlite3.connect(self.db_path)
-        df = pd.read_sql_query(
+        conn = self._get_connection()
+        df = self._read_sql_query(
             "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ?",
             conn,
             params=(fiscal_period_id, scenario)
@@ -409,8 +644,8 @@ class DataProcessor:
 
     def get_sub_accounts_for_parent(self, fiscal_period_id, scenario, parent_item):
         """特定親項目の補助科目を取得"""
-        conn = sqlite3.connect(self.db_path)
-        df = pd.read_sql_query(
+        conn = self._get_connection()
+        df = self._read_sql_query(
             "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ?",
             conn,
             params=(fiscal_period_id, scenario, parent_item)
@@ -421,7 +656,7 @@ class DataProcessor:
     def save_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name, values_dict):
         """補助科目を保存"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             
             for month, amount in values_dict.items():
@@ -440,7 +675,7 @@ class DataProcessor:
     def delete_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name):
         """補助科目を削除"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ? AND sub_account_name = ?",
@@ -668,6 +903,16 @@ class DataProcessor:
             # DataFrameに変換
             imported_df = pd.DataFrame.from_dict(imported_data, orient='index').reset_index().rename(columns={'index': '項目名'})
             
+            # 月列を取得してソート
+            month_cols = [c for c in imported_df.columns if c != '項目名']
+            if month_cols:
+                # YYYY-MM形式の月をソート
+                try:
+                    month_cols_sorted = sorted(month_cols, key=lambda x: pd.to_datetime(x + '-01'))
+                    imported_df = imported_df[['項目名'] + month_cols_sorted]
+                except:
+                    pass  # ソート失敗時はそのまま
+            
             # 項目名でソート
             imported_df['項目名'] = pd.Categorical(imported_df['項目名'], categories=self.all_items, ordered=True)
             imported_df = imported_df.sort_values('項目名').reset_index(drop=True)
@@ -679,8 +924,9 @@ class DataProcessor:
 
     def save_extracted_data(self, fiscal_period_id, imported_df):
         """抽出されたDataFrameをデータベースに保存"""
+        conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             
             # 既存のデータを削除
@@ -688,17 +934,27 @@ class DataProcessor:
             
             months = [c for c in imported_df.columns if c != '項目名']
             
+            # バルクインサート用のデータを準備
+            insert_data = []
             for _, row in imported_df.iterrows():
                 for m in months:
                     val = row[m]
                     if val != 0 and not pd.isna(val):
-                        cursor.execute(
-                            "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
-                            (fiscal_period_id, row['項目名'], m, float(val))
-                        )
+                        insert_data.append((fiscal_period_id, row['項目名'], m, float(val)))
+            
+            # 一括挿入
+            if insert_data:
+                cursor.executemany(
+                    "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
+                    insert_data
+                )
             
             conn.commit()
-            conn.close()
             return True, "インポートが完了しました"
         except Exception as e:
+            if conn:
+                conn.rollback()
             return False, str(e)
+        finally:
+            if conn:
+                conn.close()
