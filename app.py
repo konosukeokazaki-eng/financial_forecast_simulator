@@ -249,6 +249,15 @@ if st.sidebar.button("ログアウト", type="secondary"):
 
 st.sidebar.markdown("---")
 
+# データベース接続状態の表示
+if processor.use_postgres:
+    st.sidebar.success("🌐 Supabase接続中")
+else:
+    st.sidebar.warning("💾 SQLite使用中")
+    st.sidebar.caption("⚠️ データは一時的です")
+
+st.sidebar.markdown("---")
+
 # 会社選択
 companies = processor.get_companies()
 if companies.empty:
@@ -1145,7 +1154,7 @@ else:
         elif st.session_state.page == "システム設定":
             st.title("⚙️ システム設定")
             
-            tab1, tab2 = st.tabs(["🏢 会社設定", "📅 会計期間設定"])
+            tab1, tab2, tab3 = st.tabs(["🏢 会社設定", "📅 会計期間設定", "🔍 データベース診断"])
             
             with tab1:
                 st.subheader("会社登録")
@@ -1220,6 +1229,88 @@ else:
                         st.dataframe(periods_list, use_container_width=True)
                     else:
                         st.info("登録されている会計期間がありません")
+            
+            with tab3:
+                st.subheader("🔍 データベース診断")
+                
+                # 接続状態
+                st.markdown("### 📡 接続状態")
+                if processor.use_postgres:
+                    st.success("✅ **PostgreSQL (Supabase) 接続中**")
+                    st.markdown("""
+                    <div class="success-box">
+                        <strong>データは永続的に保存されます</strong><br>
+                        • アプリ再起動後もデータが残ります<br>
+                        • 複数デバイスから同じデータにアクセス可能<br>
+                        • データは安全にクラウドに保存されています
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Supabase設定情報
+                    if hasattr(st, 'secrets') and 'database' in st.secrets:
+                        st.markdown("### ⚙️ Supabase設定")
+                        config_info = {
+                            "項目": ["ホスト", "データベース", "ユーザー", "ポート"],
+                            "値": [
+                                st.secrets['database']['host'],
+                                st.secrets['database']['database'],
+                                st.secrets['database']['user'],
+                                str(st.secrets['database']['port'])
+                            ]
+                        }
+                        st.table(pd.DataFrame(config_info))
+                else:
+                    st.warning("⚠️ **SQLite ローカルデータベース使用中**")
+                    st.markdown("""
+                    <div class="warning-box">
+                        <strong>データは一時的です</strong><br>
+                        • Streamlit Cloudではアプリ再起動時にデータが消えます<br>
+                        • ローカル環境では問題なく動作します<br>
+                        • 永続化するにはSupabaseの設定が必要です
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown("### 🔧 Supabaseを設定するには")
+                    st.markdown("""
+                    1. Streamlit Cloud → あなたのアプリ → Settings → Secrets
+                    2. 以下の設定を追加:
+                    ```toml
+                    [database]
+                    host = "db.xxxxx.supabase.co"
+                    database = "postgres"
+                    user = "postgres"
+                    password = "your-password"
+                    port = 5432
+                    ```
+                    3. アプリを再起動
+                    """)
+                
+                st.markdown("---")
+                
+                # データ統計
+                st.markdown("### 📊 データ統計")
+                
+                companies = processor.get_companies()
+                total_companies = len(companies)
+                
+                st.metric("登録会社数", f"{total_companies}社")
+                
+                if total_companies > 0 and 'selected_comp_id' in st.session_state:
+                    periods = processor.get_company_periods(st.session_state.selected_comp_id)
+                    st.metric("会計期間数", f"{len(periods)}期")
+                
+                # 接続テスト
+                st.markdown("---")
+                st.markdown("### 🧪 接続テスト")
+                
+                if st.button("🔄 データベース接続をテスト", type="primary"):
+                    with st.spinner("接続テスト中..."):
+                        try:
+                            # 簡単なクエリで接続テスト
+                            test_result = processor.get_companies()
+                            st.success(f"✅ 接続成功！会社データを{len(test_result)}件取得しました")
+                        except Exception as e:
+                            st.error(f"❌ 接続失敗: {str(e)}")
 
     else:
         st.warning("⚠️ 会計期間が選択されていません。システム設定から登録してください。")
