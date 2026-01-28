@@ -261,9 +261,13 @@ st.sidebar.markdown("---")
 # 会社選択
 companies = processor.get_companies()
 if companies.empty:
-    st.sidebar.error("会社データがありません")
-    st.session_state.page = "システム設定"
+    st.sidebar.info("🏢 会社を登録してください")
+    st.sidebar.markdown("👉 システム設定から会社を追加")
+    # 強制的にシステム設定ページに
+    if 'page' not in st.session_state or st.session_state.page != "システム設定":
+        st.session_state.page = "システム設定"
     selected_comp_name = ""
+    selected_comp_id = None
 else:
     comp_names = companies['name'].tolist()
     
@@ -290,8 +294,10 @@ else:
     # 期選択
     periods = processor.get_company_periods(selected_comp_id)
     if periods.empty:
-        st.sidebar.warning("期データがありません")
+        st.sidebar.info("📅 会計期間を登録してください")
+        st.sidebar.markdown("👉 システム設定から期を追加")
         selected_period_num = 0
+        selected_period_id = None
     else:
         # 前回の選択を保存
         prev_period_id = st.session_state.get('selected_period_id', None)
@@ -1321,4 +1327,34 @@ else:
                             st.error(f"❌ 接続失敗: {str(e)}")
 
     else:
-        st.warning("⚠️ 会計期間が選択されていません。システム設定から登録してください。")
+        # 会社または期が未登録の場合
+        if companies.empty:
+            st.info("### 👋 ようこそ！財務予測シミュレーターへ")
+            st.markdown("""
+            <div class="info-box">
+                <strong>🚀 はじめての方へ</strong><br><br>
+                まずは以下の手順でセットアップしてください：<br><br>
+                <strong>1️⃣ 会社を登録</strong><br>
+                   ← 左サイドバーの「システム設定」をクリック<br>
+                   → 「会社設定」タブで会社名を入力<br><br>
+                <strong>2️⃣ 会計期間を登録</strong><br>
+                   → 「会計期間設定」タブで期の情報を入力<br><br>
+                <strong>3️⃣ データ入力・インポート</strong><br>
+                   → サイドバーで会社と期を選択後、各機能が使えます
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # クイックアクセス
+            st.markdown("### ⚡ クイックスタート")
+            if st.button("📝 会社を登録する", type="primary", use_container_width=True):
+                st.session_state.page = "システム設定"
+                st.rerun()
+        else:
+            st.warning("### ⚠️ 会計期間が選択されていません")
+            st.markdown("""
+            <div class="warning-box">
+                <strong>会計期間を登録してください</strong><br><br>
+                左サイドバーの「システム設定」→「会計期間設定」タブから<br>
+                会計期間を追加してください。
+            </div>
+            """, unsafe_allow_html=True)
