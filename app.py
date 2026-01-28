@@ -445,15 +445,28 @@ if st.session_state.page == "システム設定":
         
         with st.form("company_form"):
             company_name = st.text_input("会社名", placeholder="例: 株式会社サンプル")
+            submitted = st.form_submit_button("➕ 会社を追加", type="primary")
             
-            if st.form_submit_button("➕ 会社を追加", type="primary"):
+            if submitted:
+                st.write(f"🔍 デバッグ: フォーム送信検知")
+                st.write(f"   入力された会社名: '{company_name}'")
+                
                 if company_name:
-                    success = processor.add_company(company_name)
-                    if success:
-                        st.success(f"✅ 会社 **{company_name}** を追加しました")
-                        st.rerun()
-                    else:
-                        st.error("❌ 会社の追加に失敗しました")
+                    st.write(f"   add_company()を呼び出し中...")
+                    try:
+                        success = processor.add_company(company_name)
+                        st.write(f"   結果: {success}")
+                        
+                        if success:
+                            st.success(f"✅ 会社 **{company_name}** を追加しました")
+                            st.write("   ページをリロードします...")
+                            st.rerun()
+                        else:
+                            st.error("❌ 会社の追加に失敗しました")
+                    except Exception as e:
+                        st.error(f"❌ エラー発生: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
                 else:
                     st.error("❌ 会社名を入力してください")
         
