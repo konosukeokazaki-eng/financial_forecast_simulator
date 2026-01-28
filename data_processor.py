@@ -402,9 +402,9 @@ class DataProcessor:
         conn = self._get_connection()
         try:
             if params:
-                df = self._read_sql_query(query, conn, params=params)
+                df = pd.read_sql_query(query, conn, params=params)
             else:
-                df = self._read_sql_query(query, conn)
+                df = pd.read_sql_query(query, conn)
             return df
         finally:
             conn.close()
