@@ -142,7 +142,7 @@ st.markdown("""
     }
     
     .warning-box {
-        background-color: #fff3cd;
+        background-color: #ff8ca1;
         padding: 1rem;
         border-left: 4px solid #ff7f0e;
         border-radius: 4px;
