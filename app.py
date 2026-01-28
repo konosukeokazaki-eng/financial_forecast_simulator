@@ -1284,10 +1284,10 @@ else:
                     2. 以下の設定を追加:
                     ```toml
                     [database]
-                    host = "db.xxxxx.supabase.co"
+                    host = "db.jbisjvpgedmvuxtbnraw.supabase.co"
                     database = "postgres"
                     user = "postgres"
-                    password = "your-password"
+                    password = "Okazaki0418"
                     port = 5432
                     ```
                     3. アプリを再起動
