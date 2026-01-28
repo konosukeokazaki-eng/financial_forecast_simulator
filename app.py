@@ -257,12 +257,24 @@ if companies.empty:
     selected_comp_name = ""
 else:
     comp_names = companies['name'].tolist()
+    
+    # 前回の選択を保存
+    prev_comp_id = st.session_state.get('selected_comp_id', None)
+    
     selected_comp_name = st.sidebar.selectbox(
         "🏢 会社を選択",
         comp_names,
         key="comp_select"
     )
     selected_comp_id = int(companies[companies['name'] == selected_comp_name]['id'].iloc[0])
+    
+    # 会社が変更された場合、データをリフレッシュ
+    if prev_comp_id != selected_comp_id:
+        # session_stateをクリア（データ再読み込み用）
+        for key in ['actuals_df', 'forecasts_df']:
+            if key in st.session_state:
+                del st.session_state[key]
+    
     st.session_state.selected_comp_id = selected_comp_id
     st.session_state.selected_comp_name = selected_comp_name
 
@@ -272,6 +284,9 @@ else:
         st.sidebar.warning("期データがありません")
         selected_period_num = 0
     else:
+        # 前回の選択を保存
+        prev_period_id = st.session_state.get('selected_period_id', None)
+        
         period_options = [
             f"第{row['period_num']}期 ({row['start_date']} 〜 {row['end_date']})"
             for _, row in periods.iterrows()
@@ -290,6 +305,13 @@ else:
                 selected_period_id = int(period_match['id'].iloc[0])
             else:
                 selected_period_id = int(period_match.iloc[0, 0])
+            
+            # 期が変更された場合、データをリフレッシュ
+            if prev_period_id != selected_period_id:
+                # session_stateをクリア（データ再読み込み用）
+                for key in ['actuals_df', 'forecasts_df']:
+                    if key in st.session_state:
+                        del st.session_state[key]
                 
             st.session_state.selected_period_id = selected_period_id
             st.session_state.selected_period_num = selected_period_num
