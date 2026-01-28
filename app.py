@@ -430,7 +430,7 @@ else:
         return val
     
     # データの読み込み
-    if 'selected_period_id' in st.session_state:
+    if 'selected_period_id' in st.session_state and st.session_state.selected_period_id is not None:
         actuals_df = processor.load_actual_data(st.session_state.selected_period_id)
         forecasts_df = processor.load_forecast_data(st.session_state.selected_period_id, "現実")
         
@@ -1329,26 +1329,32 @@ else:
     else:
         # 会社または期が未登録の場合
         if companies.empty:
-            st.info("### 👋 ようこそ！財務予測シミュレーターへ")
+            st.title("👋 ようこそ！財務予測シミュレーターへ")
+            
             st.markdown("""
-            <div class="info-box">
-                <strong>🚀 はじめての方へ</strong><br><br>
-                まずは以下の手順でセットアップしてください：<br><br>
-                <strong>1️⃣ 会社を登録</strong><br>
-                   ← 左サイドバーの「システム設定」をクリック<br>
-                   → 「会社設定」タブで会社名を入力<br><br>
-                <strong>2️⃣ 会計期間を登録</strong><br>
-                   → 「会計期間設定」タブで期の情報を入力<br><br>
-                <strong>3️⃣ データ入力・インポート</strong><br>
-                   → サイドバーで会社と期を選択後、各機能が使えます
+            <div style="background-color: #e3f2fd; padding: 2rem; border-radius: 10px; margin: 2rem 0;">
+                <h3 style="color: #1976d2; margin-top: 0;">🚀 はじめての方へ</h3>
+                <p style="font-size: 1.1rem; line-height: 1.8;">
+                    まずは以下の手順でセットアップしてください：
+                </p>
+                <div style="background-color: white; padding: 1.5rem; border-radius: 8px; margin: 1rem 0;">
+                    <strong style="font-size: 1.2rem; color: #1976d2;">📍 手順</strong><br><br>
+                    <strong style="color: #d32f2f;">1️⃣ 左サイドバーの「システム設定」をクリック</strong><br>
+                    <span style="font-size: 0.9rem; color: #666;">← 左側のメニューから選択してください</span><br><br>
+                    <strong>2️⃣ 会社設定タブで会社名を入力</strong><br><br>
+                    <strong>3️⃣ 会計期間設定タブで期の情報を入力</strong><br><br>
+                    <strong>4️⃣ サイドバーで会社と期を選択</strong><br>
+                    <span style="font-size: 0.9rem; color: #666;">→ すべての機能が使えるようになります！</span>
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # クイックアクセス
-            st.markdown("### ⚡ クイックスタート")
-            if st.button("📝 会社を登録する", type="primary", use_container_width=True):
-                st.session_state.page = "システム設定"
-                st.rerun()
+            # データベース接続状態を表示
+            if processor.use_postgres:
+                st.success("✅ Supabaseに接続済み - データは永続的に保存されます")
+            else:
+                st.info("ℹ️ ローカルモードで動作中")
+                
         else:
             st.warning("### ⚠️ 会計期間が選択されていません")
             st.markdown("""
