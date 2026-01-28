@@ -681,13 +681,16 @@ else:
             for scenario, rate in st.session_state.scenario_rates.items():
                 temp_forecasts_df = forecasts_df.copy()
                 
+                # DataFrameに存在する予測月のみを使用
+                available_forecast_months = [m for m in forecast_months if m in temp_forecasts_df.columns]
+                
                 for item in processor.all_items:
                     if item == "売上高":
-                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, forecast_months] *= (1 + rate)
+                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, available_forecast_months] *= (1 + rate)
                     elif item == "売上原価":
-                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, forecast_months] *= (1 - rate * 0.5)
+                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.5)
                     elif item in processor.ga_items:
-                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, forecast_months] *= (1 - rate * 0.3)
+                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.3)
                         
                 temp_pl_df = processor.calculate_pl(actuals_df, temp_forecasts_df, split_idx, months)
                 scenario_results[scenario] = temp_pl_df[['項目名', '合計']].set_index('項目名')['合計']
