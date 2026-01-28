@@ -437,14 +437,16 @@ else:
                 st.session_state.selected_period_id
             )
             forecast_months = months[split_idx:]
+            # DataFrameに存在する月のみを使用
+            available_forecast_months = [m for m in forecast_months if m in forecasts_df.columns]
             
             for item in processor.all_items:
                 if item == "売上高":
-                    forecasts_df.loc[forecasts_df['項目名'] == item, forecast_months] *= (1 + rate)
+                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 + rate)
                 elif item == "売上原価":
-                    forecasts_df.loc[forecasts_df['項目名'] == item, forecast_months] *= (1 - rate * 0.5)
+                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.5)
                 elif item in processor.ga_items:
-                    forecasts_df.loc[forecasts_df['項目名'] == item, forecast_months] *= (1 - rate * 0.3)
+                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.3)
                     
             st.session_state.adjusted_forecasts_df = forecasts_df.copy()
         
@@ -740,10 +742,13 @@ else:
             initial_forecast_df = processor.load_forecast_data(st.session_state.selected_period_id, "現実")
             
             actual_months = months[:split_idx]
-            actual_sum = actuals_df[actual_months].sum(axis=1)
+            # DataFrameに存在する月のみを使用
+            available_actual_months = [m for m in actual_months if m in actuals_df.columns]
+            
+            actual_sum = actuals_df[available_actual_months].sum(axis=1) if available_actual_months else pd.Series(0, index=actuals_df.index)
             actual_sum.index = actuals_df['項目名']
             
-            initial_forecast_sum = initial_forecast_df[actual_months].sum(axis=1)
+            initial_forecast_sum = initial_forecast_df[available_actual_months].sum(axis=1) if available_actual_months else pd.Series(0, index=initial_forecast_df.index)
             initial_forecast_sum.index = initial_forecast_df['項目名']
             
             comparison_actual_df = pd.DataFrame({
