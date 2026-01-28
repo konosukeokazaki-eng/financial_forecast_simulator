@@ -563,7 +563,7 @@ else:
                 # スタイル付きデータフレーム
                 def highlight_summary(row):
                     if row['タイプ'] == '要約':
-                        return ['background-color: #e3f2fd; font-weight: bold'] * len(row)
+                        return ['background-color: #5db5f5; font-weight: bold'] * len(row)
                     return [''] * len(row)
                 
                 # タイプ列を使ってスタイルを適用してから削除
