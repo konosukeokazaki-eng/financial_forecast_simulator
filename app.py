@@ -264,10 +264,25 @@ if companies.empty:
     st.sidebar.info("🏢 会社を登録してください")
     st.sidebar.markdown("👉 システム設定から会社を追加")
     # 強制的にシステム設定ページに
-    if 'page' not in st.session_state or st.session_state.page != "システム設定":
-        st.session_state.page = "システム設定"
+    st.session_state.page = "システム設定"
     selected_comp_name = ""
     selected_comp_id = None
+    
+    # メニューを表示（システム設定のみ使用可能）
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📋 メニュー")
+    menu = ["システム設定"]
+    menu_icons = {"システム設定": "⚙️"}
+    
+    selected_menu = st.sidebar.radio(
+        "移動先を選択",
+        menu,
+        index=0,
+        format_func=lambda x: f"{menu_icons.get(x, '•')} {x}",
+        label_visibility="collapsed"
+    )
+    st.session_state.page = selected_menu
+    
 else:
     comp_names = companies['name'].tolist()
     
@@ -429,8 +444,155 @@ else:
             return f"¥{int(val):,}"
         return val
     
-    # データの読み込み
-    if 'selected_period_id' in st.session_state and st.session_state.selected_period_id is not None:
+    # システム設定ページは常に表示（会社・期未登録でも使用可能）
+    if st.session_state.page == "システム設定":
+        st.title("⚙️ システム設定")
+        
+        tab1, tab2, tab3 = st.tabs(["🏢 会社設定", "📅 会計期間設定", "🔍 データベース診断"])
+        
+        with tab1:
+            st.subheader("会社登録")
+            
+            with st.form("company_form"):
+                company_name = st.text_input("会社名", placeholder="例: 株式会社サンプル")
+                
+                if st.form_submit_button("➕ 会社を追加", type="primary"):
+                    if company_name:
+                        success = processor.add_company(company_name)
+                        if success:
+                            st.success(f"✅ 会社 **{company_name}** を追加しました")
+                            st.rerun()
+                        else:
+                            st.error("❌ 会社の追加に失敗しました")
+                    else:
+                        st.error("❌ 会社名を入力してください")
+            
+            st.markdown("---")
+            
+            # 登録済み会社一覧
+            st.subheader("📋 登録済み会社一覧")
+            
+            companies_list = processor.get_companies()
+            if not companies_list.empty:
+                st.dataframe(companies_list, width=800)
+            else:
+                st.info("登録されている会社がありません")
+        
+        with tab2:
+            st.subheader("会計期間登録")
+            
+            # 会社が登録されているかチェック
+            companies_for_period = processor.get_companies()
+            if companies_for_period.empty:
+                st.warning("⚠️ まず会社を登録してください")
+            else:
+                with st.form("period_form"):
+                    comp_id_for_period = st.selectbox(
+                        "会社を選択",
+                        companies_for_period['id'].tolist(),
+                        format_func=lambda x: companies_for_period[companies_for_period['id'] == x]['name'].iloc[0]
+                    )
+                    period_num = st.number_input("期数", min_value=1, step=1, value=1)
+                    start_date = st.date_input("開始日")
+                    end_date = st.date_input("終了日")
+                    
+                    if st.form_submit_button("➕ 期を追加", type="primary"):
+                        if start_date and end_date:
+                            if start_date < end_date:
+                                success = processor.add_period(comp_id_for_period, period_num, str(start_date), str(end_date))
+                                if success:
+                                    st.success(f"✅ 第{period_num}期を追加しました")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ 期の追加に失敗しました")
+                            else:
+                                st.error("❌ 終了日は開始日より後である必要があります")
+                        else:
+                            st.error("❌ すべてのフィールドを入力してください")
+                
+                st.markdown("---")
+                
+                # 登録済み期間一覧
+                st.subheader("📋 登録済み会計期間")
+                
+                if 'selected_comp_id' in st.session_state and st.session_state.selected_comp_id:
+                    periods_list = processor.get_company_periods(st.session_state.selected_comp_id)
+                    if not periods_list.empty:
+                        st.dataframe(periods_list, width=800)
+                    else:
+                        st.info("登録されている会計期間がありません")
+                else:
+                    st.info("会社を選択すると、その会社の期間が表示されます")
+        
+        with tab3:
+            st.subheader("🔍 データベース診断")
+            
+            # 接続状態
+            st.markdown("### 📡 接続状態")
+            if processor.use_postgres:
+                st.success("✅ **PostgreSQL (Supabase) 接続中**")
+                st.markdown("""
+                <div class="success-box">
+                    <strong>データは永続的に保存されます</strong><br>
+                    • アプリ再起動後もデータが残ります<br>
+                    • 複数デバイスから同じデータにアクセス可能<br>
+                    • データは安全にクラウドに保存されています
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Supabase設定情報
+                if hasattr(st, 'secrets') and 'database' in st.secrets:
+                    st.markdown("### ⚙️ Supabase設定")
+                    config_info = {
+                        "項目": ["ホスト", "データベース", "ユーザー", "ポート"],
+                        "値": [
+                            st.secrets['database']['host'],
+                            st.secrets['database']['database'],
+                            st.secrets['database']['user'],
+                            str(st.secrets['database']['port'])
+                        ]
+                    }
+                    st.table(pd.DataFrame(config_info))
+            else:
+                st.warning("⚠️ **SQLite ローカルデータベース使用中**")
+                st.markdown("""
+                <div class="warning-box">
+                    <strong>データは一時的です</strong><br>
+                    • Streamlit Cloudではアプリ再起動時にデータが消えます<br>
+                    • ローカル環境では問題なく動作します<br>
+                    • 永続化するにはSupabaseの設定が必要です
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # データ統計
+            st.markdown("### 📊 データ統計")
+            
+            companies_stat = processor.get_companies()
+            total_companies = len(companies_stat)
+            
+            st.metric("登録会社数", f"{total_companies}社")
+            
+            if total_companies > 0 and 'selected_comp_id' in st.session_state and st.session_state.selected_comp_id:
+                periods_stat = processor.get_company_periods(st.session_state.selected_comp_id)
+                st.metric("会計期間数", f"{len(periods_stat)}期")
+            
+            # 接続テスト
+            st.markdown("---")
+            st.markdown("### 🧪 接続テスト")
+            
+            if st.button("🔄 データベース接続をテスト", type="primary"):
+                with st.spinner("接続テスト中..."):
+                    try:
+                        # 簡単なクエリで接続テスト
+                        test_result = processor.get_companies()
+                        st.success(f"✅ 接続成功！会社データを{len(test_result)}件取得しました")
+                    except Exception as e:
+                        st.error(f"❌ 接続失敗: {str(e)}")
+    
+    # データの読み込み（期が選択されている場合のみ）
+    elif 'selected_period_id' in st.session_state and st.session_state.selected_period_id is not None:
         actuals_df = processor.load_actual_data(st.session_state.selected_period_id)
         forecasts_df = processor.load_forecast_data(st.session_state.selected_period_id, "現実")
         
@@ -1165,166 +1327,6 @@ else:
             
             st.table(pd.DataFrame(summary_data))
         
-        elif st.session_state.page == "システム設定":
-            st.title("⚙️ システム設定")
-            
-            tab1, tab2, tab3 = st.tabs(["🏢 会社設定", "📅 会計期間設定", "🔍 データベース診断"])
-            
-            with tab1:
-                st.subheader("会社登録")
-                
-                with st.form("company_form"):
-                    company_name = st.text_input("会社名", placeholder="例: 株式会社サンプル")
-                    
-                    if st.form_submit_button("➕ 会社を追加", type="primary"):
-                        if company_name:
-                            success = processor.add_company(company_name)
-                            if success:
-                                st.success(f"✅ 会社 **{company_name}** を追加しました")
-                                st.rerun()
-                            else:
-                                st.error("❌ 会社の追加に失敗しました")
-                        else:
-                            st.error("❌ 会社名を入力してください")
-                
-                st.markdown("---")
-                
-                # 登録済み会社一覧
-                st.subheader("📋 登録済み会社一覧")
-                
-                companies_list = processor.get_companies()
-                if not companies_list.empty:
-                    st.dataframe(companies_list, use_container_width=True)
-                else:
-                    st.info("登録されている会社がありません")
-            
-            with tab2:
-                st.subheader("会計期間登録")
-                
-                if 'selected_comp_id' not in st.session_state or not st.session_state.selected_comp_id:
-                    st.warning("⚠️ まず会社を選択してください")
-                else:
-                    with st.form("period_form"):
-                        col1, col2, col3 = st.columns(3)
-                        
-                        with col1:
-                            period_num = st.number_input("期数", min_value=1, step=1, value=1)
-                        with col2:
-                            start_date = st.date_input("期首日")
-                        with col3:
-                            end_date = st.date_input("期末日")
-                        
-                        if st.form_submit_button("➕ 会計期間を追加", type="primary"):
-                            if period_num and start_date and end_date:
-                                if start_date < end_date:
-                                    success = processor.add_fiscal_period(
-                                        st.session_state.selected_comp_id,
-                                        period_num,
-                                        start_date.strftime('%Y-%m-%d'),
-                                        end_date.strftime('%Y-%m-%d')
-                                    )
-                                    if success:
-                                        st.success(f"✅ 第{period_num}期を追加しました")
-                                        st.rerun()
-                                    else:
-                                        st.error("❌ 会計期間の追加に失敗しました")
-                                else:
-                                    st.error("❌ 期末日は期首日より後に設定してください")
-                            else:
-                                st.error("❌ すべてのフィールドを入力してください")
-                    
-                    st.markdown("---")
-                    
-                    # 登録済み期間一覧
-                    st.subheader("📋 登録済み会計期間")
-                    
-                    periods_list = processor.get_company_periods(st.session_state.selected_comp_id)
-                    if not periods_list.empty:
-                        st.dataframe(periods_list, use_container_width=True)
-                    else:
-                        st.info("登録されている会計期間がありません")
-            
-            with tab3:
-                st.subheader("🔍 データベース診断")
-                
-                # 接続状態
-                st.markdown("### 📡 接続状態")
-                if processor.use_postgres:
-                    st.success("✅ **PostgreSQL (Supabase) 接続中**")
-                    st.markdown("""
-                    <div class="success-box">
-                        <strong>データは永続的に保存されます</strong><br>
-                        • アプリ再起動後もデータが残ります<br>
-                        • 複数デバイスから同じデータにアクセス可能<br>
-                        • データは安全にクラウドに保存されています
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Supabase設定情報
-                    if hasattr(st, 'secrets') and 'database' in st.secrets:
-                        st.markdown("### ⚙️ Supabase設定")
-                        config_info = {
-                            "項目": ["ホスト", "データベース", "ユーザー", "ポート"],
-                            "値": [
-                                st.secrets['database']['host'],
-                                st.secrets['database']['database'],
-                                st.secrets['database']['user'],
-                                str(st.secrets['database']['port'])
-                            ]
-                        }
-                        st.table(pd.DataFrame(config_info))
-                else:
-                    st.warning("⚠️ **SQLite ローカルデータベース使用中**")
-                    st.markdown("""
-                    <div class="warning-box">
-                        <strong>データは一時的です</strong><br>
-                        • Streamlit Cloudではアプリ再起動時にデータが消えます<br>
-                        • ローカル環境では問題なく動作します<br>
-                        • 永続化するにはSupabaseの設定が必要です
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    st.markdown("### 🔧 Supabaseを設定するには")
-                    st.markdown("""
-                    1. Streamlit Cloud → あなたのアプリ → Settings → Secrets
-                    2. 以下の設定を追加:
-                    ```toml
-                    [database]
-                    host = "db.jbisjvpgedmvuxtbnraw.supabase.co"
-                    database = "postgres"
-                    user = "postgres"
-                    password = "Okazaki0418"
-                    port = 5432
-                    ```
-                    3. アプリを再起動
-                    """)
-                
-                st.markdown("---")
-                
-                # データ統計
-                st.markdown("### 📊 データ統計")
-                
-                companies = processor.get_companies()
-                total_companies = len(companies)
-                
-                st.metric("登録会社数", f"{total_companies}社")
-                
-                if total_companies > 0 and 'selected_comp_id' in st.session_state:
-                    periods = processor.get_company_periods(st.session_state.selected_comp_id)
-                    st.metric("会計期間数", f"{len(periods)}期")
-                
-                # 接続テスト
-                st.markdown("---")
-                st.markdown("### 🧪 接続テスト")
-                
-                if st.button("🔄 データベース接続をテスト", type="primary"):
-                    with st.spinner("接続テスト中..."):
-                        try:
-                            # 簡単なクエリで接続テスト
-                            test_result = processor.get_companies()
-                            st.success(f"✅ 接続成功！会社データを{len(test_result)}件取得しました")
-                        except Exception as e:
-                            st.error(f"❌ 接続失敗: {str(e)}")
 
     else:
         # 会社または期が未登録の場合
@@ -1339,7 +1341,7 @@ else:
                 </p>
                 <div style="background-color: white; padding: 1.5rem; border-radius: 8px; margin: 1rem 0;">
                     <strong style="font-size: 1.2rem; color: #1976d2;">📍 手順</strong><br><br>
-                    <strong style="color: #d32f2f;">1️⃣ 左サイドバーの「システム設定」をクリック</strong><br>
+                    <strong style="color: #d32f2f;">1️⃣ 左サイドバーの「⚙️ システム設定」をクリック</strong><br>
                     <span style="font-size: 0.9rem; color: #666;">← 左側のメニューから選択してください</span><br><br>
                     <strong>2️⃣ 会社設定タブで会社名を入力</strong><br><br>
                     <strong>3️⃣ 会計期間設定タブで期の情報を入力</strong><br><br>
