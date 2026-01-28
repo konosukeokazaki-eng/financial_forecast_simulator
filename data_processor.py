@@ -5,6 +5,7 @@ import re
 import os
 from datetime import datetime, timedelta
 import streamlit as st
+import sys
 
 class DataProcessor:
     def __init__(self, db_path=None):
@@ -13,42 +14,50 @@ class DataProcessor:
         self.conn_string = None
         
         # Streamlit Secretsからデータベース設定を取得
-        print("🔍 データベース接続チェック開始...")
-        print(f"   hasattr(st, 'secrets'): {hasattr(st, 'secrets')}")
+        sys.stderr.write("=" * 80 + "\n")
+        sys.stderr.write("🔍 データベース接続チェック開始...\n")
+        sys.stderr.write(f"   hasattr(st, 'secrets'): {hasattr(st, 'secrets')}\n")
+        sys.stderr.flush()
         
         if hasattr(st, 'secrets'):
-            print(f"   'database' in st.secrets: {'database' in st.secrets}")
+            sys.stderr.write(f"   'database' in st.secrets: {'database' in st.secrets}\n")
             if 'database' in st.secrets:
-                print(f"   st.secrets['database'] keys: {list(st.secrets['database'].keys())}")
+                sys.stderr.write(f"   st.secrets['database'] keys: {list(st.secrets['database'].keys())}\n")
+            sys.stderr.flush()
         
         if hasattr(st, 'secrets') and 'database' in st.secrets:
             try:
                 db_config = st.secrets['database']
-                print(f"   host: {db_config.get('host', 'NOT SET')}")
-                print(f"   database: {db_config.get('database', 'NOT SET')}")
-                print(f"   user: {db_config.get('user', 'NOT SET')}")
-                print(f"   port: {db_config.get('port', 'NOT SET')}")
-                print(f"   password: {'SET' if db_config.get('password') else 'NOT SET'}")
+                sys.stderr.write(f"   host: {db_config.get('host', 'NOT SET')}\n")
+                sys.stderr.write(f"   database: {db_config.get('database', 'NOT SET')}\n")
+                sys.stderr.write(f"   user: {db_config.get('user', 'NOT SET')}\n")
+                sys.stderr.write(f"   port: {db_config.get('port', 'NOT SET')}\n")
+                sys.stderr.write(f"   password: {'SET' if db_config.get('password') else 'NOT SET'}\n")
+                sys.stderr.flush()
                 
                 self.conn_string = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
                 
                 # 接続テスト
-                print("   接続テストを実行中...")
+                sys.stderr.write("   接続テストを実行中...\n")
+                sys.stderr.flush()
                 test_conn = self._test_postgres_connection()
                 if test_conn:
                     self.use_postgres = True
-                    print("✅ PostgreSQL接続成功 - Supabaseを使用します")
-                    print(f"   ホスト: {db_config['host']}")
+                    sys.stderr.write("✅ PostgreSQL接続成功 - Supabaseを使用します\n")
+                    sys.stderr.write(f"   ホスト: {db_config['host']}\n")
                 else:
-                    print("⚠️ PostgreSQL接続テスト失敗 - SQLiteにフォールバック")
+                    sys.stderr.write("⚠️ PostgreSQL接続テスト失敗 - SQLiteにフォールバック\n")
                     self.use_postgres = False
+                sys.stderr.flush()
             except Exception as e:
-                print(f"⚠️ PostgreSQL設定エラー、SQLiteにフォールバック: {e}")
+                sys.stderr.write(f"⚠️ PostgreSQL設定エラー、SQLiteにフォールバック: {e}\n")
                 import traceback
                 traceback.print_exc()
+                sys.stderr.flush()
                 self.use_postgres = False
         else:
-            print("ℹ️ Supabase設定なし - SQLiteを使用します")
+            sys.stderr.write("ℹ️ Supabase設定なし - SQLiteを使用します\n")
+            sys.stderr.flush()
         
         # SQLiteの場合
         if not self.use_postgres:
@@ -57,7 +66,11 @@ class DataProcessor:
                 self.db_path = os.path.join(base_dir, "financial_data.db")
             else:
                 self.db_path = db_path
-            print(f"📁 SQLiteデータベース: {self.db_path}")
+            sys.stderr.write(f"📁 SQLiteデータベース: {self.db_path}\n")
+            sys.stderr.flush()
+        
+        sys.stderr.write("=" * 80 + "\n")
+        sys.stderr.flush()
         
         self._init_db()
         
