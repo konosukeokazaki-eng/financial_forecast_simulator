@@ -13,12 +13,27 @@ class DataProcessor:
         self.conn_string = None
         
         # Streamlit Secretsからデータベース設定を取得
+        print("🔍 データベース接続チェック開始...")
+        print(f"   hasattr(st, 'secrets'): {hasattr(st, 'secrets')}")
+        
+        if hasattr(st, 'secrets'):
+            print(f"   'database' in st.secrets: {'database' in st.secrets}")
+            if 'database' in st.secrets:
+                print(f"   st.secrets['database'] keys: {list(st.secrets['database'].keys())}")
+        
         if hasattr(st, 'secrets') and 'database' in st.secrets:
             try:
                 db_config = st.secrets['database']
+                print(f"   host: {db_config.get('host', 'NOT SET')}")
+                print(f"   database: {db_config.get('database', 'NOT SET')}")
+                print(f"   user: {db_config.get('user', 'NOT SET')}")
+                print(f"   port: {db_config.get('port', 'NOT SET')}")
+                print(f"   password: {'SET' if db_config.get('password') else 'NOT SET'}")
+                
                 self.conn_string = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
                 
                 # 接続テスト
+                print("   接続テストを実行中...")
                 test_conn = self._test_postgres_connection()
                 if test_conn:
                     self.use_postgres = True
@@ -29,6 +44,8 @@ class DataProcessor:
                     self.use_postgres = False
             except Exception as e:
                 print(f"⚠️ PostgreSQL設定エラー、SQLiteにフォールバック: {e}")
+                import traceback
+                traceback.print_exc()
                 self.use_postgres = False
         else:
             print("ℹ️ Supabase設定なし - SQLiteを使用します")
@@ -642,9 +659,14 @@ class DataProcessor:
         """予測データを保存"""
         conn = None
         try:
+            print(f"💾 予測データ保存開始: {item_name}, シナリオ: {scenario}")
+            print(f"   use_postgres: {self.use_postgres}")
+            print(f"   データ件数: {len(values_dict)}")
+            
             conn = self._get_connection()
             cursor = conn.cursor()
             
+            saved_count = 0
             for month, amount in values_dict.items():
                 if self.use_postgres:
                     # PostgreSQL用のUPSERT
@@ -663,11 +685,15 @@ class DataProcessor:
                         "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
                         (fiscal_period_id, scenario, item_name, month, float(amount))
                     )
+                saved_count += 1
             
             conn.commit()
+            print(f"✅ 保存成功: {saved_count}件のデータを保存しました")
             return True
         except Exception as e:
-            print(f"Error saving forecast data: {e}")
+            print(f"❌ Error saving forecast data: {e}")
+            import traceback
+            traceback.print_exc()
             if conn:
                 conn.rollback()
             return False
