@@ -179,17 +179,29 @@ class DataProcessor:
             from urllib.parse import urlparse
             
             result = urlparse(self.conn_string)
+            sys.stderr.write(f"   接続パラメータ:\n")
+            sys.stderr.write(f"     - database: {result.path[1:]}\n")
+            sys.stderr.write(f"     - user: {result.username}\n")
+            sys.stderr.write(f"     - host: {result.hostname}\n")
+            sys.stderr.write(f"     - port: {result.port}\n")
+            sys.stderr.flush()
+            
             conn = psycopg2.connect(
                 database=result.path[1:],
                 user=result.username,
                 password=result.password,
                 host=result.hostname,
-                port=result.port
+                port=result.port,
+                connect_timeout=10
             )
             conn.close()
             return True
         except Exception as e:
-            print(f"   接続テスト失敗: {e}")
+            sys.stderr.write(f"   ❌ 接続テスト失敗: {type(e).__name__}: {e}\n")
+            import traceback
+            sys.stderr.write("   スタックトレース:\n")
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
             return False
     
     def _get_connection(self):
