@@ -513,7 +513,7 @@ else:
                 st.markdown(f"""
                 <div class="summary-card-green">
                     <div class="card-title">売上総利益</div>
-                    <div class="card-value">¥{int(gp_total/1000000):,}M</div>
+                    <div class="card-value">¥{int(gp_total):,}M</div>
                     <div class="card-subtitle">粗利率: {gp_rate:.1f}%</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -524,7 +524,7 @@ else:
                 st.markdown(f"""
                 <div class="summary-card-orange">
                     <div class="card-title">営業利益</div>
-                    <div class="card-value">¥{int(op_total/1000000):,}M</div>
+                    <div class="card-value">¥{int(op_total):,}M</div>
                     <div class="card-subtitle">営業利益率: {op_rate:.1f}%</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -535,7 +535,7 @@ else:
                 st.markdown(f"""
                 <div class="summary-card">
                     <div class="card-title">経常利益</div>
-                    <div class="card-value">¥{int(ord_total/1000000):,}M</div>
+                    <div class="card-value">¥{int(ord_total):,}M</div>
                     <div class="card-subtitle">経常利益率: {ord_rate:.1f}%</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -547,7 +547,7 @@ else:
                 st.markdown(f"""
                 <div class="{color_class}">
                     <div class="card-title">当期純利益</div>
-                    <div class="card-value">¥{int(net_total/1000000):,}M</div>
+                    <div class="card-value">¥{int(net_total):,}M</div>
                     <div class="card-subtitle">純利益率: {net_rate:.1f}%</div>
                 </div>
                 """, unsafe_allow_html=True)
