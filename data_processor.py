@@ -558,21 +558,36 @@ class DataProcessor:
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (?, ?, ?, ?)",
-                (comp_id, period_num, start_date, end_date)
-            )
+            
+            if self.use_postgres:
+                cursor.execute(
+                    "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (%s, %s, %s, %s)",
+                    (comp_id, period_num, start_date, end_date)
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (?, ?, ?, ?)",
+                    (comp_id, period_num, start_date, end_date)
+                )
+            
             conn.commit()
             conn.close()
             return True
-        except:
+        except Exception as e:
+            sys.stderr.write(f"❌ add_fiscal_period() 失敗: {e}\n")
+            sys.stderr.flush()
             return False
 
     def get_period_info(self, period_id):
         """会計期情報を取得"""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM fiscal_periods WHERE id = ?", (period_id,))
+        
+        if self.use_postgres:
+            cursor.execute("SELECT * FROM fiscal_periods WHERE id = %s", (period_id,))
+        else:
+            cursor.execute("SELECT * FROM fiscal_periods WHERE id = ?", (period_id,))
+        
         row = cursor.fetchone()
         conn.close()
         if row:
@@ -589,7 +604,12 @@ class DataProcessor:
         """会計期IDから会社IDを取得"""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT comp_id FROM fiscal_periods WHERE id = ?", (fiscal_period_id,))
+        
+        if self.use_postgres:
+            cursor.execute("SELECT comp_id FROM fiscal_periods WHERE id = %s", (fiscal_period_id,))
+        else:
+            cursor.execute("SELECT comp_id FROM fiscal_periods WHERE id = ?", (fiscal_period_id,))
+        
         result = cursor.fetchone()
         conn.close()
         return result[0] if result else None
@@ -807,10 +827,18 @@ class DataProcessor:
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute(
-                "DELETE FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ? AND sub_account_name = ?",
-                (fiscal_period_id, scenario, parent_item, sub_account_name)
-            )
+            
+            if self.use_postgres:
+                cursor.execute(
+                    "DELETE FROM sub_accounts WHERE fiscal_period_id = %s AND scenario = %s AND parent_item = %s AND sub_account_name = %s",
+                    (fiscal_period_id, scenario, parent_item, sub_account_name)
+                )
+            else:
+                cursor.execute(
+                    "DELETE FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ? AND sub_account_name = ?",
+                    (fiscal_period_id, scenario, parent_item, sub_account_name)
+                )
+            
             conn.commit()
             conn.close()
             return True
@@ -1080,7 +1108,10 @@ class DataProcessor:
             cursor = conn.cursor()
             
             # 既存のデータを削除
-            cursor.execute("DELETE FROM actual_data WHERE fiscal_period_id = ?", (fiscal_period_id,))
+            if self.use_postgres:
+                cursor.execute("DELETE FROM actual_data WHERE fiscal_period_id = %s", (fiscal_period_id,))
+            else:
+                cursor.execute("DELETE FROM actual_data WHERE fiscal_period_id = ?", (fiscal_period_id,))
             
             months = [c for c in imported_df.columns if c != '項目名']
             
@@ -1094,10 +1125,16 @@ class DataProcessor:
             
             # 一括挿入
             if insert_data:
-                cursor.executemany(
-                    "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
-                    insert_data
-                )
+                if self.use_postgres:
+                    cursor.executemany(
+                        "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (%s, %s, %s, %s)",
+                        insert_data
+                    )
+                else:
+                    cursor.executemany(
+                        "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
+                        insert_data
+                    )
             
             conn.commit()
             return True, "インポートが完了しました"
