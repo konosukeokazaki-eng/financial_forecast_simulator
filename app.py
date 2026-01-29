@@ -791,7 +791,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     values='合計',
                     names='項目名',
                     title="販売管理費の内訳",
-                    hole=0.8,
+                    hole=0.3,
                     color_discrete_sequence=px.colors.qualitative.Pastel
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
