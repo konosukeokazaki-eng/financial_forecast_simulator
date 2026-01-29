@@ -1,4 +1,3 @@
-import sqlite3
 import pandas as pd
 import numpy as np
 import re
@@ -292,13 +291,10 @@ class DataProcessor:
             month TEXT NOT NULL,
             amount REAL NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
             UNIQUE(fiscal_period_id, item_name, month)
         )
         ''')
-        
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_item ON actual_data(fiscal_period_id, item_name)')
         
         # 2.3.4 予測データ
         cursor.execute('''
@@ -310,16 +306,12 @@ class DataProcessor:
             month TEXT NOT NULL,
             amount REAL NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
-            UNIQUE(fiscal_period_id, scenario, item_name, month),
-            CHECK (scenario IN ('現実', '楽観', '悲観'))
+            UNIQUE(fiscal_period_id, scenario, item_name, month)
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_scenario ON forecast_data(fiscal_period_id, scenario)')
-        
-        # 2.3.5 補助科目
+        # 2.3.5 補助科目データ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS sub_accounts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -330,40 +322,20 @@ class DataProcessor:
             month TEXT NOT NULL,
             amount REAL NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
+            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
             UNIQUE(fiscal_period_id, scenario, parent_item, sub_account_name, month)
-        )
-        ''')
-        
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_parent ON sub_accounts(fiscal_period_id, parent_item)')
-        
-        # 2.3.6 勘定科目属性
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS item_attributes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fiscal_period_id INTEGER NOT NULL,
-            item_name TEXT NOT NULL,
-            is_variable INTEGER DEFAULT 0,
-            variable_rate REAL DEFAULT 0.0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
-            UNIQUE(fiscal_period_id, item_name),
-            CHECK (is_variable IN (0, 1)),
-            CHECK (variable_rate >= 0 AND variable_rate <= 1)
         )
         ''')
         
         conn.commit()
         conn.close()
-    
+
     def _init_postgres_db(self):
         """PostgreSQLデータベースの初期化"""
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        # 2.3.1 会社マスタ
+        # 会社マスタ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS companies (
             id SERIAL PRIMARY KEY,
@@ -372,133 +344,118 @@ class DataProcessor:
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_name ON companies(name)')
-        
-        # 2.3.2 会計期マスタ
+        # 会計期マスタ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS fiscal_periods (
             id SERIAL PRIMARY KEY,
-            comp_id INTEGER NOT NULL,
+            comp_id INTEGER NOT NULL REFERENCES companies(id),
             period_num INTEGER NOT NULL,
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (comp_id) REFERENCES companies (id),
-            UNIQUE(comp_id, period_num),
-            CHECK (start_date < end_date)
+            UNIQUE(comp_id, period_num)
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_comp_period ON fiscal_periods(comp_id, period_num)')
-        
-        # 2.3.3 実績データ
+        # 実績データ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS actual_data (
             id SERIAL PRIMARY KEY,
-            fiscal_period_id INTEGER NOT NULL,
+            fiscal_period_id INTEGER NOT NULL REFERENCES fiscal_periods(id),
             item_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount DOUBLE PRECISION NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
             UNIQUE(fiscal_period_id, item_name, month)
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_item ON actual_data(fiscal_period_id, item_name)')
-        
-        # 2.3.4 予測データ
+        # 予測データ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS forecast_data (
             id SERIAL PRIMARY KEY,
-            fiscal_period_id INTEGER NOT NULL,
+            fiscal_period_id INTEGER NOT NULL REFERENCES fiscal_periods(id),
             scenario TEXT NOT NULL,
             item_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount DOUBLE PRECISION NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
-            UNIQUE(fiscal_period_id, scenario, item_name, month),
-            CHECK (scenario IN ('現実', '楽観', '悲観'))
+            UNIQUE(fiscal_period_id, scenario, item_name, month)
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_scenario ON forecast_data(fiscal_period_id, scenario)')
-        
-        # 2.3.5 補助科目
+        # 補助科目データ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS sub_accounts (
             id SERIAL PRIMARY KEY,
-            fiscal_period_id INTEGER NOT NULL,
+            fiscal_period_id INTEGER NOT NULL REFERENCES fiscal_periods(id),
             scenario TEXT NOT NULL,
             parent_item TEXT NOT NULL,
             sub_account_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount DOUBLE PRECISION NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
             UNIQUE(fiscal_period_id, scenario, parent_item, sub_account_name, month)
-        )
-        ''')
-        
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_parent ON sub_accounts(fiscal_period_id, parent_item)')
-        
-        # 2.3.6 勘定科目属性
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS item_attributes (
-            id SERIAL PRIMARY KEY,
-            fiscal_period_id INTEGER NOT NULL,
-            item_name TEXT NOT NULL,
-            is_variable INTEGER DEFAULT 0,
-            variable_rate REAL DEFAULT 0.0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
-            UNIQUE(fiscal_period_id, item_name),
-            CHECK (is_variable IN (0, 1)),
-            CHECK (variable_rate >= 0 AND variable_rate <= 1)
         )
         ''')
         
         conn.commit()
         conn.close()
-    
+
     def _read_sql_query(self, query, params=None):
         """SQLクエリを実行してDataFrameを返す（PostgreSQLとSQLiteの互換性対応）"""
         if self.use_postgres:
             # PostgreSQL用にプレースホルダーを変換 (? → %s)
             query = query.replace('?', '%s')
         
+        # IDの型変換（SQLiteでバイナリになる問題への対策）
+        if params:
+            new_params = []
+            for p in params:
+                if isinstance(p, bytes):
+                    try:
+                        new_params.append(int.from_bytes(p, 'little'))
+                    except:
+                        new_params.append(p)
+                else:
+                    new_params.append(p)
+            params = tuple(new_params)
+
         conn = self._get_connection()
         try:
-            if params:
-                df = pd.read_sql_query(query, conn, params=params)
-            else:
-                df = pd.read_sql_query(query, conn)
+            df = pd.read_sql_query(query, conn, params=params)
+            
+            # SQLiteでIDがバイナリ形式で返ってくる場合の対策
+            for col in df.columns:
+                if col.endswith('_id') or col == 'id':
+                    df[col] = df[col].apply(lambda x: int.from_bytes(x, 'little') if isinstance(x, bytes) else x)
+            
             return df
         finally:
             conn.close()
-    
+
     def _sort_months(self, df, fiscal_period_id):
-        """会計期の開始月を考慮して月をソート"""
+        """月を会計期間の順序でソート"""
         try:
-            # 会計期情報を取得
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT start_date, end_date FROM fiscal_periods WHERE id = ?",
-                (fiscal_period_id,)
-            )
-            result = cursor.fetchone()
-            conn.close()
-            
-            if not result:
+            period = self.get_period_info(fiscal_period_id)
+            if not period:
                 return df
             
-            start_date_str, end_date_str = result
+            start_date = datetime.strptime(period['start_date'], '%Y-%m-%d')
+            end_date = datetime.strptime(period['end_date'], '%Y-%m-%d')
+            
+            # 会計期間の月リストを作成
+            months_order = []
+            curr = start_date
+            while curr <= end_date:
+                months_order.append(curr.strftime('%Y-%m'))
+                if curr.month == 12:
+                    curr = curr.replace(year=curr.year + 1, month=1)
+                else:
+                    curr = curr.replace(month=curr.month + 1)
+            
+            # ソート用のマッピング
+            order_map = {m: i for i, m in enumerate(months_order)}
             
             # YYYY-MM形式の月をdatetimeに変換してソート
             if 'month' in df.columns:
@@ -556,6 +513,10 @@ class DataProcessor:
     def add_fiscal_period(self, comp_id, period_num, start_date, end_date):
         """会計期を追加"""
         try:
+            # IDの型変換
+            if isinstance(comp_id, bytes):
+                comp_id = int.from_bytes(comp_id, 'little')
+
             conn = self._get_connection()
             cursor = conn.cursor()
             
@@ -580,6 +541,10 @@ class DataProcessor:
 
     def get_period_info(self, period_id):
         """会計期情報を取得"""
+        # IDの型変換
+        if isinstance(period_id, bytes):
+            period_id = int.from_bytes(period_id, 'little')
+
         conn = self._get_connection()
         cursor = conn.cursor()
         
@@ -591,9 +556,17 @@ class DataProcessor:
         row = cursor.fetchone()
         conn.close()
         if row:
+            # SQLiteでIDがバイナリ形式で返ってくる場合の対策
+            row_id = row[0]
+            if isinstance(row_id, bytes):
+                row_id = int.from_bytes(row_id, 'little')
+            row_comp_id = row[1]
+            if isinstance(row_comp_id, bytes):
+                row_comp_id = int.from_bytes(row_comp_id, 'little')
+
             return {
-                "id": row[0],
-                "comp_id": row[1],
+                "id": row_id,
+                "comp_id": row_comp_id,
                 "period_num": row[2],
                 "start_date": row[3],
                 "end_date": row[4]
@@ -602,6 +575,10 @@ class DataProcessor:
 
     def get_company_id_from_period_id(self, fiscal_period_id):
         """会計期IDから会社IDを取得"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         conn = self._get_connection()
         cursor = conn.cursor()
         
@@ -612,7 +589,10 @@ class DataProcessor:
         
         result = cursor.fetchone()
         conn.close()
-        return result[0] if result else None
+        if result:
+            res = result[0]
+            return int.from_bytes(res, 'little') if isinstance(res, bytes) else res
+        return None
 
     def get_fiscal_months(self, comp_id, fiscal_period_id):
         """会計期の月リストを取得"""
@@ -643,6 +623,10 @@ class DataProcessor:
 
     def load_actual_data(self, fiscal_period_id):
         """実績データを読み込み"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         df = self._read_sql_query(
             "SELECT item_name as 項目名, month, amount FROM actual_data WHERE fiscal_period_id = ?",
             params=(fiscal_period_id,)
@@ -664,6 +648,10 @@ class DataProcessor:
 
     def load_forecast_data(self, fiscal_period_id, scenario):
         """予測データを読み込み"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         df = self._read_sql_query(
             "SELECT item_name as 項目名, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?",
             params=(fiscal_period_id, scenario)
@@ -685,6 +673,10 @@ class DataProcessor:
 
     def save_actual_item(self, fiscal_period_id, item_name, values_dict):
         """実績データを保存"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         conn = None
         try:
             conn = self._get_connection()
@@ -723,6 +715,10 @@ class DataProcessor:
 
     def save_forecast_item(self, fiscal_period_id, scenario, item_name, values_dict):
         """予測データを保存"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         conn = None
         try:
             sys.stderr.write(f"💾 予測データ保存開始: {item_name}, シナリオ: {scenario}\n")
@@ -772,20 +768,32 @@ class DataProcessor:
 
     def load_sub_accounts(self, fiscal_period_id, scenario):
         """補助科目データを読み込み"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         return self._read_sql_query(
             "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ?",
             params=(fiscal_period_id, scenario)
         )
 
     def get_sub_accounts_for_parent(self, fiscal_period_id, scenario, parent_item):
-        """特定親項目の補助科目を取得"""
+        """親項目に紐づく補助科目を取得"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         return self._read_sql_query(
             "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ?",
             params=(fiscal_period_id, scenario, parent_item)
         )
 
     def save_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name, values_dict):
-        """補助科目を保存"""
+        """補助科目データを保存"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         conn = None
         try:
             conn = self._get_connection()
@@ -793,7 +801,6 @@ class DataProcessor:
             
             for month, amount in values_dict.items():
                 if self.use_postgres:
-                    # PostgreSQL用のUPSERT
                     cursor.execute(
                         """
                         INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) 
@@ -804,200 +811,198 @@ class DataProcessor:
                         (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
                     )
                 else:
-                    # SQLite用のUPSERT
                     cursor.execute(
                         "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) VALUES (?, ?, ?, ?, ?, ?)",
                         (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
                     )
             
             conn.commit()
-            return True
+            return True, "補助科目を保存しました"
         except Exception as e:
-            sys.stderr.write(f"Error saving sub account: {e}\n")
-            sys.stderr.flush()
             if conn:
                 conn.rollback()
-            return False
+            return False, str(e)
         finally:
             if conn:
                 conn.close()
 
     def delete_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name):
         """補助科目を削除"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            
             if self.use_postgres:
-                cursor.execute(
+                self._execute_query(
                     "DELETE FROM sub_accounts WHERE fiscal_period_id = %s AND scenario = %s AND parent_item = %s AND sub_account_name = %s",
                     (fiscal_period_id, scenario, parent_item, sub_account_name)
                 )
             else:
-                cursor.execute(
+                self._execute_query(
                     "DELETE FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ? AND sub_account_name = ?",
                     (fiscal_period_id, scenario, parent_item, sub_account_name)
+                )
+            return True, "補助科目を削除しました"
+        except Exception as e:
+            return False, str(e)
+
+    def calculate_pl(self, actuals_df, forecasts_df, split_idx, months):
+        """損益計算書(PL)を計算"""
+        pl_df = pd.DataFrame(columns=['項目名'] + months + ['合計'])
+        
+        # 実績と予測を結合
+        combined_data = []
+        for item in self.all_items:
+            row_data = {'項目名': item}
+            actual_row = actuals_df[actuals_df['項目名'] == item]
+            forecast_row = forecasts_df[forecasts_df['項目名'] == item]
+            
+            total = 0
+            for i, month in enumerate(months):
+                if i < split_idx:
+                    val = actual_row[month].iloc[0] if not actual_row.empty and month in actual_row.columns else 0
+                else:
+                    val = forecast_row[month].iloc[0] if not forecast_row.empty and month in forecast_row.columns else 0
+                row_data[month] = val
+                total += val
+            
+            row_data['合計'] = total
+            combined_data.append(row_data)
+        
+        pl_df = pd.DataFrame(combined_data)
+        
+        # 計算項目の算出
+        def get_row_values(item_name):
+            row = pl_df[pl_df['項目名'] == item_name]
+            if row.empty:
+                return np.zeros(len(months) + 1)
+            return row[months + ['合計']].values[0]
+
+        # 1. 売上総利益 = 売上高 - 売上原価
+        sales = get_row_values("売上高")
+        cogs = get_row_values("売上原価")
+        gp = sales - cogs
+        pl_df.loc[pl_df['項目名'] == "売上総損益金額", months + ['合計']] = gp
+        
+        # 2. 販売管理費計
+        ga_total = np.zeros(len(months) + 1)
+        for item in self.ga_items:
+            ga_total += get_row_values(item)
+        pl_df.loc[pl_df['項目名'] == "販売管理費計", months + ['合計']] = ga_total
+        
+        # 3. 営業利益 = 売上総利益 - 販売管理費計
+        op = gp - ga_total
+        pl_df.loc[pl_df['項目名'] == "営業損益金額", months + ['合計']] = op
+        
+        # 4. 経常利益 = 営業利益 + 営業外収益 - 営業外費用
+        non_op_inc = get_row_values("営業外収益合計")
+        non_op_exp = get_row_values("営業外費用合計")
+        ord_profit = op + non_op_inc - non_op_exp
+        pl_df.loc[pl_df['項目名'] == "経常損益金額", months + ['合計']] = ord_profit
+        
+        # 5. 税引前当期純利益 = 経常利益 + 特別利益 - 特別損失
+        sp_inc = get_row_values("特別利益合計")
+        sp_exp = get_row_values("特別損失合計")
+        pre_tax_profit = ord_profit + sp_inc - sp_exp
+        pl_df.loc[pl_df['項目名'] == "税引前当期純損益金額", months + ['合計']] = pre_tax_profit
+        
+        # 6. 当期純利益 = 税引前当期純利益 - 法人税等
+        taxes = get_row_values("法人税、住民税及び事業税")
+        net_profit = pre_tax_profit - taxes
+        pl_df.loc[pl_df['項目名'] == "当期純損益金額", months + ['合計']] = net_profit
+        
+        # 表示用のタイプ分け
+        pl_df['タイプ'] = '詳細'
+        pl_df.loc[pl_df['項目名'].isin(self.calculated_items), 'タイプ'] = '要約'
+        pl_df.loc[pl_df['項目名'] == "売上高", 'タイプ'] = '要約'
+        pl_df.loc[pl_df['項目名'] == "売上原価", 'タイプ'] = '要約'
+        
+        return pl_df
+
+    def register_company(self, name):
+        """会社を登録（重複チェック付き）"""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # 重複チェック
+            if self.use_postgres:
+                cursor.execute("SELECT id FROM companies WHERE name = %s", (name,))
+            else:
+                cursor.execute("SELECT id FROM companies WHERE name = ?", (name,))
+            
+            if cursor.fetchone():
+                conn.close()
+                return False, f"会社名 '{name}' は既に登録されています"
+            
+            if self.use_postgres:
+                cursor.execute("INSERT INTO companies (name) VALUES (%s)", (name,))
+            else:
+                cursor.execute("INSERT INTO companies (name) VALUES (?)", (name,))
+            
+            conn.commit()
+            conn.close()
+            return True, f"会社 '{name}' を登録しました"
+        except Exception as e:
+            return False, str(e)
+
+    def register_fiscal_period(self, comp_id, period_num, start_date, end_date):
+        """会計期を登録（重複チェック付き）"""
+        try:
+            # IDの型変換
+            if isinstance(comp_id, bytes):
+                comp_id = int.from_bytes(comp_id, 'little')
+
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # 重複チェック
+            if self.use_postgres:
+                cursor.execute("SELECT id FROM fiscal_periods WHERE comp_id = %s AND period_num = %s", (comp_id, period_num))
+            else:
+                cursor.execute("SELECT id FROM fiscal_periods WHERE comp_id = ? AND period_num = ?", (comp_id, period_num))
+            
+            if cursor.fetchone():
+                conn.close()
+                return False, f"第{period_num}期は既に登録されています"
+            
+            if self.use_postgres:
+                cursor.execute(
+                    "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (%s, %s, %s, %s)",
+                    (comp_id, period_num, start_date, end_date)
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (?, ?, ?, ?)",
+                    (comp_id, period_num, start_date, end_date)
                 )
             
             conn.commit()
             conn.close()
-            return True
-        except:
-            return False
+            return True, f"第{period_num}期を登録しました"
+        except Exception as e:
+            return False, str(e)
 
-    def calculate_growth_forecast(self, actuals_df, item_name, split_index, months):
-        """成長率ベースの予測計算 (要件定義書の5.5.2に準拠)"""
-        forecast_values = {}
-        
-        actual_months = months[:split_index]
-        forecast_months = months[split_index:]
-        
-        if len(actual_months) < 2:
-            # 実績が2ヶ月未満の場合は前月踏襲
-            if len(actual_months) == 1:
-                last_value = actuals_df[actuals_df['項目名'] == item_name][actual_months[0]].iloc[0]
-            else:
-                last_value = 0
-            
-            for m in forecast_months:
-                forecast_values[m] = last_value
-            
-            return forecast_values
-        
-        # 前月比成長率の平均を計算
-        item_row = actuals_df[actuals_df['項目名'] == item_name]
-        actual_values = [item_row[m].iloc[0] for m in actual_months]
-        
-        growth_rates = []
-        for i in range(1, len(actual_values)):
-            if actual_values[i-1] != 0:
-                rate = (actual_values[i] - actual_values[i-1]) / abs(actual_values[i-1])
-                growth_rates.append(rate)
-        
-        if len(growth_rates) == 0:
-            avg_growth_rate = 0
-        else:
-            # 異常値を除外 (±100%以上の変動は除外)
-            filtered_rates = [r for r in growth_rates if abs(r) < 1.0]
-            if len(filtered_rates) > 0:
-                avg_growth_rate = np.mean(filtered_rates)
-            else:
-                avg_growth_rate = 0
-        
-        # 予測値の生成
-        last_actual_value = actual_values[-1]
-        current_forecast_value = last_actual_value
-        
-        for m in forecast_months:
-            if last_actual_value != 0:
-                current_forecast_value *= (1 + avg_growth_rate)
-            else:
-                current_forecast_value += avg_growth_rate
-                
-            forecast_values[m] = current_forecast_value
-            
-        return forecast_values
-
-    def calculate_pl(self, actuals_df, forecasts_df, split_index, months):
-        """
-        損益計算書を計算 (要件定義書の3.2に準拠)
-        
-        計算ロジック:
-        - 売上総損益金額 = 売上高 - 売上原価
-        - 販売管理費計 = 33項目の合計
-        - 営業損益金額 = 売上総損益金額 - 販売管理費計
-        - 経常損益金額 = 営業損益金額 + 営業外収益合計 - 営業外費用合計
-        - 税引前当期純損益金額 = 経常損益金額 + 特別利益合計 - 特別損失合計
-        - 当期純損益金額 = 税引前当期純損益金額 - 法人税、住民税及び事業税
-        """
-        df = pd.DataFrame({'項目名': self.all_items})
-        
-        # 実績と予測の結合
-        for i, m in enumerate(months):
-            if i < split_index:
-                # 実績
-                if m in actuals_df.columns:
-                    df[m] = df['項目名'].map(actuals_df.set_index('項目名')[m])
-                else:
-                    df[m] = 0.0
-            else:
-                # 予測
-                if m in forecasts_df.columns:
-                    df[m] = df['項目名'].map(forecasts_df.set_index('項目名')[m])
-                else:
-                    df[m] = 0.0
-        
-        df = df.fillna(0)
-        
-        # 計算項目の算出
-        def get_val(item_name):
-            row = df[df['項目名'] == item_name]
-            if not row.empty:
-                return row[months].iloc[0]
-            return pd.Series(0.0, index=months)
-
-        # 売上総損益金額 = 売上高 - 売上原価
-        sales = get_val("売上高")
-        cogs = get_val("売上原価")
-        gp = sales - cogs
-        df.loc[df['項目名'] == "売上総損益金額", months] = gp.values
-        
-        # 販売管理費計 = 33項目の合計
-        ga_total = pd.Series(0.0, index=months)
-        for item in self.ga_items:
-            ga_total += get_val(item)
-        df.loc[df['項目名'] == "販売管理費計", months] = ga_total.values
-        
-        # 営業損益金額 = 売上総損益金額 - 販売管理費計
-        op = gp - ga_total
-        df.loc[df['項目名'] == "営業損益金額", months] = op.values
-        
-        # 経常損益金額 = 営業損益金額 + 営業外収益合計 - 営業外費用合計
-        non_op_inc = get_val("営業外収益合計")
-        non_op_exp = get_val("営業外費用合計")
-        ord_p = op + non_op_inc - non_op_exp
-        df.loc[df['項目名'] == "経常損益金額", months] = ord_p.values
-        
-        # 税引前当期純損益金額 = 経常損益金額 + 特別利益合計 - 特別損失合計
-        sp_inc = get_val("特別利益合計")
-        sp_exp = get_val("特別損失合計")
-        pre_tax = ord_p + sp_inc - sp_exp
-        df.loc[df['項目名'] == "税引前当期純損益金額", months] = pre_tax.values
-        
-        # 当期純損益金額 = 税引前当期純損益金額 - 法人税、住民税及び事業税
-        tax = get_val("法人税、住民税及び事業税")
-        net_p = pre_tax - tax
-        df.loc[df['項目名'] == "当期純損益金額", months] = net_p.values
-        
-        # 合計列の追加
-        df['実績合計'] = df[months[:split_index]].sum(axis=1)
-        df['予測合計'] = df[months[split_index:]].sum(axis=1)
-        df['合計'] = df['実績合計'] + df['予測合計']
-        
-        # タイプ（要約/詳細）の付与
-        summary_items = ["売上高", "売上総損益金額", "販売管理費計", "営業損益金額", "経常損益金額", "当期純損益金額"]
-        df['タイプ'] = df['項目名'].apply(lambda x: '要約' if x in summary_items else '詳細')
-        
-        return df
-
-    def import_yayoi_excel(self, file_path, fiscal_period_id, preview_only=False):
-        """
-        弥生会計Excelからデータをインポート
-        preview_only=True の場合はプレビュー用のDataFrameを返す
-        """
+    def import_yayoi_excel(self, file_path, fiscal_period_id, preview_only=True):
+        """弥生会計のExcelからデータを抽出"""
         try:
-            # 会計期の情報を取得
+            # IDの型変換
+            if isinstance(fiscal_period_id, bytes):
+                fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
+            # 会計期間の情報を取得
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT start_date, end_date FROM fiscal_periods WHERE id = ?",
-                (fiscal_period_id,)
-            )
+            if self.use_postgres:
+                cursor.execute("SELECT start_date, end_date FROM fiscal_periods WHERE id = %s", (fiscal_period_id,))
+            else:
+                cursor.execute("SELECT start_date, end_date FROM fiscal_periods WHERE id = ?", (fiscal_period_id,))
             result = cursor.fetchone()
             conn.close()
             
             if not result:
-                return pd.DataFrame(), "会計期が見つかりません"
+                return pd.DataFrame(), "会計期間情報が見つかりません"
             
             start_date_str, end_date_str = result
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
@@ -1032,7 +1037,11 @@ class DataProcessor:
                                 year = fiscal_start_year + 1
                             
                             month_str = f"{year}-{month_num:02d}"
-                            month_cols[month_str] = c
+                            
+                            # 会計期間内の月のみを対象とする
+                            month_dt = datetime.strptime(month_str + "-01", '%Y-%m-%d')
+                            if start_date <= month_dt <= end_date:
+                                month_cols[month_str] = c
                 
                 if not month_cols:
                     continue
@@ -1102,6 +1111,10 @@ class DataProcessor:
 
     def save_extracted_data(self, fiscal_period_id, imported_df):
         """抽出されたDataFrameをデータベースに保存"""
+        # IDの型変換
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
         conn = None
         try:
             conn = self._get_connection()
