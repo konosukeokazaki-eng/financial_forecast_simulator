@@ -594,9 +594,16 @@ class DataProcessor:
             return int.from_bytes(res, 'little') if isinstance(res, bytes) else res
         return None
 
-    def get_fiscal_months(self, comp_id, fiscal_period_id):
-        """会計期の月リストを取得"""
-        period = self.get_period_info(fiscal_period_id)
+    def get_fiscal_months(self, comp_id_or_period_id, fiscal_period_id=None):
+        """会計期の月リストを取得 (引数が1つの場合はperiod_idとして扱う)"""
+        # 引数が1つの場合、または2つ目がNoneの場合、最初の引数をperiod_idとして扱う
+        target_period_id = fiscal_period_id if fiscal_period_id is not None else comp_id_or_period_id
+        
+        # IDの型変換
+        if isinstance(target_period_id, bytes):
+            target_period_id = int.from_bytes(target_period_id, 'little')
+            
+        period = self.get_period_info(target_period_id)
         if not period:
             return []
         
@@ -615,7 +622,7 @@ class DataProcessor:
 
     def get_split_index(self, comp_id, current_month, fiscal_period_id):
         """実績と予測の境界インデックスを取得"""
-        months = self.get_fiscal_months(comp_id, fiscal_period_id)
+        months = self.get_fiscal_months(fiscal_period_id)
         try:
             return months.index(current_month) + 1
         except:
