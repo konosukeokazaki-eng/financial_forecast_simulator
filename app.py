@@ -715,7 +715,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     .apply(highlight_summary, axis=1)\
                     .format(lambda x: f"¥{int(x):,}" if isinstance(x, (int, float)) else x)
                 
-                st.dataframe(styled_df, use_container_width=True, height=500)
+                st.dataframe(styled_df, width="stretch", height=500)
                 
             with tab2:
                 st.subheader("月次推移グラフ")
@@ -780,7 +780,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 fig.update_yaxes(title_text="売上高 (円)", secondary_y=False)
                 fig.update_yaxes(title_text="営業利益 (円)", secondary_y=True)
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
                 
                 # 費用構成の円グラフ
                 st.subheader("費用構成分析（通期予測）")
@@ -794,7 +794,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     hole=0.4,
                     color_discrete_sequence=px.colors.qualitative.Pastel
                 )
-                st.plotly_chart(fig_pie, use_container_width=True)
+                st.plotly_chart(fig_pie, width="stretch")
 
         elif st.session_state.page == "損益計算書 (PL)":
             st.title("📄 損益計算書 (PL)")
@@ -820,9 +820,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # フォーマット
             formatted_df = display_df.style\
                 .format(lambda x: f"¥{int(x):,}" if isinstance(x, (int, float)) else x)\
-                .apply(lambda row: ['background-color: #245280; font-weight: bold' if row['タイプ'] == '要約' else '' for _ in row], axis=1)
+                .apply(lambda row: ['background-color: #f8f9fa; font-weight: bold' if row['タイプ'] == '要約' else '' for _ in row], axis=1)
             
-            st.dataframe(formatted_df, use_container_width=True, height=700)
+            st.dataframe(formatted_df, width="stretch", height=700)
             
             # CSVダウンロード
             csv = display_df.to_csv(index=False).encode('utf-8-sig')
@@ -973,7 +973,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             df_display = pd.DataFrame([display_data])
                             st.dataframe(
                                 df_display.style.format(format_currency),
-                                use_container_width=True
+                                width="stretch"
                             )
                             
                             if st.button(f"🗑️ {sub_name}を削除", key=f"del_{sub_name}"):
@@ -1100,7 +1100,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         # 編集可能なデータエディタを使用
                         edited_df = st.data_editor(
                             st.session_state.imported_df,
-                            use_container_width=True,
+                            width="stretch",
                             height=400,
                             num_rows="fixed",  # 行の追加・削除は不可
                             disabled=["項目名"],  # 項目名列は編集不可
@@ -1234,7 +1234,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         # 編集可能なデータエディタを使用
                         edited_forecast_df = st.data_editor(
                             st.session_state.forecast_imported_df,
-                            use_container_width=True,
+                            width="stretch",
                             height=400,
                             num_rows="fixed",
                             disabled=["項目名"],
