@@ -747,13 +747,25 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 
                 # 実績/予測の境界線
                 try:
-                    # Plotlyのadd_vlineでTypeErrorが発生する場合の対策
-                    # xの値をリスト形式 [val] で渡すことで内部のsum()計算エラーを回避
-                    fig.add_vline(
-                        x=[st.session_state.current_month],
-                        line_dash="dash",
-                        line_color="gray",
-                        annotation_text="実績/予測 境界"
+                    # add_vlineの代わりに、より安定したadd_shapeを使用して境界線を描画
+                    fig.add_shape(
+                        type="line",
+                        x0=st.session_state.current_month,
+                        x1=st.session_state.current_month,
+                        y0=0,
+                        y1=1,
+                        yref="paper",
+                        line=dict(color="gray", width=2, dash="dash")
+                    )
+                    # 境界線のラベルを追加
+                    fig.add_annotation(
+                        x=st.session_state.current_month,
+                        y=1,
+                        yref="paper",
+                        text="実績/予測 境界",
+                        showarrow=False,
+                        xanchor="left",
+                        textangle=-90
                     )
                 except Exception as e:
                     # 万が一エラーが発生した場合は境界線なしで続行
