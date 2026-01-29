@@ -232,6 +232,37 @@ if 'processor' not in st.session_state:
     st.session_state.processor = DataProcessor()
 processor = st.session_state.processor
 
+# キャッシュ付きデータ読み込み関数（高速化）
+@st.cache_data(ttl=60)  # 60秒間キャッシュ
+def load_actual_data_cached(period_id, _processor):
+    """実績データをキャッシュ付きで読み込み"""
+    return _processor.load_actual_data(period_id)
+
+@st.cache_data(ttl=60)
+def load_forecast_data_cached(period_id, scenario, _processor):
+    """予測データをキャッシュ付きで読み込み"""
+    return _processor.load_forecast_data(period_id, scenario)
+
+@st.cache_data(ttl=60)
+def load_sub_accounts_cached(period_id, scenario, _processor):
+    """補助科目データをキャッシュ付きで読み込み"""
+    return _processor.load_sub_accounts(period_id, scenario)
+
+@st.cache_data(ttl=300)  # 5分間キャッシュ（変更頻度が低い）
+def get_companies_cached(_processor):
+    """会社一覧をキャッシュ付きで取得"""
+    return _processor.get_companies()
+
+@st.cache_data(ttl=300)
+def get_company_periods_cached(comp_id, _processor):
+    """会計期間一覧をキャッシュ付きで取得"""
+    return _processor.get_company_periods(comp_id)
+
+@st.cache_data(ttl=300)
+def get_fiscal_months_cached(comp_id, period_id, _processor):
+    """会計月一覧をキャッシュ付きで取得"""
+    return _processor.get_fiscal_months(comp_id, period_id)
+
 # サイドバー
 st.sidebar.markdown("""
 <div style='text-align: center; padding: 1rem 0;'>
@@ -261,7 +292,7 @@ else:
 st.sidebar.markdown("---")
 
 # 会社選択
-companies = processor.get_companies()
+companies = get_companies_cached(processor)
 if companies.empty:
     st.sidebar.info("🏢 会社を登録してください")
     st.sidebar.markdown("👉 システム設定から会社を追加")
@@ -299,7 +330,7 @@ else:
     st.session_state.selected_comp_name = selected_comp_name
 
     # 期選択
-    periods = processor.get_company_periods(selected_comp_id)
+    periods = get_company_periods_cached(selected_comp_id, processor)
     if periods.empty:
         st.sidebar.info("📅 会計期間を登録してください")
         st.sidebar.markdown("👉 システム設定から期を追加")
@@ -370,7 +401,7 @@ else:
     
     # 月次リスト取得
     if selected_period_id:
-        months = processor.get_fiscal_months(selected_period_id)
+        months = get_fiscal_months_cached(selected_comp_id, selected_period_id, processor)
         
         # 実績締月の選択
         if 'current_month' not in st.session_state or st.session_state.current_month not in months:
@@ -572,9 +603,9 @@ if st.session_state.page == "システム設定":
 if 'selected_period_id' in st.session_state and st.session_state.selected_period_id is not None:
         # キャッシュされたデータを使用
         if 'actuals_df' not in st.session_state:
-            st.session_state.actuals_df = processor.load_actual_data(st.session_state.selected_period_id)
+            st.session_state.actuals_df = load_actual_data_cached(st.session_state.selected_period_id, processor)
         if 'forecasts_df' not in st.session_state:
-            st.session_state.forecasts_df = processor.load_forecast_data(st.session_state.selected_period_id, "現実")
+            st.session_state.forecasts_df = load_forecast_data_cached(st.session_state.selected_period_id, "現実", processor)
             
         actuals_df = st.session_state.actuals_df.copy()
         forecasts_df = st.session_state.forecasts_df.copy()
