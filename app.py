@@ -871,157 +871,226 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             st.markdown(f"""
             <div class="info-box">
                 <strong>シナリオ: {st.session_state.scenario}</strong> | 
-                実績締月: {st.session_state.current_month} 以降のデータを編集してください。
+                実績締月: {st.session_state.current_month} 以降のデータを編集してください。<br>
+                💡 <strong>使い方:</strong> 項目をクリックして展開 → 数値を入力 → 保存
             </div>
             """, unsafe_allow_html=True)
             
-            tab1, tab2 = st.tabs(["📝 基本項目入力", "分 補助科目入力"])
+            # 予測PLデータ全体を取得
+            forecast_pl_df = forecasts_df.copy()
             
-            with tab1:
-                st.subheader("月次予測値の直接入力")
-                
-                # 編集可能な項目（計算項目以外）
-                editable_items = [item for item in processor.all_items if item not in processor.calculated_items]
-                
-                selected_item = st.selectbox("編集する項目を選択", editable_items, key="forecast_item_select")
-                
-                st.markdown(f"### {selected_item} の予測値入力")
-                
-                # 現在の値を表示
-                current_values = forecasts_df[forecasts_df['項目名'] == selected_item]
-                
-                # 入力フォーム
-                col_count = 4
-                cols = st.columns(col_count)
-                new_values = {}
-                
-                for i, month in enumerate(months):
-                    col_idx = i % col_count
-                    with cols[col_idx]:
-                        current_val = 0
-                        if not current_values.empty and month in current_values.columns:
-                            current_val = current_values[month].iloc[0]
+            # 展開状態を管理
+            if 'expanded_items' not in st.session_state:
+                st.session_state.expanded_items = set()
+            
+            # PLの構造を定義
+            pl_structure = {
+                "売上": ["売上高"],
+                "売上原価": ["売上原価"],
+                "売上総利益": ["売上総損益金額"],
+                "人件費": ["役員報酬", "給料手当", "賞与", "法定福利費", "福利厚生費"],
+                "採用・外注": ["採用教育費", "外注費"],
+                "販売費": ["荷造運賃", "広告宣伝費", "販売手数料", "販売促進費"],
+                "一般管理費": [
+                    "交際費", "会議費", "旅費交通費", "通信費", "消耗品費", 
+                    "修繕費", "事務用品費", "水道光熱費", "新聞図書費", "諸会費",
+                    "支払手数料", "車両費", "地代家賃", "賃借料", "保険料",
+                    "租税公課", "支払報酬料", "研究開発費", "研修費", "減価償却費",
+                    "貸倒損失(販)", "雑費", "少額交際費"
+                ],
+                "営業外・特別損益": [
+                    "営業外収益合計", "営業外費用合計", 
+                    "特別利益合計", "特別損失合計"
+                ],
+                "税金": ["法人税、住民税及び事業税"]
+            }
+            
+            # 編集不可の計算項目
+            calculated_items_set = set(processor.calculated_items)
+            
+            # PL表示
+            st.markdown("### 📊 損益計算書（予測）")
+            
+            for category, items in pl_structure.items():
+                with st.expander(f"**{category}**", expanded=True):
+                    for item in items:
+                        if item not in forecast_pl_df['項目名'].values:
+                            continue
                         
-                        new_val = st.number_input(
-                            f"{month}",
-                            value=float(current_val),
-                            step=10000.0,
-                            format="%.0f",
-                            key=f"forecast_{selected_item}_{month}"
-                        )
-                        new_values[month] = new_val
-                
-                if st.button("💾 保存", key="save_forecast", type="primary"):
-                    success, msg = processor.save_forecast_item(
-                        st.session_state.selected_period_id,
-                        st.session_state.scenario,
-                        selected_item,
-                        new_values
-                    )
-                    if success:
-                        st.success(msg)
-                        # キャッシュクリア
-                        if 'forecasts_df' in st.session_state:
-                            del st.session_state.forecasts_df
-                        st.rerun()
-                    else:
-                        st.error(msg)
-            
-            with tab2:
-                st.subheader("補助科目入力")
-                
-                st.markdown("""
-                <div class="info-box">
-                    <strong>💡 使い方:</strong> 売上高、売上原価、販売管理費の各項目について、詳細な内訳(補助科目)を入力できます。
-                </div>
-                """, unsafe_allow_html=True)
-                
-                parent_item = st.selectbox(
-                    "親項目を選択", 
-                    processor.parent_items_with_sub_accounts,
-                    help="売上高、売上原価、販売管理費の詳細内訳を入力できます"
-                )
-                
-                # 既存の補助科目を取得
-                existing_subs = processor.get_sub_accounts_for_parent(
-                    st.session_state.selected_period_id,
-                    st.session_state.scenario,
-                    parent_item
-                )
-                
-                # 補助科目追加
-                st.markdown("#### 新規補助科目追加")
-                new_sub_name = st.text_input("補助科目名", key="new_sub_name")
-                
-                if new_sub_name:
-                    st.markdown(f"**{new_sub_name}** の月次入力")
-                    
-                    cols = st.columns(4)
-                    sub_values = {}
-                    
-                    for i, month in enumerate(months):
-                        with cols[i % 4]:
-                            val = st.number_input(
-                                f"{month}",
-                                value=0.0,
-                                step=1000.0,
-                                format="%.0f",
-                                key=f"sub_{parent_item}_{new_sub_name}_{month}"
-                            )
-                            sub_values[month] = val
-                    
-                    if st.button("💾 補助科目を追加", type="primary"):
-                        success, msg = processor.save_sub_account(
-                            st.session_state.selected_period_id,
-                            st.session_state.scenario,
-                            parent_item,
-                            new_sub_name,
-                            sub_values
-                        )
-                        if success:
-                            st.success(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
-                
-                # 既存補助科目の表示・編集
-                if not existing_subs.empty:
-                    st.markdown("#### 既存補助科目")
-                    
-                    for sub_name in existing_subs['sub_account_name'].unique():
-                        with st.expander(f"📌 {sub_name}"):
-                            sub_data = existing_subs[existing_subs['sub_account_name'] == sub_name]
-                            
-                            # 月次データ表示
-                            display_data = {}
-                            for month in months:
-                                matching = sub_data[sub_data['month'] == month]
-                                if not matching.empty:
-                                    display_data[month] = matching['amount'].iloc[0]
-                                else:
-                                    display_data[month] = 0
-                            
-                            df_display = pd.DataFrame([display_data])
-                            st.dataframe(
-                                df_display.style.format(format_currency),
-                                width="stretch"
-                            )
-                            
-                            if st.button(f"🗑️ {sub_name}を削除", key=f"del_{sub_name}"):
-                                success, msg = processor.delete_sub_account(
-                                    st.session_state.selected_period_id,
-                                    st.session_state.scenario,
-                                    parent_item,
-                                    sub_name
-                                )
-                                if success:
-                                    st.success(msg)
+                        item_data = forecast_pl_df[forecast_pl_df['項目名'] == item]
+                        is_calculated = item in calculated_items_set
+                        
+                        # 項目の展開/折りたたみボタン
+                        col1, col2 = st.columns([3, 1])
+                        
+                        with col1:
+                            if is_calculated:
+                                st.markdown(f"**{item}** 🔒 (自動計算)")
+                            else:
+                                if st.button(
+                                    f"{'▼' if item in st.session_state.expanded_items else '▶'} {item}",
+                                    key=f"expand_{item}",
+                                    use_container_width=True
+                                ):
+                                    if item in st.session_state.expanded_items:
+                                        st.session_state.expanded_items.remove(item)
+                                    else:
+                                        st.session_state.expanded_items.add(item)
                                     st.rerun()
-                                else:
-                                    st.error(msg)
-        
-        elif st.session_state.page == "実績データ入力":
-            st.title("⌨️ 実績データ入力")
+                        
+                        with col2:
+                            # 合計値を表示
+                            if not item_data.empty:
+                                month_cols = [m for m in months if m in item_data.columns]
+                                total = item_data[month_cols].sum(axis=1).iloc[0] if month_cols else 0
+                                st.markdown(f"<div style='text-align: right;'>合計: ¥{int(total):,}</div>", unsafe_allow_html=True)
+                        
+                        # 展開されている場合、入力フォームを表示
+                        if item in st.session_state.expanded_items and not is_calculated:
+                            with st.container():
+                                st.markdown("---")
+                                
+                                # 補助科目がある場合は表示
+                                if item in processor.parent_items_with_sub_accounts:
+                                    sub_accounts = processor.get_sub_accounts_for_parent(
+                                        st.session_state.selected_period_id,
+                                        st.session_state.scenario,
+                                        item
+                                    )
+                                    
+                                    if not sub_accounts.empty:
+                                        st.markdown(f"**📋 {item}の内訳（補助科目）**")
+                                        for _, sub in sub_accounts.iterrows():
+                                            sub_name = sub['sub_account_name']
+                                            with st.expander(f"🔹 {sub_name}"):
+                                                # 補助科目の編集フォーム
+                                                cols_sub = st.columns(4)
+                                                sub_values = {}
+                                                
+                                                for i, month in enumerate(months):
+                                                    with cols_sub[i % 4]:
+                                                        current_val = 0
+                                                        if month in sub.index:
+                                                            val = sub[month]
+                                                            if pd.notna(val):
+                                                                current_val = float(val)
+                                                        
+                                                        new_val = st.number_input(
+                                                            month,
+                                                            value=current_val,
+                                                            step=10000.0,
+                                                            format="%.0f",
+                                                            key=f"sub_{item}_{sub_name}_{month}"
+                                                        )
+                                                        sub_values[month] = new_val
+                                                
+                                                col_save, col_delete = st.columns([1, 1])
+                                                with col_save:
+                                                    if st.button("💾 保存", key=f"save_sub_{item}_{sub_name}", type="primary"):
+                                                        success, msg = processor.save_sub_account(
+                                                            st.session_state.selected_period_id,
+                                                            st.session_state.scenario,
+                                                            item,
+                                                            sub_name,
+                                                            sub_values
+                                                        )
+                                                        if success:
+                                                            st.success(msg)
+                                                            st.rerun()
+                                                        else:
+                                                            st.error(msg)
+                                                
+                                                with col_delete:
+                                                    if st.button("🗑️ 削除", key=f"del_sub_{item}_{sub_name}"):
+                                                        success, msg = processor.delete_sub_account(
+                                                            st.session_state.selected_period_id,
+                                                            st.session_state.scenario,
+                                                            item,
+                                                            sub_name
+                                                        )
+                                                        if success:
+                                                            st.success(msg)
+                                                            st.rerun()
+                                                        else:
+                                                            st.error(msg)
+                                
+                                # 新しい補助科目の追加フォーム
+                                if item in processor.parent_items_with_sub_accounts:
+                                    with st.expander("➕ 新しい補助科目を追加"):
+                                        new_sub_name = st.text_input(
+                                            "補助科目名",
+                                            key=f"new_sub_{item}",
+                                            placeholder="例: 国内売上、海外売上"
+                                        )
+                                        
+                                        if new_sub_name:
+                                            cols_new = st.columns(4)
+                                            new_sub_values = {}
+                                            
+                                            for i, month in enumerate(months):
+                                                with cols_new[i % 4]:
+                                                    val = st.number_input(
+                                                        month,
+                                                        value=0.0,
+                                                        step=10000.0,
+                                                        format="%.0f",
+                                                        key=f"new_sub_{item}_{new_sub_name}_{month}"
+                                                    )
+                                                    new_sub_values[month] = val
+                                            
+                                            if st.button("💾 補助科目を追加", key=f"add_sub_{item}", type="primary"):
+                                                success, msg = processor.save_sub_account(
+                                                    st.session_state.selected_period_id,
+                                                    st.session_state.scenario,
+                                                    item,
+                                                    new_sub_name,
+                                                    new_sub_values
+                                                )
+                                                if success:
+                                                    st.success(msg)
+                                                    st.rerun()
+                                                else:
+                                                    st.error(msg)
+                                
+                                # 基本項目の入力フォーム
+                                st.markdown(f"**💰 {item} の月次予測値**")
+                                
+                                cols = st.columns(4)
+                                item_values = {}
+                                
+                                for i, month in enumerate(months):
+                                    with cols[i % 4]:
+                                        current_val = 0
+                                        if not item_data.empty and month in item_data.columns:
+                                            val = item_data[month].iloc[0]
+                                            if pd.notna(val):
+                                                current_val = float(val)
+                                        
+                                        new_val = st.number_input(
+                                            month,
+                                            value=current_val,
+                                            step=10000.0,
+                                            format="%.0f",
+                                            key=f"forecast_{item}_{month}"
+                                        )
+                                        item_values[month] = new_val
+                                
+                                if st.button("💾 保存", key=f"save_{item}", type="primary"):
+                                    success, msg = processor.save_forecast_item(
+                                        st.session_state.selected_period_id,
+                                        st.session_state.scenario,
+                                        item,
+                                        item_values
+                                    )
+                                    if success:
+                                        st.success(msg)
+                                        if 'forecasts_df' in st.session_state:
+                                            del st.session_state.forecasts_df
+                                        st.rerun()
+                                    else:
+                                        st.error(msg)
+                                
+                                st.markdown("---")
             
             st.markdown("""
             <div class="info-box">
