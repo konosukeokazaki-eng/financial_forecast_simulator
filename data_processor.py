@@ -689,24 +689,31 @@ class DataProcessor:
             conn = self._get_connection()
             cursor = conn.cursor()
             
-            for month, amount in values_dict.items():
-                if self.use_postgres:
-                    # PostgreSQL用のUPSERT
-                    cursor.execute(
-                        """
-                        INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) 
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (fiscal_period_id, item_name, month) 
-                        DO UPDATE SET amount = EXCLUDED.amount
-                        """,
-                        (fiscal_period_id, item_name, month, float(amount))
-                    )
-                else:
-                    # SQLite用のUPSERT
-                    cursor.execute(
-                        "INSERT OR REPLACE INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
-                        (fiscal_period_id, item_name, month, float(amount))
-                    )
+            # バッチ処理用のデータを準備
+            batch_data = [
+                (fiscal_period_id, item_name, month, float(amount))
+                for month, amount in values_dict.items()
+            ]
+            
+            if self.use_postgres:
+                # PostgreSQL用のUPSERT（バッチ）
+                from psycopg2.extras import execute_values
+                execute_values(
+                    cursor,
+                    """
+                    INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) 
+                    VALUES %s
+                    ON CONFLICT (fiscal_period_id, item_name, month) 
+                    DO UPDATE SET amount = EXCLUDED.amount
+                    """,
+                    batch_data
+                )
+            else:
+                # SQLite用のUPSERT（バッチ）
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
+                    batch_data
+                )
             
             conn.commit()
             return True, "実績データを保存しました"
@@ -736,31 +743,36 @@ class DataProcessor:
             conn = self._get_connection()
             cursor = conn.cursor()
             
-            saved_count = 0
-            for month, amount in values_dict.items():
-                if self.use_postgres:
-                    # PostgreSQL用のUPSERT
-                    cursor.execute(
-                        """
-                        INSERT INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) 
-                        VALUES (%s, %s, %s, %s, %s)
-                        ON CONFLICT (fiscal_period_id, scenario, item_name, month) 
-                        DO UPDATE SET amount = EXCLUDED.amount
-                        """,
-                        (fiscal_period_id, scenario, item_name, month, float(amount))
-                    )
-                else:
-                    # SQLite用のUPSERT（updated_atなし）
-                    cursor.execute(
-                        "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) VALUES (?, ?, ?, ?, ?)",
-                        (fiscal_period_id, scenario, item_name, month, float(amount))
-                    )
-                saved_count += 1
+            # バッチ処理用のデータを準備
+            batch_data = [
+                (fiscal_period_id, scenario, item_name, month, float(amount))
+                for month, amount in values_dict.items()
+            ]
+            
+            if self.use_postgres:
+                # PostgreSQL用のUPSERT（バッチ）
+                from psycopg2.extras import execute_values
+                execute_values(
+                    cursor,
+                    """
+                    INSERT INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) 
+                    VALUES %s
+                    ON CONFLICT (fiscal_period_id, scenario, item_name, month) 
+                    DO UPDATE SET amount = EXCLUDED.amount
+                    """,
+                    batch_data
+                )
+            else:
+                # SQLite用のUPSERT（バッチ）
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) VALUES (?, ?, ?, ?, ?)",
+                    batch_data
+                )
             
             conn.commit()
-            sys.stderr.write(f"✅ 保存成功: {saved_count}件のデータを保存しました\n")
+            sys.stderr.write(f"✅ 保存成功: {len(batch_data)}件のデータを保存しました\n")
             sys.stderr.flush()
-            return True, f"{saved_count}件の予測データを保存しました"
+            return True, f"{len(batch_data)}件の予測データを保存しました"
         except Exception as e:
             sys.stderr.write(f"❌ Error saving forecast data: {e}\n")
             import traceback
@@ -806,22 +818,31 @@ class DataProcessor:
             conn = self._get_connection()
             cursor = conn.cursor()
             
-            for month, amount in values_dict.items():
-                if self.use_postgres:
-                    cursor.execute(
-                        """
-                        INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) 
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (fiscal_period_id, scenario, parent_item, sub_account_name, month) 
-                        DO UPDATE SET amount = EXCLUDED.amount
-                        """,
-                        (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
-                    )
-                else:
-                    cursor.execute(
-                        "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) VALUES (?, ?, ?, ?, ?, ?)",
-                        (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
-                    )
+            # バッチ処理用のデータを準備
+            batch_data = [
+                (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
+                for month, amount in values_dict.items()
+            ]
+            
+            if self.use_postgres:
+                # PostgreSQL用のUPSERT（バッチ）
+                from psycopg2.extras import execute_values
+                execute_values(
+                    cursor,
+                    """
+                    INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) 
+                    VALUES %s
+                    ON CONFLICT (fiscal_period_id, scenario, parent_item, sub_account_name, month) 
+                    DO UPDATE SET amount = EXCLUDED.amount
+                    """,
+                    batch_data
+                )
+            else:
+                # SQLite用のUPSERT（バッチ）
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) VALUES (?, ?, ?, ?, ?, ?)",
+                    batch_data
+                )
             
             conn.commit()
             return True, "補助科目を保存しました"
