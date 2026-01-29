@@ -802,7 +802,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # フォーマット
             formatted_df = display_df.style\
                 .format(lambda x: f"¥{int(x):,}" if isinstance(x, (int, float)) else x)\
-                .apply(lambda row: ['background-color: #f8f9fa; font-weight: bold' if row['タイプ'] == '要約' else '' for _ in row], axis=1)
+                .apply(lambda row: ['background-color: #69b4ff; font-weight: bold' if row['タイプ'] == '要約' else '' for _ in row], axis=1)
             
             st.dataframe(formatted_df, use_container_width=True, height=700)
             
