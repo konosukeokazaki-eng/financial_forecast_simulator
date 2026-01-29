@@ -19,13 +19,16 @@ class DataProcessor:
         sys.stderr.write(f"   hasattr(st, 'secrets'): {hasattr(st, 'secrets')}\n")
         sys.stderr.flush()
         
-        if hasattr(st, 'secrets'):
-            sys.stderr.write(f"   'database' in st.secrets: {'database' in st.secrets}\n")
-            if 'database' in st.secrets:
-                sys.stderr.write(f"   st.secrets['database'] keys: {list(st.secrets['database'].keys())}\n")
-            sys.stderr.flush()
-        
-        if hasattr(st, 'secrets') and 'database' in st.secrets:
+        # Streamlit Secretsの安全なチェック
+        has_secrets = False
+        try:
+            # st.secrets自体へのアクセスで例外が発生する場合がある
+            if hasattr(st, 'secrets') and len(st.secrets) > 0:
+                has_secrets = True
+        except:
+            has_secrets = False
+
+        if has_secrets and 'database' in st.secrets:
             try:
                 db_config = st.secrets['database']
                 sys.stderr.write(f"   host: {db_config.get('host', 'NOT SET')}\n")
@@ -56,7 +59,7 @@ class DataProcessor:
                 sys.stderr.flush()
                 self.use_postgres = False
         else:
-            sys.stderr.write("ℹ️ Supabase設定なし - SQLiteを使用します\n")
+            sys.stderr.write("ℹ️ Supabase設定なし、または不完全 - SQLiteを使用します\n")
             sys.stderr.flush()
         
         # SQLiteの場合
@@ -231,6 +234,7 @@ class DataProcessor:
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
+            # SQLiteの場合は ? をそのまま使い、PostgreSQLの場合は %s に変換済み
             if params:
                 cursor.execute(query, params)
             else:
@@ -242,6 +246,16 @@ class DataProcessor:
             raise e
         finally:
             conn.close()
+
+    def _get_cursor(self, conn):
+        """カーソルを取得（PostgreSQLとSQLiteの互換性対応）"""
+        return conn.cursor()
+
+    def _format_query(self, query):
+        """クエリのプレースホルダーを変換"""
+        if self.use_postgres:
+            return query.replace('?', '%s')
+        return query
 
     def _init_db(self):
         """データベーステーブルの初期化 (要件定義書の2.3に準拠)"""
@@ -290,15 +304,12 @@ class DataProcessor:
             fiscal_period_id INTEGER NOT NULL,
             item_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount REAL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
             UNIQUE(fiscal_period_id, item_name, month)
         )
         ''')
-        
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_item ON actual_data(fiscal_period_id, item_name)')
         
         # 2.3.4 予測データ
         cursor.execute('''
@@ -308,18 +319,14 @@ class DataProcessor:
             scenario TEXT NOT NULL,
             item_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount REAL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
-            UNIQUE(fiscal_period_id, scenario, item_name, month),
-            CHECK (scenario IN ('現実', '楽観', '悲観'))
+            UNIQUE(fiscal_period_id, scenario, item_name, month)
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_scenario ON forecast_data(fiscal_period_id, scenario)')
-        
-        # 2.3.5 補助科目
+        # 2.3.5 補助科目データ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS sub_accounts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -328,42 +335,22 @@ class DataProcessor:
             parent_item TEXT NOT NULL,
             sub_account_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount REAL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
+            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
             UNIQUE(fiscal_period_id, scenario, parent_item, sub_account_name, month)
-        )
-        ''')
-        
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_parent ON sub_accounts(fiscal_period_id, parent_item)')
-        
-        # 2.3.6 勘定科目属性
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS item_attributes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fiscal_period_id INTEGER NOT NULL,
-            item_name TEXT NOT NULL,
-            is_variable INTEGER DEFAULT 0,
-            variable_rate REAL DEFAULT 0.0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
-            UNIQUE(fiscal_period_id, item_name),
-            CHECK (is_variable IN (0, 1)),
-            CHECK (variable_rate >= 0 AND variable_rate <= 1)
         )
         ''')
         
         conn.commit()
         conn.close()
-    
+
     def _init_postgres_db(self):
         """PostgreSQLデータベースの初期化"""
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        # 2.3.1 会社マスタ
+        # 会社マスタ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS companies (
             id SERIAL PRIMARY KEY,
@@ -372,532 +359,364 @@ class DataProcessor:
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_name ON companies(name)')
-        
-        # 2.3.2 会計期マスタ
+        # 会計期マスタ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS fiscal_periods (
             id SERIAL PRIMARY KEY,
-            comp_id INTEGER NOT NULL,
+            comp_id INTEGER NOT NULL REFERENCES companies(id),
             period_num INTEGER NOT NULL,
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (comp_id) REFERENCES companies (id),
-            UNIQUE(comp_id, period_num),
-            CHECK (start_date < end_date)
+            UNIQUE(comp_id, period_num)
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_comp_period ON fiscal_periods(comp_id, period_num)')
-        
-        # 2.3.3 実績データ
+        # 実績データ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS actual_data (
             id SERIAL PRIMARY KEY,
-            fiscal_period_id INTEGER NOT NULL,
+            fiscal_period_id INTEGER NOT NULL REFERENCES fiscal_periods(id),
             item_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount DOUBLE PRECISION DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
             UNIQUE(fiscal_period_id, item_name, month)
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_item ON actual_data(fiscal_period_id, item_name)')
-        
-        # 2.3.4 予測データ
+        # 予測データ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS forecast_data (
             id SERIAL PRIMARY KEY,
-            fiscal_period_id INTEGER NOT NULL,
+            fiscal_period_id INTEGER NOT NULL REFERENCES fiscal_periods(id),
             scenario TEXT NOT NULL,
             item_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount DOUBLE PRECISION DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods (id),
-            UNIQUE(fiscal_period_id, scenario, item_name, month),
-            CHECK (scenario IN ('現実', '楽観', '悲観'))
+            UNIQUE(fiscal_period_id, scenario, item_name, month)
         )
         ''')
         
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_scenario ON forecast_data(fiscal_period_id, scenario)')
-        
-        # 2.3.5 補助科目
+        # 補助科目データ
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS sub_accounts (
             id SERIAL PRIMARY KEY,
-            fiscal_period_id INTEGER NOT NULL,
+            fiscal_period_id INTEGER NOT NULL REFERENCES fiscal_periods(id),
             scenario TEXT NOT NULL,
             parent_item TEXT NOT NULL,
             sub_account_name TEXT NOT NULL,
             month TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
+            amount DOUBLE PRECISION DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
             UNIQUE(fiscal_period_id, scenario, parent_item, sub_account_name, month)
-        )
-        ''')
-        
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_parent ON sub_accounts(fiscal_period_id, parent_item)')
-        
-        # 2.3.6 勘定科目属性
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS item_attributes (
-            id SERIAL PRIMARY KEY,
-            fiscal_period_id INTEGER NOT NULL,
-            item_name TEXT NOT NULL,
-            is_variable INTEGER DEFAULT 0,
-            variable_rate REAL DEFAULT 0.0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (fiscal_period_id) REFERENCES fiscal_periods(id),
-            UNIQUE(fiscal_period_id, item_name),
-            CHECK (is_variable IN (0, 1)),
-            CHECK (variable_rate >= 0 AND variable_rate <= 1)
         )
         ''')
         
         conn.commit()
         conn.close()
-    
-    def _read_sql_query(self, query, params=None):
-        """SQLクエリを実行してDataFrameを返す（PostgreSQLとSQLiteの互換性対応）"""
-        if self.use_postgres:
-            # PostgreSQL用にプレースホルダーを変換 (? → %s)
-            query = query.replace('?', '%s')
-        
-        conn = self._get_connection()
-        try:
-            if params:
-                df = pd.read_sql_query(query, conn, params=params)
-            else:
-                df = pd.read_sql_query(query, conn)
-            return df
-        finally:
-            conn.close()
-    
-    def _sort_months(self, df, fiscal_period_id):
-        """会計期の開始月を考慮して月をソート"""
-        try:
-            # 会計期情報を取得
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT start_date, end_date FROM fiscal_periods WHERE id = ?",
-                (fiscal_period_id,)
-            )
-            result = cursor.fetchone()
-            conn.close()
-            
-            if not result:
-                return df
-            
-            start_date_str, end_date_str = result
-            
-            # YYYY-MM形式の月をdatetimeに変換してソート
-            if 'month' in df.columns:
-                df['_month_dt'] = pd.to_datetime(df['month'] + '-01')
-                df = df.sort_values('_month_dt').drop(columns=['_month_dt'])
-            
-            return df
-        except Exception as e:
-            print(f"Error sorting months: {e}")
-            return df
 
+    # --- 会社・会計期管理 ---
+    
     def get_companies(self):
-        """会社一覧を取得"""
-        return self._read_sql_query("SELECT * FROM companies ORDER BY name")
-
-    def add_company(self, company_name):
-        """会社を追加"""
-        try:
-            sys.stderr.write(f"💾 add_company() 開始: '{company_name}'\n")
-            sys.stderr.write(f"   use_postgres: {self.use_postgres}\n")
-            sys.stderr.flush()
-            
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            
-            if self.use_postgres:
-                sys.stderr.write("   PostgreSQLモードでINSERT実行\n")
-                cursor.execute("INSERT INTO companies (name) VALUES (%s)", (company_name,))
-            else:
-                sys.stderr.write("   SQLiteモードでINSERT実行\n")
-                cursor.execute("INSERT INTO companies (name) VALUES (?)", (company_name,))
-            
-            conn.commit()
-            sys.stderr.write("   コミット成功\n")
-            sys.stderr.flush()
-            conn.close()
-            
-            sys.stderr.write("✅ add_company() 成功\n")
-            sys.stderr.flush()
-            return True
-        except Exception as e:
-            sys.stderr.write(f"❌ add_company() 失敗: {e}\n")
-            import traceback
-            traceback.print_exc(file=sys.stderr)
-            sys.stderr.flush()
-            return False
-
-    def get_company_periods(self, comp_id):
-        """指定会社の会計期一覧を取得"""
-        return self._read_sql_query(
-            "SELECT * FROM fiscal_periods WHERE comp_id = ? ORDER BY period_num DESC",
-            params=(comp_id,)
-        )
-
-    def add_fiscal_period(self, comp_id, period_num, start_date, end_date):
-        """会計期を追加"""
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            
-            if self.use_postgres:
-                cursor.execute(
-                    "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (%s, %s, %s, %s)",
-                    (comp_id, period_num, start_date, end_date)
-                )
-            else:
-                cursor.execute(
-                    "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (?, ?, ?, ?)",
-                    (comp_id, period_num, start_date, end_date)
-                )
-            
-            conn.commit()
-            conn.close()
-            return True
-        except Exception as e:
-            sys.stderr.write(f"❌ add_fiscal_period() 失敗: {e}\n")
-            sys.stderr.flush()
-            return False
-
-    def get_period_info(self, period_id):
-        """会計期情報を取得"""
         conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        if self.use_postgres:
-            cursor.execute("SELECT * FROM fiscal_periods WHERE id = %s", (period_id,))
-        else:
-            cursor.execute("SELECT * FROM fiscal_periods WHERE id = ?", (period_id,))
-        
-        row = cursor.fetchone()
+        df = pd.read_sql_query("SELECT * FROM companies ORDER BY name", conn)
         conn.close()
-        if row:
-            return {
-                "id": row[0],
-                "comp_id": row[1],
-                "period_num": row[2],
-                "start_date": row[3],
-                "end_date": row[4]
-            }
-        return None
+        return df
+    
+    def add_company(self, name):
+        try:
+            self._execute_query("INSERT INTO companies (name) VALUES (?)", (name,))
+            return True, "会社を登録しました"
+        except Exception as e:
+            return False, str(e)
+            
+    def get_company_periods(self, comp_id):
+        conn = self._get_connection()
+        query = self._format_query("SELECT * FROM fiscal_periods WHERE comp_id = ? ORDER BY period_num DESC")
+        # PostgreSQLとSQLiteの両方で動作するようにカラム名を小文字に統一
+        df = pd.read_sql_query(query, conn, params=(comp_id,))
+        conn.close()
+        return df
+        
+    def add_fiscal_period(self, comp_id, period_num, start_date, end_date):
+        try:
+            self._execute_query(
+                "INSERT INTO fiscal_periods (comp_id, period_num, start_date, end_date) VALUES (?, ?, ?, ?)",
+                (comp_id, period_num, start_date, end_date)
+            )
+            return True, "会計期を登録しました"
+        except Exception as e:
+            return False, str(e)
 
-    def get_company_id_from_period_id(self, fiscal_period_id):
-        """会計期IDから会社IDを取得"""
+    # --- データ取得・保存 ---
+    
+    def get_fiscal_months(self, fiscal_period_id):
+        """会計期間内の月リスト(YYYY-MM)を取得"""
         conn = self._get_connection()
         cursor = conn.cursor()
-        
-        if self.use_postgres:
-            cursor.execute("SELECT comp_id FROM fiscal_periods WHERE id = %s", (fiscal_period_id,))
-        else:
-            cursor.execute("SELECT comp_id FROM fiscal_periods WHERE id = ?", (fiscal_period_id,))
-        
+        query = self._format_query("SELECT start_date, end_date FROM fiscal_periods WHERE id = ?")
+        cursor.execute(query, (fiscal_period_id,))
         result = cursor.fetchone()
         conn.close()
-        return result[0] if result else None
-
-    def get_fiscal_months(self, comp_id, fiscal_period_id):
-        """会計期の月リストを取得"""
-        period = self.get_period_info(fiscal_period_id)
-        if not period:
-            return []
         
-        start = datetime.strptime(period['start_date'], '%Y-%m-%d')
-        end = datetime.strptime(period['end_date'], '%Y-%m-%d')
+        if not result:
+            return []
+            
+        start_date = datetime.strptime(result[0], '%Y-%m-%d')
+        end_date = datetime.strptime(result[1], '%Y-%m-%d')
         
         months = []
-        curr = start
-        while curr <= end:
+        curr = start_date
+        while curr <= end_date:
             months.append(curr.strftime('%Y-%m'))
+            # 次の月へ
             if curr.month == 12:
                 curr = curr.replace(year=curr.year + 1, month=1)
             else:
                 curr = curr.replace(month=curr.month + 1)
-        return months
-
-    def get_split_index(self, comp_id, current_month, fiscal_period_id):
-        """実績と予測の境界インデックスを取得"""
-        months = self.get_fiscal_months(comp_id, fiscal_period_id)
-        try:
-            return months.index(current_month) + 1
-        except:
-            return 0
+        
+        return months[:12] # 最大12ヶ月
 
     def load_actual_data(self, fiscal_period_id):
-        """実績データを読み込み"""
-        df = self._read_sql_query(
-            "SELECT item_name as 項目名, month, amount FROM actual_data WHERE fiscal_period_id = ?",
-            params=(fiscal_period_id,)
-        )
+        """実績データをロードしてピボット形式で返す"""
+        # IDを確実に整数に変換
+        try:
+            if isinstance(fiscal_period_id, bytes):
+                import struct
+                fiscal_period_id = struct.unpack('<Q', fiscal_period_id.ljust(8, b'\x00'))[0]
+            fiscal_period_id = int(fiscal_period_id)
+        except:
+            pass
+
+        conn = self._get_connection()
+        query = self._format_query("SELECT item_name, month, amount FROM actual_data WHERE fiscal_period_id = ?")
+        df = pd.read_sql_query(query, conn, params=(fiscal_period_id,))
+        conn.close()
         
-        if df.empty:
-            return pd.DataFrame({'項目名': self.all_items}).fillna(0)
+        months = self.get_fiscal_months(fiscal_period_id)
         
-        df = df.drop_duplicates(subset=['項目名', 'month'], keep='last')
+        # 全項目と全月を網羅したベースDataFrameを作成
+        result = pd.DataFrame({'項目名': self.all_items})
+        for m in months:
+            result[m] = 0.0
+            
+        if not df.empty:
+            # ピボット
+            pivot_df = df.pivot(index='item_name', columns='month', values='amount').reset_index()
+            pivot_df = pivot_df.rename(columns={'item_name': '項目名'})
+            
+            # ベースにマージ
+            # 既存の月列を削除してからマージ
+            result_base = result[['項目名']]
+            result = pd.merge(result_base, pivot_df, on='項目名', how='left').fillna(0)
+            
+            # 欠落している月列を補完
+            for m in months:
+                if m not in result.columns:
+                    result[m] = 0.0
         
-        # 月を正しくソート（会計期順）
-        df = self._sort_months(df, fiscal_period_id)
-        
-        pivot_df = df.pivot(index='項目名', columns='month', values='amount').reset_index()
-        
-        all_items_df = pd.DataFrame({'項目名': self.all_items})
-        pivot_df = pd.merge(all_items_df, pivot_df, on='項目名', how='left').fillna(0)
-        return pivot_df
+        # 月列の順序を整える
+        cols = ['項目名'] + months
+        return result[cols]
 
     def load_forecast_data(self, fiscal_period_id, scenario):
-        """予測データを読み込み"""
-        df = self._read_sql_query(
-            "SELECT item_name as 項目名, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?",
-            params=(fiscal_period_id, scenario)
-        )
-        
-        if df.empty:
-            return pd.DataFrame({'項目名': self.all_items}).fillna(0)
-        
-        df = df.drop_duplicates(subset=['項目名', 'month'], keep='last')
-        
-        # 月を正しくソート（会計期順）
-        df = self._sort_months(df, fiscal_period_id)
-        
-        pivot_df = df.pivot(index='項目名', columns='month', values='amount').reset_index()
-        
-        all_items_df = pd.DataFrame({'項目名': self.all_items})
-        pivot_df = pd.merge(all_items_df, pivot_df, on='項目名', how='left').fillna(0)
-        return pivot_df
+        """予測データをロードしてピボット形式で返す"""
+        # IDを確実に整数に変換
+        try:
+            if isinstance(fiscal_period_id, bytes):
+                import struct
+                fiscal_period_id = struct.unpack('<Q', fiscal_period_id.ljust(8, b'\x00'))[0]
+            fiscal_period_id = int(fiscal_period_id)
+        except:
+            pass
 
-    def save_actual_item(self, fiscal_period_id, item_name, values_dict):
-        """実績データを保存"""
-        conn = None
+        conn = self._get_connection()
+        query = self._format_query("SELECT item_name, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?")
+        df = pd.read_sql_query(query, conn, params=(fiscal_period_id, scenario))
+        conn.close()
+        
+        months = self.get_fiscal_months(fiscal_period_id)
+        
+        # 全項目と全月を網羅したベースDataFrameを作成
+        result = pd.DataFrame({'項目名': self.all_items})
+        for m in months:
+            result[m] = 0.0
+            
+        if not df.empty:
+            # ピボット
+            pivot_df = df.pivot(index='item_name', columns='month', values='amount').reset_index()
+            pivot_df = pivot_df.rename(columns={'item_name': '項目名'})
+            
+            # ベースにマージ
+            result_base = result[['項目名']]
+            result = pd.merge(result_base, pivot_df, on='項目名', how='left').fillna(0)
+            
+            # 欠落している月列を補完
+            for m in months:
+                if m not in result.columns:
+                    result[m] = 0.0
+        
+        # 月列の順序を整える
+        cols = ['項目名'] + months
+        return result[cols]
+
+    def save_actual_item(self, fiscal_period_id, item_name, month_values):
+        """特定の項目の実績値を保存"""
+        # IDを確実に整数に変換
+        try:
+            if isinstance(fiscal_period_id, bytes):
+                import struct
+                fiscal_period_id = struct.unpack('<Q', fiscal_period_id.ljust(8, b'\x00'))[0]
+            fiscal_period_id = int(fiscal_period_id)
+        except:
+            pass
+
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             
-            for month, amount in values_dict.items():
+            for month, amount in month_values.items():
                 if self.use_postgres:
-                    # PostgreSQL用のUPSERT
-                    cursor.execute(
-                        """
-                        INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) 
+                    cursor.execute('''
+                        INSERT INTO actual_data (fiscal_period_id, item_name, month, amount)
                         VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (fiscal_period_id, item_name, month) 
+                        ON CONFLICT (fiscal_period_id, item_name, month)
                         DO UPDATE SET amount = EXCLUDED.amount
-                        """,
-                        (fiscal_period_id, item_name, month, float(amount))
-                    )
+                    ''', (fiscal_period_id, item_name, month, amount))
                 else:
-                    # SQLite用のUPSERT
-                    cursor.execute(
-                        "INSERT OR REPLACE INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
-                        (fiscal_period_id, item_name, month, float(amount))
-                    )
-            
-            conn.commit()
-            return True
-        except Exception as e:
-            sys.stderr.write(f"Error saving actual data: {e}\n")
-            sys.stderr.flush()
-            if conn:
-                conn.rollback()
-            return False
-        finally:
-            if conn:
-                conn.close()
-
-    def save_forecast_item(self, fiscal_period_id, scenario, item_name, values_dict):
-        """予測データを保存"""
-        conn = None
-        try:
-            sys.stderr.write(f"💾 予測データ保存開始: {item_name}, シナリオ: {scenario}\n")
-            sys.stderr.write(f"   use_postgres: {self.use_postgres}\n")
-            sys.stderr.write(f"   データ件数: {len(values_dict)}\n")
-            sys.stderr.flush()
-            
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            
-            saved_count = 0
-            for month, amount in values_dict.items():
-                if self.use_postgres:
-                    # PostgreSQL用のUPSERT
-                    cursor.execute(
-                        """
-                        INSERT INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) 
-                        VALUES (%s, %s, %s, %s, %s)
-                        ON CONFLICT (fiscal_period_id, scenario, item_name, month) 
-                        DO UPDATE SET amount = EXCLUDED.amount
-                        """,
-                        (fiscal_period_id, scenario, item_name, month, float(amount))
-                    )
-                else:
-                    # SQLite用のUPSERT（updated_atなし）
-                    cursor.execute(
-                        "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) VALUES (?, ?, ?, ?, ?)",
-                        (fiscal_period_id, scenario, item_name, month, float(amount))
-                    )
-                saved_count += 1
-            
-            conn.commit()
-            sys.stderr.write(f"✅ 保存成功: {saved_count}件のデータを保存しました\n")
-            sys.stderr.flush()
-            return True
-        except Exception as e:
-            sys.stderr.write(f"❌ Error saving forecast data: {e}\n")
-            import traceback
-            traceback.print_exc()
-            sys.stderr.flush()
-            if conn:
-                conn.rollback()
-            return False
-        finally:
-            if conn:
-                conn.close()
-
-    def load_sub_accounts(self, fiscal_period_id, scenario):
-        """補助科目データを読み込み"""
-        return self._read_sql_query(
-            "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ?",
-            params=(fiscal_period_id, scenario)
-        )
-
-    def get_sub_accounts_for_parent(self, fiscal_period_id, scenario, parent_item):
-        """特定親項目の補助科目を取得"""
-        return self._read_sql_query(
-            "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ?",
-            params=(fiscal_period_id, scenario, parent_item)
-        )
-
-    def save_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name, values_dict):
-        """補助科目を保存"""
-        conn = None
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            
-            for month, amount in values_dict.items():
-                if self.use_postgres:
-                    # PostgreSQL用のUPSERT
-                    cursor.execute(
-                        """
-                        INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) 
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (fiscal_period_id, scenario, parent_item, sub_account_name, month) 
-                        DO UPDATE SET amount = EXCLUDED.amount
-                        """,
-                        (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
-                    )
-                else:
-                    # SQLite用のUPSERT
-                    cursor.execute(
-                        "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) VALUES (?, ?, ?, ?, ?, ?)",
-                        (fiscal_period_id, scenario, parent_item, sub_account_name, month, float(amount))
-                    )
-            
-            conn.commit()
-            return True
-        except Exception as e:
-            sys.stderr.write(f"Error saving sub account: {e}\n")
-            sys.stderr.flush()
-            if conn:
-                conn.rollback()
-            return False
-        finally:
-            if conn:
-                conn.close()
-
-    def delete_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name):
-        """補助科目を削除"""
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            
-            if self.use_postgres:
-                cursor.execute(
-                    "DELETE FROM sub_accounts WHERE fiscal_period_id = %s AND scenario = %s AND parent_item = %s AND sub_account_name = %s",
-                    (fiscal_period_id, scenario, parent_item, sub_account_name)
-                )
-            else:
-                cursor.execute(
-                    "DELETE FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ? AND sub_account_name = ?",
-                    (fiscal_period_id, scenario, parent_item, sub_account_name)
-                )
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO actual_data (fiscal_period_id, item_name, month, amount)
+                        VALUES (?, ?, ?, ?)
+                    ''', (fiscal_period_id, item_name, month, amount))
             
             conn.commit()
             conn.close()
             return True
-        except:
+        except Exception as e:
+            print(f"Error saving actual item: {e}")
             return False
 
-    def calculate_growth_forecast(self, actuals_df, item_name, split_index, months):
-        """成長率ベースの予測計算 (要件定義書の5.5.2に準拠)"""
-        forecast_values = {}
-        
-        actual_months = months[:split_index]
-        forecast_months = months[split_index:]
-        
-        if len(actual_months) < 2:
-            # 実績が2ヶ月未満の場合は前月踏襲
-            if len(actual_months) == 1:
-                last_value = actuals_df[actuals_df['項目名'] == item_name][actual_months[0]].iloc[0]
-            else:
-                last_value = 0
-            
-            for m in forecast_months:
-                forecast_values[m] = last_value
-            
-            return forecast_values
-        
-        # 前月比成長率の平均を計算
-        item_row = actuals_df[actuals_df['項目名'] == item_name]
-        actual_values = [item_row[m].iloc[0] for m in actual_months]
-        
-        growth_rates = []
-        for i in range(1, len(actual_values)):
-            if actual_values[i-1] != 0:
-                rate = (actual_values[i] - actual_values[i-1]) / abs(actual_values[i-1])
-                growth_rates.append(rate)
-        
-        if len(growth_rates) == 0:
-            avg_growth_rate = 0
-        else:
-            # 異常値を除外 (±100%以上の変動は除外)
-            filtered_rates = [r for r in growth_rates if abs(r) < 1.0]
-            if len(filtered_rates) > 0:
-                avg_growth_rate = np.mean(filtered_rates)
-            else:
-                avg_growth_rate = 0
-        
-        # 予測値の生成
-        last_actual_value = actual_values[-1]
-        current_forecast_value = last_actual_value
-        
-        for m in forecast_months:
-            if last_actual_value != 0:
-                current_forecast_value *= (1 + avg_growth_rate)
-            else:
-                current_forecast_value += avg_growth_rate
-                
-            forecast_values[m] = current_forecast_value
-            
-        return forecast_values
+    def save_forecast_item(self, fiscal_period_id, scenario, item_name, month_values):
+        """特定の項目の予測値を保存"""
+        # IDを確実に整数に変換
+        try:
+            if isinstance(fiscal_period_id, bytes):
+                import struct
+                fiscal_period_id = struct.unpack('<Q', fiscal_period_id.ljust(8, b'\x00'))[0]
+            fiscal_period_id = int(fiscal_period_id)
+        except:
+            pass
 
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            for month, amount in month_values.items():
+                if self.use_postgres:
+                    cursor.execute('''
+                        INSERT INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (fiscal_period_id, scenario, item_name, month)
+                        DO UPDATE SET amount = EXCLUDED.amount
+                    ''', (fiscal_period_id, scenario, item_name, month, amount))
+                else:
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (fiscal_period_id, scenario, item_name, month, amount))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error saving forecast item: {e}")
+            return False
+
+    # --- 補助科目管理 ---
+    
+    def get_sub_accounts_for_parent(self, fiscal_period_id, scenario, parent_item):
+        conn = self._get_connection()
+        query = self._format_query("SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ?")
+        df = pd.read_sql_query(query, conn, params=(fiscal_period_id, scenario, parent_item))
+        conn.close()
+        return df
+        
+    def save_sub_account(self, fiscal_period_id, scenario, parent_item, sub_name, month_values):
+        # IDを確実に整数に変換
+        try:
+            if isinstance(fiscal_period_id, bytes):
+                import struct
+                fiscal_period_id = struct.unpack('<Q', fiscal_period_id.ljust(8, b'\x00'))[0]
+            fiscal_period_id = int(fiscal_period_id)
+        except:
+            pass
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            for month, amount in month_values.items():
+                if self.use_postgres:
+                    cursor.execute('''
+                        INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (fiscal_period_id, scenario, parent_item, sub_account_name, month)
+                        DO UPDATE SET amount = EXCLUDED.amount
+                    ''', (fiscal_period_id, scenario, parent_item, sub_name, month, amount))
+                else:
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (fiscal_period_id, scenario, parent_item, sub_name, month, amount))
+            
+            # 親項目の合計値を更新
+            self._update_parent_from_subs(fiscal_period_id, scenario, parent_item)
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error saving sub account: {e}")
+            return False
+            
+    def delete_sub_account(self, fiscal_period_id, scenario, parent_item, sub_name):
+        # IDを確実に整数に変換
+        try:
+            if isinstance(fiscal_period_id, bytes):
+                import struct
+                fiscal_period_id = struct.unpack('<Q', fiscal_period_id.ljust(8, b'\x00'))[0]
+            fiscal_period_id = int(fiscal_period_id)
+        except:
+            pass
+
+        try:
+            query = self._format_query("DELETE FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ? AND sub_account_name = ?")
+            self._execute_query(
+                query,
+                (fiscal_period_id, scenario, parent_item, sub_name)
+            )
+            # 親項目の合計値を更新
+            self._update_parent_from_subs(fiscal_period_id, scenario, parent_item)
+            return True
+        except Exception as e:
+            print(f"Error deleting sub account: {e}")
+            return False
+            
+    def _update_parent_from_subs(self, fiscal_period_id, scenario, parent_item):
+        """補助科目の合計を親項目の予測値に反映"""
+        conn = self._get_connection()
+        query = self._format_query("SELECT month, SUM(amount) as total FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ? GROUP BY month")
+        df = pd.read_sql_query(query, conn, params=(fiscal_period_id, scenario, parent_item))
+        conn.close()
+        
+        if not df.empty:
+            month_values = dict(zip(df['month'], df['total']))
+            self.save_forecast_item(fiscal_period_id, scenario, parent_item, month_values)
+
+    # --- PL計算 ---
+    
     def calculate_pl(self, actuals_df, forecasts_df, split_index, months):
         """
         損益計算書を計算 (要件定義書の3.2に準拠)
@@ -980,19 +799,29 @@ class DataProcessor:
         
         return df
 
+    # --- データインポート ---
+    
     def import_yayoi_excel(self, file_path, fiscal_period_id, preview_only=False):
         """
         弥生会計Excelからデータをインポート
         preview_only=True の場合はプレビュー用のDataFrameを返す
         """
         try:
+            # IDを確実に整数に変換
+            try:
+                if isinstance(fiscal_period_id, bytes):
+                    # SQLiteで稀に発生するバイナリIDの対応
+                    import struct
+                    fiscal_period_id = struct.unpack('<Q', fiscal_period_id.ljust(8, b'\x00'))[0]
+                fiscal_period_id = int(fiscal_period_id)
+            except:
+                pass
+
             # 会計期の情報を取得
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT start_date, end_date FROM fiscal_periods WHERE id = ?",
-                (fiscal_period_id,)
-            )
+            query = self._format_query("SELECT start_date, end_date FROM fiscal_periods WHERE id = ?")
+            cursor.execute(query, (fiscal_period_id,))
             result = cursor.fetchone()
             conn.close()
             
@@ -1096,22 +925,29 @@ class DataProcessor:
             imported_df = imported_df.sort_values('項目名').reset_index(drop=True)
             
             return imported_df, "データ抽出に成功しました"
-
+            
         except Exception as e:
             return pd.DataFrame(), str(e)
 
     def save_extracted_data(self, fiscal_period_id, imported_df):
         """抽出されたDataFrameをデータベースに保存"""
+        # IDを確実に整数に変換
+        try:
+            if isinstance(fiscal_period_id, bytes):
+                import struct
+                fiscal_period_id = struct.unpack('<Q', fiscal_period_id.ljust(8, b'\x00'))[0]
+            fiscal_period_id = int(fiscal_period_id)
+        except:
+            pass
+
         conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             
             # 既存のデータを削除
-            if self.use_postgres:
-                cursor.execute("DELETE FROM actual_data WHERE fiscal_period_id = %s", (fiscal_period_id,))
-            else:
-                cursor.execute("DELETE FROM actual_data WHERE fiscal_period_id = ?", (fiscal_period_id,))
+            query = self._format_query("DELETE FROM actual_data WHERE fiscal_period_id = ?")
+            cursor.execute(query, (fiscal_period_id,))
             
             months = [c for c in imported_df.columns if c != '項目名']
             
