@@ -901,11 +901,15 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 
                 st.markdown("""
                 <div class="info-box">
-                    <strong>💡 使い方:</strong> 販売管理費の各項目について、詳細な内訳(補助科目)を入力できます。
+                    <strong>💡 使い方:</strong> 売上高、売上原価、販売管理費の各項目について、詳細な内訳(補助科目)を入力できます。
                 </div>
                 """, unsafe_allow_html=True)
                 
-                parent_item = st.selectbox("親項目を選択", processor.ga_items)
+                parent_item = st.selectbox(
+                    "親項目を選択", 
+                    processor.parent_items_with_sub_accounts,
+                    help="売上高、売上原価、販売管理費の詳細内訳を入力できます"
+                )
                 
                 # 既存の補助科目を取得
                 existing_subs = processor.get_sub_accounts_for_parent(
@@ -1038,94 +1042,235 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         elif st.session_state.page == "データインポート":
             st.title("📥 データインポート")
             
-            st.markdown("""
-            <div class="info-box">
-                <strong>💡 使い方:</strong> 弥生会計からエクスポートしたExcelファイルをアップロードしてください。
-            </div>
-            """, unsafe_allow_html=True)
+            # タブで実績データと予測データを分ける
+            tab1, tab2 = st.tabs(["💰 実績データインポート", "📊 予測データインポート"])
             
-            uploaded_file = st.file_uploader(
-                "Excelファイルを選択",
-                type=['xlsx', 'xls'],
-                help="弥生会計の月次推移表をアップロードしてください"
-            )
-            
-            # ファイルが削除された場合のキャッシュクリア
-            if uploaded_file is None:
-                if 'imported_df' in st.session_state:
-                    del st.session_state.imported_df
-                if 'show_import_button' in st.session_state:
-                    del st.session_state.show_import_button
-            
-            if uploaded_file:
-                if 'imported_df' not in st.session_state:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
-                        tmp_file.write(uploaded_file.read())
-                        temp_path = tmp_file.name
-                        st.session_state.temp_path_to_delete = temp_path
+            # ===== タブ1: 実績データインポート =====
+            with tab1:
+                st.markdown("""
+                <div class="info-box">
+                    <strong>💡 使い方:</strong> 弥生会計からエクスポートしたExcelファイルをアップロードしてください。
+                </div>
+                """, unsafe_allow_html=True)
+                
+                uploaded_file = st.file_uploader(
+                    "Excelファイルを選択（実績データ）",
+                    type=['xlsx', 'xls'],
+                    help="弥生会計の月次推移表をアップロードしてください",
+                    key="actual_upload"
+                )
+                
+                # ファイルが削除された場合のキャッシュクリア
+                if uploaded_file is None:
+                    if 'imported_df' in st.session_state:
+                        del st.session_state.imported_df
+                    if 'show_import_button' in st.session_state:
+                        del st.session_state.show_import_button
+                
+                if uploaded_file:
+                    if 'imported_df' not in st.session_state:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
+                            tmp_file.write(uploaded_file.read())
+                            temp_path = tmp_file.name
+                            st.session_state.temp_path_to_delete = temp_path
+                            
+                        st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
                         
-                    st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
-                    
-                    # fiscal_period_idを渡す
-                    st.session_state.imported_df, info = processor.import_yayoi_excel(
-                        temp_path, 
-                        st.session_state.selected_period_id,
-                        preview_only=True
-                    )
-                    st.session_state.show_import_button = True
-                    
-                    # 一時ファイルを削除
-                    if os.path.exists(temp_path):
-                        os.unlink(temp_path)
-                    
-                if st.session_state.get('show_import_button'):
-                    st.subheader("📋 インポートデータ プレビュー（直接編集可能）")
-                    
-                    st.markdown("""
-                    <div class="info-box">
-                        <strong>✏️ 編集:</strong> セルをダブルクリックして値を直接修正できます。
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # 編集可能なデータエディタを使用
-                    edited_df = st.data_editor(
-                        st.session_state.imported_df,
-                        use_container_width=True,
-                        height=400,
-                        num_rows="fixed",  # 行の追加・削除は不可
-                        disabled=["項目名"],  # 項目名列は編集不可
-                        column_config={
-                            col: st.column_config.NumberColumn(
-                                format="¥%d",
-                                min_value=-999999999,
-                                max_value=999999999
-                            ) for col in st.session_state.imported_df.columns if col != '項目名'
-                        }
-                    )
-                    
-                    # 編集後のデータを保存
-                    st.session_state.imported_df = edited_df
-                    
-                    st.markdown("""
-                    <div class="warning-box">
-                        <strong>⚠️ 注意:</strong> 上記の内容でインポートを実行すると、現在の実績データは上書きされます。
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button("✅ 上記内容でインポートを実行", type="primary"):
-                        success, info = processor.save_extracted_data(
+                        # fiscal_period_idを渡す
+                        st.session_state.imported_df, info = processor.import_yayoi_excel(
+                            temp_path, 
                             st.session_state.selected_period_id,
-                            st.session_state.imported_df
+                            preview_only=True
                         )
-                        if success:
-                            st.success("✅ インポートが完了しました！")
-                            # キャッシュクリア
-                            for key in ['actuals_df', 'imported_df', 'show_import_button']:
-                                if key in st.session_state:
-                                    del st.session_state[key]
-                            st.rerun()
-                        else:
-                            st.error(f"❌ インポートに失敗しました: {info}")
+                        st.session_state.show_import_button = True
+                        
+                        # 一時ファイルを削除
+                        if os.path.exists(temp_path):
+                            os.unlink(temp_path)
+                        
+                    if st.session_state.get('show_import_button'):
+                        st.subheader("📋 インポートデータ プレビュー（直接編集可能）")
+                        
+                        st.markdown("""
+                        <div class="info-box">
+                            <strong>✏️ 編集:</strong> セルをダブルクリックして値を直接修正できます。
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # 編集可能なデータエディタを使用
+                        edited_df = st.data_editor(
+                            st.session_state.imported_df,
+                            use_container_width=True,
+                            height=400,
+                            num_rows="fixed",  # 行の追加・削除は不可
+                            disabled=["項目名"],  # 項目名列は編集不可
+                            column_config={
+                                col: st.column_config.NumberColumn(
+                                    format="¥%d",
+                                    min_value=-999999999,
+                                    max_value=999999999
+                                ) for col in st.session_state.imported_df.columns if col != '項目名'
+                            }
+                        )
+                        
+                        # 編集後のデータを保存
+                        st.session_state.imported_df = edited_df
+                        
+                        st.markdown("""
+                        <div class="warning-box">
+                            <strong>⚠️ 注意:</strong> 上記の内容でインポートを実行すると、現在の実績データは上書きされます。
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if st.button("✅ 上記内容でインポートを実行", type="primary", key="import_actual"):
+                            success, info = processor.save_extracted_data(
+                                st.session_state.selected_period_id,
+                                st.session_state.imported_df
+                            )
+                            if success:
+                                st.success("✅ インポートが完了しました！")
+                                # キャッシュクリア
+                                for key in ['actuals_df', 'imported_df', 'show_import_button']:
+                                    if key in st.session_state:
+                                        del st.session_state[key]
+                                st.rerun()
+                            else:
+                                st.error(f"❌ インポートに失敗しました: {info}")
+            
+            # ===== タブ2: 予測データインポート =====
+            with tab2:
+                st.markdown("""
+                <div class="info-box">
+                    <strong>💡 使い方:</strong><br>
+                    1. テンプレートをダウンロード<br>
+                    2. Excelで予測数値を入力<br>
+                    3. ファイルをアップロード
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # シナリオ選択
+                forecast_scenario = st.selectbox(
+                    "インポート先シナリオを選択",
+                    ["現実", "楽観", "悲観"],
+                    key="forecast_import_scenario"
+                )
+                
+                # テンプレートダウンロード
+                st.subheader("📥 ステップ1: テンプレートをダウンロード")
+                
+                template_df = processor.create_forecast_template(
+                    st.session_state.selected_period_id,
+                    forecast_scenario
+                )
+                
+                if template_df is not None:
+                    # Excelファイルとして出力
+                    from io import BytesIO
+                    output = BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        template_df.to_excel(writer, index=False, sheet_name='予測データ')
+                    excel_data = output.getvalue()
+                    
+                    st.download_button(
+                        label="📥 予測データテンプレートをダウンロード",
+                        data=excel_data,
+                        file_name=f"予測データテンプレート_{forecast_scenario}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        type="primary"
+                    )
+                    
+                    st.info("""
+                    💡 **テンプレートの使い方:**
+                    - 各項目の予測数値を月ごとに入力してください
+                    - 0のままの項目はインポートされません
+                    - 項目名の列は変更しないでください
+                    """)
+                
+                st.markdown("---")
+                
+                # ファイルアップロード
+                st.subheader("📤 ステップ2: 入力済みファイルをアップロード")
+                
+                forecast_file = st.file_uploader(
+                    "予測データExcelファイルを選択",
+                    type=['xlsx', 'xls'],
+                    help="入力済みのテンプレートファイルをアップロードしてください",
+                    key="forecast_upload"
+                )
+                
+                # ファイルが削除された場合のキャッシュクリア
+                if forecast_file is None:
+                    if 'forecast_imported_df' in st.session_state:
+                        del st.session_state.forecast_imported_df
+                    if 'show_forecast_import_button' in st.session_state:
+                        del st.session_state.show_forecast_import_button
+                
+                if forecast_file:
+                    if 'forecast_imported_df' not in st.session_state:
+                        try:
+                            # Excelファイルを読み込み
+                            forecast_df = pd.read_excel(forecast_file)
+                            
+                            # 基本的なバリデーション
+                            if '項目名' not in forecast_df.columns:
+                                st.error("❌ テンプレート形式が正しくありません。「項目名」列が見つかりません。")
+                            else:
+                                st.success(f"✅ ファイル **{forecast_file.name}** を読み込みました")
+                                st.session_state.forecast_imported_df = forecast_df
+                                st.session_state.show_forecast_import_button = True
+                        
+                        except Exception as e:
+                            st.error(f"❌ ファイルの読み込みに失敗しました: {str(e)}")
+                    
+                    if st.session_state.get('show_forecast_import_button'):
+                        st.subheader("📋 インポートデータ プレビュー（直接編集可能）")
+                        
+                        st.markdown("""
+                        <div class="info-box">
+                            <strong>✏️ 編集:</strong> セルをダブルクリックして値を直接修正できます。
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # 編集可能なデータエディタを使用
+                        edited_forecast_df = st.data_editor(
+                            st.session_state.forecast_imported_df,
+                            use_container_width=True,
+                            height=400,
+                            num_rows="fixed",
+                            disabled=["項目名"],
+                            column_config={
+                                col: st.column_config.NumberColumn(
+                                    format="¥%d",
+                                    min_value=-999999999,
+                                    max_value=999999999
+                                ) for col in st.session_state.forecast_imported_df.columns if col != '項目名'
+                            }
+                        )
+                        
+                        # 編集後のデータを保存
+                        st.session_state.forecast_imported_df = edited_forecast_df
+                        
+                        st.markdown(f"""
+                        <div class="warning-box">
+                            <strong>⚠️ 注意:</strong> 上記の内容でインポートを実行すると、「{forecast_scenario}」シナリオの予測データが上書きされます。
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if st.button("✅ 予測データをインポート", type="primary", key="import_forecast"):
+                            success, info = processor.save_forecast_from_excel(
+                                st.session_state.selected_period_id,
+                                forecast_scenario,
+                                st.session_state.forecast_imported_df
+                            )
+                            if success:
+                                st.success(f"✅ {info}")
+                                # キャッシュクリア
+                                for key in ['forecasts_df', 'forecast_imported_df', 'show_forecast_import_button']:
+                                    if key in st.session_state:
+                                        del st.session_state[key]
+                                st.rerun()
+                            else:
+                                st.error(f"❌ インポートに失敗しました: {info}")
         
         elif st.session_state.page == "シナリオ一括設定":
             st.title("🎯 シナリオ一括設定")
