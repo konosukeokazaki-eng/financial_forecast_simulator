@@ -709,13 +709,13 @@ class DataProcessor:
                     )
             
             conn.commit()
-            return True
+            return True, "実績データを保存しました"
         except Exception as e:
             sys.stderr.write(f"Error saving actual data: {e}\n")
             sys.stderr.flush()
             if conn:
                 conn.rollback()
-            return False
+            return False, str(e)
         finally:
             if conn:
                 conn.close()
@@ -760,7 +760,7 @@ class DataProcessor:
             conn.commit()
             sys.stderr.write(f"✅ 保存成功: {saved_count}件のデータを保存しました\n")
             sys.stderr.flush()
-            return True
+            return True, f"{saved_count}件の予測データを保存しました"
         except Exception as e:
             sys.stderr.write(f"❌ Error saving forecast data: {e}\n")
             import traceback
@@ -768,7 +768,7 @@ class DataProcessor:
             sys.stderr.flush()
             if conn:
                 conn.rollback()
-            return False
+            return False, str(e)
         finally:
             if conn:
                 conn.close()
