@@ -969,7 +969,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 
                                                 for i, month in enumerate(months):
                                                     with cols_sub[i % 4]:
-                                                        current_val = 0
+                                                        current_val = 0.0
                                                         if month in sub.index:
                                                             val = sub[month]
                                                             if pd.notna(val):
@@ -1060,7 +1060,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 for i, month in enumerate(months):
                                     with cols[i % 4]:
-                                        current_val = 0
+                                        current_val = 0.0
                                         if not item_data.empty and month in item_data.columns:
                                             val = item_data[month].iloc[0]
                                             if pd.notna(val):
@@ -1111,7 +1111,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             for i, month in enumerate(months):
                 with cols[i % 4]:
-                    current_val = 0
+                    current_val = 0.0
                     if not current_values.empty and month in current_values.columns:
                         current_val = current_values[month].iloc[0]
                     
