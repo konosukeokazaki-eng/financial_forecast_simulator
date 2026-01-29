@@ -433,7 +433,14 @@ class DataProcessor:
 
         conn = self._get_connection()
         try:
-            df = pd.read_sql_query(query, conn, params=params)
+            # PostgreSQLの場合はSQLAlchemyエンジンを使用（警告回避）
+            if self.use_postgres:
+                from sqlalchemy import create_engine
+                engine = create_engine(self.conn_string)
+                df = pd.read_sql_query(query, engine, params=params)
+                engine.dispose()
+            else:
+                df = pd.read_sql_query(query, conn, params=params)
             
             # SQLiteでIDがバイナリ形式で返ってくる場合の対策
             for col in df.columns:
@@ -442,7 +449,8 @@ class DataProcessor:
             
             return df
         finally:
-            conn.close()
+            if not self.use_postgres:
+                conn.close()
 
     def _sort_months(self, df, fiscal_period_id):
         """月を会計期間の順序でソート"""
