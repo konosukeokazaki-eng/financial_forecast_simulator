@@ -358,233 +358,646 @@ else:
             "悲観": -0.1
         }
     
-    # メニュー
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📋 メニュー")
+    if st.session_state.scenario != "現実":
+        st.sidebar.markdown("---")
+        rate_key = f"{st.session_state.scenario}_rate"
+        initial_rate = st.session_state.scenario_rates[st.session_state.scenario] * 100
+        
+        new_rate = st.sidebar.number_input(
+            f"📈 {st.session_state.scenario}シナリオ増減率 (%)",
+            value=initial_rate,
+            min_value=-100.0,
+            max_value=100.0,
+            step=1.0,
+            key=rate_key
+        ) / 100.0
+        
+        st.session_state.scenario_rates[st.session_state.scenario] = new_rate
+
+    # 実績データ最終月
+    months = processor.get_fiscal_months(selected_comp_id, st.session_state.get('selected_period_id'))
+    current_month = st.sidebar.selectbox(
+        "📆 実績データ最終月",
+        months,
+        key="month_select"
+    )
+    st.session_state.current_month = current_month
+
+    # 表示設定
+    st.sidebar.markdown("### ⚙️ 表示設定")
+    st.session_state.display_mode = st.sidebar.radio(
+        "表示モード",
+        ["要約", "詳細"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
     
-    menu_options = [
+    st.sidebar.markdown("---")
+    
+    # メニュー
+    st.sidebar.markdown("### 📋 メニュー")
+    menu = [
         "着地予測ダッシュボード",
-        "月次推移詳細",
-        "予測データ入力",
+        "比較分析レポート",
+        "全体予測PL & 補助科目入力",
         "実績データ入力",
         "データインポート",
         "シナリオ一括設定",
         "システム設定"
     ]
     
-    st.session_state.page = st.sidebar.radio(
-        "画面を選択",
-        menu_options,
+    # メニューアイコン
+    menu_icons = {
+        "着地予測ダッシュボード": "📊",
+        "比較分析レポート": "📈",
+        "全体予測PL & 補助科目入力": "📝",
+        "実績データ入力": "⌨️",
+        "データインポート": "📥",
+        "シナリオ一括設定": "🎯",
+        "システム設定": "⚙️"
+    }
+    
+    selected_menu = st.sidebar.radio(
+        "移動先を選択",
+        menu,
+        index=menu.index(st.session_state.page) if st.session_state.page in menu else 0,
+        format_func=lambda x: f"{menu_icons.get(x, '•')} {x}",
         label_visibility="collapsed"
     )
-
-# --------------------------------------------------------------------------------
-# 共通関数
-# --------------------------------------------------------------------------------
-def format_currency(val):
-    """通貨フォーマット"""
-    if val >= 0:
-        return f"¥{val:,.0f}"
-    else:
-        return f"△¥{abs(val):,.0f}"
-
-def color_negative_red(val):
-    """負の値を赤色にする"""
-    color = 'red' if val < 0 else 'black'
-    return f'color: {color}'
-
-# --------------------------------------------------------------------------------
-# メインコンテンツ
-# --------------------------------------------------------------------------------
-if selected_period_id:
-    # データの読み込み
-    if 'actuals_df' not in st.session_state:
-        st.session_state.actuals_df = processor.load_actual_data(selected_period_id)
-    if 'forecasts_df' not in st.session_state:
-        st.session_state.forecasts_df = processor.load_forecast_data(selected_period_id, st.session_state.scenario)
+    st.session_state.page = selected_menu
     
-    actuals_df = st.session_state.actuals_df
-    forecasts_df = st.session_state.forecasts_df
+    # 通貨フォーマット
+    def format_currency(val):
+        if isinstance(val, (int, float, complex)) and not isinstance(val, bool):
+            if pd.isna(val):
+                return ""
+            return f"¥{int(val):,}"
+        return val
     
-    # 会計期間の月リスト
-    months = processor.get_fiscal_months(selected_period_id)
+# システム設定ページは常に表示（会社・期未登録でも使用可能）
+if st.session_state.page == "システム設定":
+    st.title("⚙️ システム設定")
     
-    # 実績と予測の切り替わり月を特定（実績がある最後の月）
-    # 実績データがある月を特定
-    actual_months_with_data = []
-    for m in months:
-        if m in actuals_df.columns and actuals_df[m].sum() != 0:
-            actual_months_with_data.append(m)
+    tab1, tab2, tab3 = st.tabs(["🏢 会社設定", "📅 会計期間設定", "🔍 データベース診断"])
     
-    if actual_months_with_data:
-        last_actual_month = actual_months_with_data[-1]
-        split_index = months.index(last_actual_month) + 1
-    else:
-        split_index = 0
+    with tab1:
+        st.subheader("会社登録")
+        
+        with st.form("company_form"):
+            company_name = st.text_input("会社名", placeholder="例: 株式会社サンプル")
+            submitted = st.form_submit_button("➕ 会社を追加", type="primary")
+            
+            if submitted:
+                st.write(f"🔍 デバッグ: フォーム送信検知")
+                st.write(f"   入力された会社名: '{company_name}'")
+                
+                if company_name:
+                    st.write(f"   add_company()を呼び出し中...")
+                    try:
+                        success = processor.add_company(company_name)
+                        st.write(f"   結果: {success}")
+                        
+                        if success:
+                            st.success(f"✅ 会社 **{company_name}** を追加しました")
+                            st.write("   ページをリロードします...")
+                            st.rerun()
+                        else:
+                            st.error("❌ 会社の追加に失敗しました")
+                    except Exception as e:
+                        st.error(f"❌ エラー発生: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
+                else:
+                    st.error("❌ 会社名を入力してください")
+        
+        st.markdown("---")
+        
+        # 登録済み会社一覧
+        st.subheader("📋 登録済み会社一覧")
+        
+        companies_list = processor.get_companies()
+        if not companies_list.empty:
+            st.dataframe(companies_list, width=800)
+        else:
+            st.info("登録されている会社がありません")
     
-    # PL計算
-    pl_df = processor.calculate_pl(actuals_df, forecasts_df, split_index, months)
+    with tab2:
+        st.subheader("会計期間登録")
+        
+        # 会社が登録されているかチェック
+        companies_for_period = processor.get_companies()
+        if companies_for_period.empty:
+            st.warning("⚠️ まず会社を登録してください")
+        else:
+            with st.form("period_form"):
+                comp_id_for_period = st.selectbox(
+                    "会社を選択",
+                    companies_for_period['id'].tolist(),
+                    format_func=lambda x: companies_for_period[companies_for_period['id'] == x]['name'].iloc[0]
+                )
+                period_num = st.number_input("期数", min_value=1, step=1, value=1)
+                start_date = st.date_input("開始日")
+                end_date = st.date_input("終了日")
+                
+                if st.form_submit_button("➕ 期を追加", type="primary"):
+                    if start_date and end_date:
+                        if start_date < end_date:
+                            success = processor.add_fiscal_period(comp_id_for_period, period_num, str(start_date), str(end_date))
+                            if success:
+                                st.success(f"✅ 第{period_num}期を追加しました")
+                                st.rerun()
+                            else:
+                                st.error("❌ 期の追加に失敗しました")
+                        else:
+                            st.error("❌ 終了日は開始日より後である必要があります")
+                    else:
+                        st.error("❌ すべてのフィールドを入力してください")
+            
+            st.markdown("---")
+            
+            # 登録済み期間一覧
+            st.subheader("📋 登録済み会計期間")
+            
+            if 'selected_comp_id' in st.session_state and st.session_state.selected_comp_id:
+                periods_list = processor.get_company_periods(st.session_state.selected_comp_id)
+                if not periods_list.empty:
+                    st.dataframe(periods_list, width=800)
+                else:
+                    st.info("登録されている会計期間がありません")
+            else:
+                st.info("会社を選択すると、その会社の期間が表示されます")
     
-    # ページごとの表示
-    if st.session_state.page == "着地予測ダッシュボード":
-        st.title("📊 着地予測ダッシュボード")
+    with tab3:
+        st.subheader("🔍 データベース診断")
         
-        # サマリー指標
-        total_row = pl_df[pl_df['項目名'] == "当期純損益金額"]
-        sales_row = pl_df[pl_df['項目名'] == "売上高"]
-        op_row = pl_df[pl_df['項目名'] == "営業損益金額"]
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            val = sales_row['合計'].iloc[0]
-            st.markdown(f"""
-            <div class="summary-card-blue">
-                <p class="card-title">通期売上高予測</p>
-                <p class="card-value">{format_currency(val)}</p>
-                <p class="card-subtitle">実績: {format_currency(sales_row['実績合計'].iloc[0])} / 予測: {format_currency(sales_row['予測合計'].iloc[0])}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with col2:
-            val = op_row['合計'].iloc[0]
-            st.markdown(f"""
-            <div class="summary-card-green">
-                <p class="card-title">通期営業利益予測</p>
-                <p class="card-value">{format_currency(val)}</p>
-                <p class="card-subtitle">利益率: {(val/sales_row['合計'].iloc[0]*100 if sales_row['合計'].iloc[0] != 0 else 0):.1f}%</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with col3:
-            val = total_row['合計'].iloc[0]
-            st.markdown(f"""
-            <div class="summary-card">
-                <p class="card-title">通期純利益予測</p>
-                <p class="card-value">{format_currency(val)}</p>
-                <p class="card-subtitle">前月比: -</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with col4:
-            # 進捗率（月数ベース）
-            progress = (split_index / len(months)) * 100
-            st.markdown(f"""
-            <div class="summary-card-orange">
-                <p class="card-title">会計期間進捗</p>
-                <p class="card-value">{progress:.0f}%</p>
-                <p class="card-subtitle">{split_index}ヶ月経過 / 残り{len(months)-split_index}ヶ月</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        # グラフ表示
-        st.markdown("### 📈 月次推移グラフ")
-        
-        # グラフ用データの準備
-        plot_df = pl_df[pl_df['タイプ'] == "要約"].copy()
-        plot_data = []
-        for m in months:
-            for _, row in plot_df.iterrows():
-                plot_data.append({
-                    '月': m,
-                    '項目': row['項目名'],
-                    '金額': row[m],
-                    '種別': '実績' if months.index(m) < split_index else '予測'
-                })
-        plot_df_long = pd.DataFrame(plot_data)
-        
-        fig = px.bar(
-            plot_df_long[plot_df_long['項目'] == "売上高"],
-            x='月', y='金額', color='種別',
-            title="売上高推移",
-            color_discrete_map={'実績': '#1f77b4', '予測': '#aec7e8'}
-        )
-        
-        # 利益ラインを追加
-        profit_data = plot_df_long[plot_df_long['項目'] == "営業損益金額"]
-        fig.add_trace(go.Scatter(
-            x=profit_data['月'], y=profit_data['金額'],
-            name='営業利益', line=dict(color='#ff7f0e', width=3)
-        ))
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # 簡易PL表示
-        st.markdown("### 📋 損益計算書サマリー")
-        summary_pl = pl_df[pl_df['タイプ'] == "要約"][['項目名', '実績合計', '予測合計', '合計']]
-        st.dataframe(
-            summary_pl.style.format({
-                '実績合計': format_currency,
-                '予測合計': format_currency,
-                '合計': format_currency
-            }),
-            use_container_width=True
-        )
-
-    elif st.session_state.page == "月次推移詳細":
-        st.title("📅 月次推移詳細")
-        
-        # フィルター
-        show_type = st.radio("表示項目", ["すべて", "要約のみ", "詳細のみ"], horizontal=True)
-        
-        display_df = pl_df.copy()
-        if show_type == "要約のみ":
-            display_df = display_df[display_df['タイプ'] == "要約"]
-        elif show_type == "詳細のみ":
-            display_df = display_df[display_df['タイプ'] == "詳細"]
-            
-        # 表示列の選択
-        cols = ['項目名'] + months + ['合計']
-        
-        # スタイル適用
-        st.dataframe(
-            display_df[cols].style.format({m: format_currency for m in months + ['合計']})
-            .applymap(color_negative_red, subset=months + ['合計']),
-            use_container_width=True,
-            height=600
-        )
-        
-        # CSVダウンロード
-        csv = display_df[cols].to_csv(index=False).encode('utf_8_sig')
-        st.download_button(
-            "📥 CSVとしてダウンロード",
-            csv,
-            f"financial_report_{selected_comp_name}_{selected_period_num}.csv",
-            "text/csv",
-            key='download-csv'
-        )
-
-    elif st.session_state.page == "予測データ入力":
-        st.title("🔮 予測データ入力")
-        
-        tab1, tab2 = st.tabs(["主要項目入力", "補助科目入力"])
-        
-        with tab1:
-            st.subheader(f"シナリオ: {st.session_state.scenario}")
-            
+        # 接続状態
+        st.markdown("### 📡 接続状態")
+        if processor.use_postgres:
+            st.success("✅ **PostgreSQL (Supabase) 接続中**")
             st.markdown("""
-            <div class="info-box">
-                <strong>💡 使い方:</strong> 各項目の月次予測値を入力してください。
-                補助科目が設定されている項目は、補助科目の合計が自動的に反映されます。
+            <div class="success-box">
+                <strong>データは永続的に保存されます</strong><br>
+                • アプリ再起動後もデータが残ります<br>
+                • 複数デバイスから同じデータにアクセス可能<br>
+                • データは安全にクラウドに保存されています
             </div>
             """, unsafe_allow_html=True)
             
-            # 編集可能な項目
-            editable_items = [item for item in processor.all_items if item not in processor.calculated_items]
+            # Supabase設定情報
+            if hasattr(st, 'secrets') and 'database' in st.secrets:
+                st.markdown("### ⚙️ Supabase設定")
+                config_info = {
+                    "項目": ["ホスト", "データベース", "ユーザー", "ポート"],
+                    "値": [
+                        st.secrets['database']['host'],
+                        st.secrets['database']['database'],
+                        st.secrets['database']['user'],
+                        str(st.secrets['database']['port'])
+                    ]
+                }
+                st.table(pd.DataFrame(config_info))
+        else:
+            st.warning("⚠️ **SQLite ローカルデータベース使用中**")
+            st.markdown("""
+            <div class="warning-box">
+                <strong>データは一時的です</strong><br>
+                • Streamlit Cloudではアプリ再起動時にデータが消えます<br>
+                • ローカル環境では問題なく動作します<br>
+                • 永続化するにはSupabaseの設定が必要です
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # データ統計
+        st.markdown("### 📊 データ統計")
+        
+        companies_stat = processor.get_companies()
+        total_companies = len(companies_stat)
+        
+        st.metric("登録会社数", f"{total_companies}社")
+        
+        if total_companies > 0 and 'selected_comp_id' in st.session_state and st.session_state.selected_comp_id:
+            periods_stat = processor.get_company_periods(st.session_state.selected_comp_id)
+            st.metric("会計期間数", f"{len(periods_stat)}期")
+        
+        # 接続テスト
+        st.markdown("---")
+        st.markdown("### 🧪 接続テスト")
+        
+        if st.button("🔄 データベース接続をテスト", type="primary"):
+            with st.spinner("接続テスト中..."):
+                try:
+                    # 簡単なクエリで接続テスト
+                    test_result = processor.get_companies()
+                    st.success(f"✅ 接続成功！会社データを{len(test_result)}件取得しました")
+                except Exception as e:
+                    st.error(f"❌ 接続失敗: {str(e)}")
+
+# データの読み込み（期が選択されている場合のみ）
+if 'selected_period_id' in st.session_state and st.session_state.selected_period_id is not None:
+        actuals_df = processor.load_actual_data(st.session_state.selected_period_id)
+        forecasts_df = processor.load_forecast_data(st.session_state.selected_period_id, "現実")
+        
+        # シナリオ調整
+        if st.session_state.scenario != "現実":
+            rate = st.session_state.scenario_rates[st.session_state.scenario]
+            split_idx = processor.get_split_index(
+                st.session_state.selected_comp_id,
+                st.session_state.current_month,
+                st.session_state.selected_period_id
+            )
+            forecast_months = months[split_idx:]
+            # DataFrameに存在する月のみを使用
+            available_forecast_months = [m for m in forecast_months if m in forecasts_df.columns]
             
-            selected_item = st.selectbox("編集する項目", editable_items)
+            for item in processor.all_items:
+                if item == "売上高":
+                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 + rate)
+                elif item == "売上原価":
+                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.5)
+                elif item in processor.ga_items:
+                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.3)
+                    
+            st.session_state.adjusted_forecasts_df = forecasts_df.copy()
+        
+        # 補助科目合計の反映
+        sub_accounts_df = processor.load_sub_accounts(st.session_state.selected_period_id, st.session_state.scenario)
+        if not sub_accounts_df.empty:
+            aggregated = sub_accounts_df.groupby(['parent_item', 'month'])['amount'].sum().reset_index()
+            for _, row in aggregated.iterrows():
+                parent = row['parent_item']
+                month = row['month']
+                amount = row['amount']
+                forecasts_df.loc[forecasts_df['項目名'] == parent, month] = amount
+        
+        # PL計算
+        pl_df = processor.calculate_pl(
+            actuals_df,
+            forecasts_df,
+            processor.get_split_index(
+                st.session_state.selected_comp_id,
+                st.session_state.current_month,
+                st.session_state.selected_period_id
+            ),
+            months
+        )
+        
+        # 表示モードでフィルタ
+        if st.session_state.display_mode == "要約":
+            pl_display = pl_df[pl_df['タイプ'] == '要約']
+        else:
+            pl_display = pl_df
+        
+        # --------------------------------------------------------------------------------
+        # ページコンテンツ
+        # --------------------------------------------------------------------------------
+        
+        if st.session_state.page == "着地予測ダッシュボード":
+            st.title("📊 着地予測ダッシュボード")
             
-            st.markdown(f"### {selected_item} の予測値入力")
+            st.markdown(f"""
+            <div class="info-box">
+                <strong>🏢 {st.session_state.selected_comp_name}</strong> | 
+                第{st.session_state.selected_period_num}期 | 
+                実績: {st.session_state.start_date} 〜 {st.session_state.current_month} | 
+                シナリオ: <strong>{st.session_state.scenario}</strong>
+            </div>
+            """, unsafe_allow_html=True)
             
-            # 現在の値を表示
-            current_values = forecasts_df[forecasts_df['項目名'] == selected_item]
+            # KPIサマリーカード
+            col1, col2, col3, col4, col5 = st.columns(5)
             
-            # 入力フォーム
-            with st.form(f"forecast_form_{selected_item}"):
-                cols = st.columns(4)
-                new_values = {}
+            with col1:
+                sales_total = pl_display[pl_display['項目名'] == '売上高']['合計'].iloc[0]
+                st.markdown(f"""
+                <div class="summary-card-blue">
+                    <div class="card-title">売上高</div>
+                    <div class="card-value">¥{int(sales_total):,}</div>
+                    <div class="card-subtitle">期末着地予測</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                gp_total = pl_display[pl_display['項目名'] == '売上総損益金額']['合計'].iloc[0]
+                gp_rate = (gp_total / sales_total * 100) if sales_total != 0 else 0
+                st.markdown(f"""
+                <div class="summary-card-green">
+                    <div class="card-title">売上総利益</div>
+                    <div class="card-value">¥{int(gp_total):,}</div>
+                    <div class="card-subtitle">粗利率: {gp_rate:.1f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                op_total = pl_display[pl_display['項目名'] == '営業損益金額']['合計'].iloc[0]
+                op_rate = (op_total / sales_total * 100) if sales_total != 0 else 0
+                st.markdown(f"""
+                <div class="summary-card-orange">
+                    <div class="card-title">営業利益</div>
+                    <div class="card-value">¥{int(op_total):,}</div>
+                    <div class="card-subtitle">営業利益率: {op_rate:.1f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                ord_total = pl_display[pl_display['項目名'] == '経常損益金額']['合計'].iloc[0]
+                ord_rate = (ord_total / sales_total * 100) if sales_total != 0 else 0
+                st.markdown(f"""
+                <div class="summary-card">
+                    <div class="card-title">経常利益</div>
+                    <div class="card-value">¥{int(ord_total):,}</div>
+                    <div class="card-subtitle">経常利益率: {ord_rate:.1f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col5:
+                net_total = pl_display[pl_display['項目名'] == '当期純損益金額']['合計'].iloc[0]
+                net_rate = (net_total / sales_total * 100) if sales_total != 0 else 0
+                color_class = "summary-card-green" if net_total >= 0 else "summary-card-red"
+                st.markdown(f"""
+                <div class="{color_class}">
+                    <div class="card-title">当期純利益</div>
+                    <div class="card-value">¥{int(net_total):,}</div>
+                    <div class="card-subtitle">純利益率: {net_rate:.1f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # タブで表示切り替え
+            tab1, tab2 = st.tabs(["📊 損益計算書", "📈 グラフ分析"])
+            
+            with tab1:
+                st.subheader("期末着地予測 損益計算書")
+                
+                # スタイル付きデータフレーム
+                def highlight_summary(row):
+                    if row['タイプ'] == '要約':
+                        return ['background-color: #5db5f5; font-weight: bold'] * len(row)
+                    return [''] * len(row)
+                
+                # タイプ列を使ってスタイルを適用してから削除
+                styled_df = pl_display.style\
+                    .apply(highlight_summary, axis=1)\
+                    .format(format_currency, subset=[c for c in pl_display.columns if c not in ['項目名', 'タイプ']])\
+                    .hide(axis="columns", subset=['タイプ'])
+                
+                st.dataframe(styled_df, use_container_width=True, height=600)
+            
+            with tab2:
+                st.subheader("月次推移グラフ")
+                
+                # グラフ用データ準備
+                graph_items = ["売上高", "売上総損益金額", "営業損益金額", "経常損益金額", "当期純損益金額"]
+                graph_df = pl_df[pl_df['項目名'].isin(graph_items)]
+                
+                fig = go.Figure()
+                
+                split_idx = processor.get_split_index(
+                    st.session_state.selected_comp_id,
+                    st.session_state.current_month,
+                    st.session_state.selected_period_id
+                )
+                
+                for item in graph_items:
+                    item_data = graph_df[graph_df['項目名'] == item]
+                    
+                    # 実績部分
+                    actual_months = months[:split_idx]
+                    actual_values = [item_data[m].iloc[0] if m in item_data.columns else 0 for m in actual_months]
+                    
+                    # 予測部分
+                    forecast_months_list = months[split_idx:]
+                    forecast_values = [item_data[m].iloc[0] if m in item_data.columns else 0 for m in forecast_months_list]
+                    
+                    # 実績グラフ
+                    fig.add_trace(go.Scatter(
+                        x=actual_months,
+                        y=actual_values,
+                        name=f"{item} (実績)",
+                        mode='lines+markers',
+                        line=dict(width=3),
+                        marker=dict(size=8)
+                    ))
+                    
+                    # 予測グラフ
+                    if len(forecast_months_list) > 0:
+                        fig.add_trace(go.Scatter(
+                            x=forecast_months_list,
+                            y=forecast_values,
+                            name=f"{item} (予測)",
+                            mode='lines+markers',
+                            line=dict(width=3, dash='dash'),
+                            marker=dict(size=8, symbol='diamond')
+                        ))
+                
+                fig.update_layout(
+                    title="主要指標の月次推移",
+                    xaxis_title="月",
+                    yaxis_title="金額 (円)",
+                    hovermode='x unified',
+                    height=500,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # 構成比グラフ
+                st.subheader("販売管理費 構成比")
+                
+                ga_items_list = processor.ga_items
+                ga_data = pl_df[pl_df['項目名'].isin(ga_items_list)]
+                ga_total_values = ga_data['合計'].values
+                ga_labels = ga_data['項目名'].values
+                
+                # 上位10項目のみ表示
+                ga_df_for_pie = pd.DataFrame({'項目名': ga_labels, '金額': ga_total_values})
+                ga_df_for_pie = ga_df_for_pie.sort_values('金額', ascending=False).head(10)
+                
+                fig_pie = go.Figure(data=[go.Pie(
+                    labels=ga_df_for_pie['項目名'],
+                    values=ga_df_for_pie['金額'],
+                    hole=.4,
+                    textposition='inside',
+                    textinfo='label+percent'
+                )])
+                
+                fig_pie.update_layout(
+                    title="販売管理費 上位10項目",
+                    height=500,
+                    showlegend=True
+                )
+                
+                st.plotly_chart(fig_pie, use_container_width=True)
+        
+        elif st.session_state.page == "比較分析レポート":
+            st.title("📈 比較分析レポート")
+            
+            # シナリオ間比較
+            st.subheader("1️⃣ シナリオ間比較 (着地予測)")
+            
+            split_idx = processor.get_split_index(
+                st.session_state.selected_comp_id,
+                st.session_state.current_month,
+                st.session_state.selected_period_id
+            )
+            forecast_months = months[split_idx:]
+            
+            scenario_results = {}
+            for scenario, rate in st.session_state.scenario_rates.items():
+                temp_forecasts_df = forecasts_df.copy()
+                
+                # DataFrameに存在する予測月のみを使用
+                available_forecast_months = [m for m in forecast_months if m in temp_forecasts_df.columns]
+                
+                for item in processor.all_items:
+                    if item == "売上高":
+                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, available_forecast_months] *= (1 + rate)
+                    elif item == "売上原価":
+                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.5)
+                    elif item in processor.ga_items:
+                        temp_forecasts_df.loc[temp_forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.3)
+                        
+                temp_pl_df = processor.calculate_pl(actuals_df, temp_forecasts_df, split_idx, months)
+                scenario_results[scenario] = temp_pl_df[['項目名', '合計']].set_index('項目名')['合計']
+                
+            comparison_df = pd.DataFrame(scenario_results)
+            
+            # 差異計算
+            comparison_df['楽観-現実'] = comparison_df['楽観'] - comparison_df['現実']
+            comparison_df['悲観-現実'] = comparison_df['悲観'] - comparison_df['現実']
+            
+            # 要約行のみ表示
+            summary_items = ["売上高", "売上総損益金額", "販売管理費計", "営業損益金額", "経常損益金額", "当期純損益金額"]
+            comparison_summary = comparison_df.loc[summary_items]
+            
+            st.dataframe(
+                comparison_summary.style.format(format_currency),
+                use_container_width=True
+            )
+            
+            # グラフ
+            fig = go.Figure()
+            
+            for col in ['現実', '楽観', '悲観']:
+                fig.add_trace(go.Bar(
+                    name=col,
+                    x=summary_items,
+                    y=comparison_summary[col],
+                    text=comparison_summary[col].apply(lambda x: f'¥{int(x/1000000)}M'),
+                    textposition='auto'
+                ))
+            
+            fig.update_layout(
+                title="シナリオ別 主要指標比較",
+                xaxis_title="項目",
+                yaxis_title="金額 (円)",
+                barmode='group',
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # 実績 vs 予測比較
+            st.subheader("2️⃣ 実績 vs 当初予測比較")
+            
+            initial_forecast_df = processor.load_forecast_data(st.session_state.selected_period_id, "現実")
+            
+            actual_months = months[:split_idx]
+            # DataFrameに存在する月のみを使用
+            available_actual_months = [m for m in actual_months if m in actuals_df.columns]
+            
+            actual_sum = actuals_df[available_actual_months].sum(axis=1) if available_actual_months else pd.Series(0, index=actuals_df.index)
+            actual_sum.index = actuals_df['項目名']
+            
+            initial_forecast_sum = initial_forecast_df[available_actual_months].sum(axis=1) if available_actual_months else pd.Series(0, index=initial_forecast_df.index)
+            initial_forecast_sum.index = initial_forecast_df['項目名']
+            
+            comparison_actual_df = pd.DataFrame({
+                '実績合計': actual_sum,
+                '当初予測合計': initial_forecast_sum
+            }).fillna(0)
+            
+            comparison_actual_df['差異'] = comparison_actual_df['実績合計'] - comparison_actual_df['当初予測合計']
+            comparison_actual_df['差異率'] = comparison_actual_df['差異'] / comparison_actual_df['当初予測合計'].replace(0, np.nan)
+            
+            comparison_actual_df = comparison_actual_df.loc[summary_items]
+            
+            st.dataframe(
+                comparison_actual_df.style.format({
+                    '実績合計': format_currency,
+                    '当初予測合計': format_currency,
+                    '差異': format_currency,
+                    '差異率': "{:.1%}"
+                }),
+                use_container_width=True
+            )
+            
+            # グラフ
+            fig2 = go.Figure()
+            
+            fig2.add_trace(go.Bar(
+                name='実績',
+                x=comparison_actual_df.index,
+                y=comparison_actual_df['実績合計'],
+                marker_color='#1f77b4'
+            ))
+            
+            fig2.add_trace(go.Bar(
+                name='当初予測',
+                x=comparison_actual_df.index,
+                y=comparison_actual_df['当初予測合計'],
+                marker_color='#ff7f0e'
+            ))
+            
+            fig2.update_layout(
+                title="実績 vs 当初予測比較",
+                xaxis_title="項目",
+                yaxis_title="金額 (円)",
+                barmode='group',
+                height=500
+            )
+            
+            st.plotly_chart(fig2, use_container_width=True)
+        
+        elif st.session_state.page == "全体予測PL & 補助科目入力":
+            st.title("📝 全体予測PL & 補助科目入力")
+            
+            tab1, tab2 = st.tabs(["📊 全体予測PL入力", "📋 補助科目入力"])
+            
+            with tab1:
+                st.subheader("全体予測値入力")
+                
+                st.markdown("""
+                <div class="info-box">
+                    <strong>💡 使い方:</strong> 各項目の予測値を入力してください。
+                    自動計算項目（売上総損益金額、販売管理費計など）は編集できません。
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # 編集可能な項目リスト
+                editable_items = [item for item in processor.all_items if item not in processor.calculated_items]
+                
+                selected_item = st.selectbox("編集する項目を選択", editable_items)
+                
+                # 月ごとの入力
+                st.markdown(f"### {selected_item} の予測値入力")
                 
                 col_count = 4
+                cols = st.columns(col_count)
+                
+                new_values = {}
+                current_values = forecasts_df[forecasts_df['項目名'] == selected_item]
+                
                 for i, month in enumerate(months):
                     col_idx = i % col_count
                     with cols[col_idx]:
@@ -601,7 +1014,7 @@ if selected_period_id:
                         )
                         new_values[month] = new_val
                 
-                if st.form_submit_button("💾 保存", type="primary"):
+                if st.button("💾 保存", key="save_forecast", type="primary"):
                     success = processor.save_forecast_item(
                         st.session_state.selected_period_id,
                         st.session_state.scenario,
@@ -614,320 +1027,346 @@ if selected_period_id:
                     else:
                         st.error("❌ 保存に失敗しました")
             
-        with tab2:
-            st.subheader("補助科目入力")
-            
-            st.markdown("""
-            <div class="info-box">
-                <strong>💡 使い方:</strong> 販売管理費の各項目について、詳細な内訳(補助科目)を入力できます。
-            </div>
-            """, unsafe_allow_html=True)
-            
-            parent_item = st.selectbox("親項目を選択", processor.ga_items)
-            
-            # 既存の補助科目を取得
-            existing_subs = processor.get_sub_accounts_for_parent(
-                st.session_state.selected_period_id,
-                st.session_state.scenario,
-                parent_item
-            )
-            
-            # 補助科目追加
-            st.markdown("#### 新規補助科目追加")
-            new_sub_name = st.text_input("補助科目名", key="new_sub_name")
-            
-            if new_sub_name:
-                st.markdown(f"**{new_sub_name}** の月次入力")
-                
-                cols = st.columns(4)
-                sub_values = {}
-                
-                for i, month in enumerate(months):
-                    with cols[i % 4]:
-                        val = st.number_input(
-                            f"{month}",
-                            value=0.0,
-                            step=1000.0,
-                            format="%.0f",
-                            key=f"sub_{parent_item}_{new_sub_name}_{month}"
-                        )
-                        sub_values[month] = val
-                
-                if st.button("💾 補助科目を追加", type="primary"):
-                    success = processor.save_sub_account(
-                        st.session_state.selected_period_id,
-                        st.session_state.scenario,
-                        parent_item,
-                        new_sub_name,
-                        sub_values
-                    )
-                    if success:
-                        st.success("✅ 追加しました")
-                        st.rerun()
-                    else:
-                        st.error("❌ 追加に失敗しました")
-            
-            # 既存補助科目の表示・編集
-            if not existing_subs.empty:
-                st.markdown("#### 既存補助科目")
-                
-                for sub_name in existing_subs['sub_account_name'].unique():
-                    with st.expander(f"📌 {sub_name}"):
-                        sub_data = existing_subs[existing_subs['sub_account_name'] == sub_name]
-                        
-                        # 月次データ表示
-                        display_data = {}
-                        for month in months:
-                            matching = sub_data[sub_data['month'] == month]
-                            if not matching.empty:
-                                display_data[month] = matching['amount'].iloc[0]
-                            else:
-                                display_data[month] = 0
-                        
-                        df_display = pd.DataFrame([display_data])
-                        st.dataframe(
-                            df_display.style.format(format_currency),
-                            use_container_width=True
-                        )
-                        
-                        if st.button(f"🗑️ {sub_name}を削除", key=f"del_{sub_name}"):
-                            processor.delete_sub_account(
-                                st.session_state.selected_period_id,
-                                st.session_state.scenario,
-                                parent_item,
-                                sub_name
-                            )
-                            st.success("削除しました")
-                            st.rerun()
-    
-    elif st.session_state.page == "実績データ入力":
-        st.title("⌨️ 実績データ入力")
-        
-        st.markdown("""
-        <div class="info-box">
-            <strong>💡 使い方:</strong> 月次の実績データを入力してください。
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # 編集可能な項目
-        editable_items = [item for item in processor.all_items if item not in processor.calculated_items]
-        
-        selected_item = st.selectbox("編集する項目", editable_items)
-        
-        st.markdown(f"### {selected_item} の実績値入力")
-        
-        cols = st.columns(4)
-        new_values = {}
-        current_values = actuals_df[actuals_df['項目名'] == selected_item]
-        
-        for i, month in enumerate(months):
-            with cols[i % 4]:
-                current_val = 0
-                if not current_values.empty and month in current_values.columns:
-                    current_val = current_values[month].iloc[0]
-                
-                new_val = st.number_input(
-                    f"{month}",
-                    value=float(current_val),
-                    step=10000.0,
-                    format="%.0f",
-                    key=f"actual_{selected_item}_{month}"
-                )
-                new_values[month] = new_val
-        
-        if st.button("💾 保存", type="primary"):
-            success = processor.save_actual_item(
-                st.session_state.selected_period_id,
-                selected_item,
-                new_values
-            )
-            if success:
-                st.success("✅ 保存しました")
-                st.rerun()
-            else:
-                st.error("❌ 保存に失敗しました")
-    
-    elif st.session_state.page == "データインポート":
-        st.title("📥 データインポート")
-        
-        st.markdown("""
-        <div class="info-box">
-            <strong>💡 使い方:</strong> 弥生会計からエクスポートしたExcelファイルをアップロードしてください。
-        </div>
-        """, unsafe_allow_html=True)
-        
-        uploaded_file = st.file_uploader(
-            "Excel fileを選択",
-            type=['xlsx', 'xls'],
-            help="弥生会計の月次推移表をアップロードしてください"
-        )
-        
-        if 'show_import_button' not in st.session_state:
-            st.session_state.show_import_button = False
-        
-        if uploaded_file:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
-                tmp_file.write(uploaded_file.read())
-                temp_path = tmp_file.name
-                st.session_state.temp_path_to_delete = temp_path
-                
-            st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
-            
-            if 'imported_df' not in st.session_state:
-                # fiscal_period_idを渡す
-                st.session_state.imported_df, info = processor.import_yayoi_excel(
-                    temp_path, 
-                    st.session_state.selected_period_id,
-                    preview_only=True
-                )
-                st.session_state.show_import_button = True
-                
-            if st.session_state.show_import_button:
-                st.subheader("📋 インポートデータ プレビュー（直接編集可能）")
+            with tab2:
+                st.subheader("補助科目入力")
                 
                 st.markdown("""
                 <div class="info-box">
-                    <strong>✏️ 編集:</strong> セルをダブルクリックして値を直接修正できます。
+                    <strong>💡 使い方:</strong> 販売管理費の各項目について、詳細な内訳(補助科目)を入力できます。
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # 編集可能なデータエディタを使用
-                edited_df = st.data_editor(
-                    st.session_state.imported_df,
-                    use_container_width=True,
-                    height=400,
-                    num_rows="fixed",  # 行の追加・削除は不可
-                    disabled=["項目名"],  # 項目名列は編集不可
-                    column_config={
-                        col: st.column_config.NumberColumn(
-                            format="¥%d",
-                            min_value=-999999999,
-                            max_value=999999999
-                        ) for col in st.session_state.imported_df.columns if col != '項目名'
-                    }
+                parent_item = st.selectbox("親項目を選択", processor.ga_items)
+                
+                # 既存の補助科目を取得
+                existing_subs = processor.get_sub_accounts_for_parent(
+                    st.session_state.selected_period_id,
+                    st.session_state.scenario,
+                    parent_item
                 )
                 
-                # 編集後のデータを保存
-                st.session_state.imported_df = edited_df
+                # 補助科目追加
+                st.markdown("#### 新規補助科目追加")
+                new_sub_name = st.text_input("補助科目名", key="new_sub_name")
                 
+                if new_sub_name:
+                    st.markdown(f"**{new_sub_name}** の月次入力")
+                    
+                    cols = st.columns(4)
+                    sub_values = {}
+                    
+                    for i, month in enumerate(months):
+                        with cols[i % 4]:
+                            val = st.number_input(
+                                f"{month}",
+                                value=0.0,
+                                step=1000.0,
+                                format="%.0f",
+                                key=f"sub_{parent_item}_{new_sub_name}_{month}"
+                            )
+                            sub_values[month] = val
+                    
+                    if st.button("💾 補助科目を追加", type="primary"):
+                        success = processor.save_sub_account(
+                            st.session_state.selected_period_id,
+                            st.session_state.scenario,
+                            parent_item,
+                            new_sub_name,
+                            sub_values
+                        )
+                        if success:
+                            st.success("✅ 追加しました")
+                            st.rerun()
+                        else:
+                            st.error("❌ 追加に失敗しました")
+                
+                # 既存補助科目の表示・編集
+                if not existing_subs.empty:
+                    st.markdown("#### 既存補助科目")
+                    
+                    for sub_name in existing_subs['sub_account_name'].unique():
+                        with st.expander(f"📌 {sub_name}"):
+                            sub_data = existing_subs[existing_subs['sub_account_name'] == sub_name]
+                            
+                            # 月次データ表示
+                            display_data = {}
+                            for month in months:
+                                matching = sub_data[sub_data['month'] == month]
+                                if not matching.empty:
+                                    display_data[month] = matching['amount'].iloc[0]
+                                else:
+                                    display_data[month] = 0
+                            
+                            df_display = pd.DataFrame([display_data])
+                            st.dataframe(
+                                df_display.style.format(format_currency),
+                                use_container_width=True
+                            )
+                            
+                            if st.button(f"🗑️ {sub_name}を削除", key=f"del_{sub_name}"):
+                                processor.delete_sub_account(
+                                    st.session_state.selected_period_id,
+                                    st.session_state.scenario,
+                                    parent_item,
+                                    sub_name
+                                )
+                                st.success("削除しました")
+                                st.rerun()
+        
+        elif st.session_state.page == "実績データ入力":
+            st.title("⌨️ 実績データ入力")
+            
+            st.markdown("""
+            <div class="info-box">
+                <strong>💡 使い方:</strong> 月次の実績データを入力してください。
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 編集可能な項目
+            editable_items = [item for item in processor.all_items if item not in processor.calculated_items]
+            
+            selected_item = st.selectbox("編集する項目", editable_items)
+            
+            st.markdown(f"### {selected_item} の実績値入力")
+            
+            cols = st.columns(4)
+            new_values = {}
+            current_values = actuals_df[actuals_df['項目名'] == selected_item]
+            
+            for i, month in enumerate(months):
+                with cols[i % 4]:
+                    current_val = 0
+                    if not current_values.empty and month in current_values.columns:
+                        current_val = current_values[month].iloc[0]
+                    
+                    new_val = st.number_input(
+                        f"{month}",
+                        value=float(current_val),
+                        step=10000.0,
+                        format="%.0f",
+                        key=f"actual_{selected_item}_{month}"
+                    )
+                    new_values[month] = new_val
+            
+            if st.button("💾 保存", type="primary"):
+                success = processor.save_actual_item(
+                    st.session_state.selected_period_id,
+                    selected_item,
+                    new_values
+                )
+                if success:
+                    st.success("✅ 保存しました")
+                    st.rerun()
+                else:
+                    st.error("❌ 保存に失敗しました")
+        
+        elif st.session_state.page == "データインポート":
+            st.title("📥 データインポート")
+            
+            st.markdown("""
+            <div class="info-box">
+                <strong>💡 使い方:</strong> 弥生会計からエクスポートしたExcelファイルをアップロードしてください。
+            </div>
+            """, unsafe_allow_html=True)
+            
+            uploaded_file = st.file_uploader(
+                "Excelファイルを選択",
+                type=['xlsx', 'xls'],
+                help="弥生会計の月次推移表をアップロードしてください"
+            )
+            
+            if 'show_import_button' not in st.session_state:
+                st.session_state.show_import_button = False
+            
+            if uploaded_file:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
+                    tmp_file.write(uploaded_file.read())
+                    temp_path = tmp_file.name
+                    st.session_state.temp_path_to_delete = temp_path
+                    
+                st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
+                
+                if 'imported_df' not in st.session_state:
+                    # fiscal_period_idを渡す
+                    st.session_state.imported_df, info = processor.import_yayoi_excel(
+                        temp_path, 
+                        st.session_state.selected_period_id,
+                        preview_only=True
+                    )
+                    st.session_state.show_import_button = True
+                    
+                if st.session_state.show_import_button:
+                    st.subheader("📋 インポートデータ プレビュー（直接編集可能）")
+                    
+                    st.markdown("""
+                    <div class="info-box">
+                        <strong>✏️ 編集:</strong> セルをダブルクリックして値を直接修正できます。
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # 編集可能なデータエディタを使用
+                    edited_df = st.data_editor(
+                        st.session_state.imported_df,
+                        use_container_width=True,
+                        height=400,
+                        num_rows="fixed",  # 行の追加・削除は不可
+                        disabled=["項目名"],  # 項目名列は編集不可
+                        column_config={
+                            col: st.column_config.NumberColumn(
+                                format="¥%d",
+                                min_value=-999999999,
+                                max_value=999999999
+                            ) for col in st.session_state.imported_df.columns if col != '項目名'
+                        }
+                    )
+                    
+                    # 編集後のデータを保存
+                    st.session_state.imported_df = edited_df
+                    
+                    st.markdown("""
+                    <div class="warning-box">
+                        <strong>⚠️ 注意:</strong> 上記の内容でインポートを実行すると、現在の実績データは上書きされます。
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if st.button("✅ 上記内容でインポートを実行", type="primary"):
+                        success, info = processor.save_extracted_data(
+                            st.session_state.selected_period_id,
+                            st.session_state.imported_df
+                        )
+                        if success:
+                            st.success("✅ インポートが完了しました！")
+                            del st.session_state.imported_df
+                            del st.session_state.show_import_button
+                            
+                            if 'temp_path_to_delete' in st.session_state:
+                                os.unlink(st.session_state.temp_path_to_delete)
+                                del st.session_state.temp_path_to_delete
+                                
+                            st.rerun()
+                        else:
+                            st.error(f"❌ インポートに失敗しました: {info}")
+        
+        elif st.session_state.page == "シナリオ一括設定":
+            st.title("🎯 シナリオ一括設定")
+            
+            st.markdown("""
+            <div class="info-box">
+                <strong>💡 使い方:</strong> 「現実」シナリオをベースに、「楽観」「悲観」シナリオの増減率を設定します。
+                設定した増減率は全画面に即座に反映されます。
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### 📈 楽観シナリオ")
                 st.markdown("""
-                <div class="warning-box">
-                    <strong>⚠️ 注意:</strong> 上記の内容でインポートを実行すると、現在の実績データは上書きされます。
+                <div class="success-box">
+                    <strong>想定される効果:</strong><br>
+                    • 売上: 増加率そのまま適用<br>
+                    • 売上原価: 増加率の50%を逆方向に適用<br>
+                    • 販管費: 増加率の30%を逆方向に適用
                 </div>
                 """, unsafe_allow_html=True)
                 
-                if st.button("✅ 上記内容でインポートを実行", type="primary"):
-                    success, info = processor.save_extracted_data(
-                        st.session_state.selected_period_id,
-                        st.session_state.imported_df
-                    )
-                    if success:
-                        st.success("✅ インポートが完了しました！")
-                        del st.session_state.imported_df
-                        del st.session_state.show_import_button
-                        
-                        if 'temp_path_to_delete' in st.session_state:
-                            os.unlink(st.session_state.temp_path_to_delete)
-                            del st.session_state.temp_path_to_delete
-                            
-                        st.rerun()
-                    else:
-                        st.error(f"❌ インポートに失敗しました: {info}")
-    
-    elif st.session_state.page == "シナリオ一括設定":
-        st.title("🎯 シナリオ一括設定")
+                new_opt_rate = st.number_input(
+                    "楽観シナリオ増減率 (%)",
+                    value=st.session_state.scenario_rates["楽観"] * 100,
+                    min_value=-100.0,
+                    max_value=100.0,
+                    step=1.0,
+                    key="opt_rate_input"
+                ) / 100.0
+                
+                if st.button("💾 楽観シナリオ増減率を保存", type="primary"):
+                    st.session_state.scenario_rates["楽観"] = new_opt_rate
+                    st.success(f"✅ 楽観シナリオの増減率を **{new_opt_rate * 100:.1f}%** に設定しました")
+                    st.rerun()
+            
+            with col2:
+                st.markdown("### 📉 悲観シナリオ")
+                st.markdown("""
+                <div class="warning-box">
+                    <strong>想定される効果:</strong><br>
+                    • 売上: 減少率そのまま適用<br>
+                    • 売上原価: 減少率の50%を逆方向に適用<br>
+                    • 販管費: 減少率の30%を逆方向に適用
+                </div>
+                """, unsafe_allow_html=True)
+                
+                new_pes_rate = st.number_input(
+                    "悲観シナリオ増減率 (%)",
+                    value=st.session_state.scenario_rates["悲観"] * 100,
+                    min_value=-100.0,
+                    max_value=100.0,
+                    step=1.0,
+                    key="pes_rate_input"
+                ) / 100.0
+                
+                if st.button("💾 悲観シナリオ増減率を保存", type="primary"):
+                    st.session_state.scenario_rates["悲観"] = new_pes_rate
+                    st.success(f"✅ 悲観シナリオの増減率を **{new_pes_rate * 100:.1f}%** に設定しました")
+                    st.rerun()
+            
+            st.markdown("---")
+            
+            # 設定値サマリー
+            st.subheader("📋 現在の設定値")
+            
+            summary_data = {
+                "シナリオ": ["現実", "楽観", "悲観"],
+                "増減率": [
+                    f"{st.session_state.scenario_rates['現実'] * 100:.1f}%",
+                    f"{st.session_state.scenario_rates['楽観'] * 100:.1f}%",
+                    f"{st.session_state.scenario_rates['悲観'] * 100:.1f}%"
+                ],
+                "説明": [
+                    "ベースとなる予測値",
+                    "売上増加・費用削減を想定",
+                    "売上減少・費用増加を想定"
+                ]
+            }
+            
+            st.table(pd.DataFrame(summary_data))
+        
+
+
+else:
+    # 会社または期が未登録の場合
+    if companies.empty:
+        st.title("👋 ようこそ！財務予測シミュレーターへ")
         
         st.markdown("""
-        <div class="info-box">
-            <strong>💡 使い方:</strong> 「現実」シナリオをベースに、「楽観」「悲観」シナリオの増減率を設定します。
-            設定した増減率は全画面に即座に反映されます。
+        <div style="background-color: #e3f2fd; padding: 2rem; border-radius: 10px; margin: 2rem 0;">
+            <h3 style="color: #1976d2; margin-top: 0;">🚀 はじめての方へ</h3>
+            <p style="font-size: 1.1rem; line-height: 1.8;">
+                まずは以下の手順でセットアップしてください：
+            </p>
+            <div style="background-color: white; padding: 1.5rem; border-radius: 8px; margin: 1rem 0;">
+                <strong style="font-size: 1.2rem; color: #1976d2;">📍 手順</strong><br><br>
+                <strong style="color: #d32f2f;">1️⃣ 左サイドバーの「⚙️ システム設定」をクリック</strong><br>
+                <span style="font-size: 0.9rem; color: #666;">← 左側のメニューから選択してください</span><br><br>
+                <strong>2️⃣ 会社設定タブで会社名を入力</strong><br><br>
+                <strong>3️⃣ 会計期間設定タブで期の情報を入力</strong><br><br>
+                <strong>4️⃣ サイドバーで会社と期を選択</strong><br>
+                <span style="font-size: 0.9rem; color: #666;">→ すべての機能が使えるようになります！</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### 📈 楽観シナリオ")
-            st.markdown("""
-            売上高を増加させ、費用を減少させるシナリオです。
-            """)
-            optimistic_rate = st.slider("売上増加率 (%)", 0, 50, 10, key="opt_rate")
+        # データベース接続状態を表示
+        if processor.use_postgres:
+            st.success("✅ Supabaseに接続済み - データは永続的に保存されます")
+        else:
+            st.info("ℹ️ ローカルモードで動作中")
             
-        with col2:
-            st.markdown("### 📉 悲観シナリオ")
-            st.markdown("""
-            売上高を減少させ、費用を増加させるシナリオです。
-            """)
-            pessimistic_rate = st.slider("売上減少率 (%)", 0, 50, 10, key="pess_rate")
-            
-        if st.button("🚀 シナリオを生成して保存", type="primary"):
-            # 現実シナリオをベースに生成
-            base_forecast = processor.load_forecast_data(selected_period_id, "現実")
-            
-            # 楽観シナリオ
-            opt_df = base_forecast.copy()
-            for m in months:
-                # 売上は増加
-                opt_df.loc[opt_df['項目名'] == "売上高", m] *= (1 + optimistic_rate/100)
-            
-            processor.save_extracted_data(selected_period_id, opt_df) # TODO: scenario引数が必要
-            
-            st.success("✅ シナリオを生成しました（※実装中）")
-
-    elif st.session_state.page == "システム設定":
-        st.title("⚙️ システム設定")
-        
-        tab1, tab2 = st.tabs(["会社管理", "会計期管理"])
-        
-        with tab1:
-            st.subheader("会社登録")
-            new_comp_name = st.text_input("新しい会社名")
-            if st.button("登録", key="add_comp"):
-                if new_comp_name:
-                    success, msg = processor.add_company(new_comp_name)
-                    if success:
-                        st.success(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
-            
-            st.subheader("登録済み会社一覧")
-            st.dataframe(companies, use_container_width=True)
-            
-        with tab2:
-            st.subheader("会計期登録")
-            if not companies.empty:
-                target_comp = st.selectbox("会社を選択", companies['name'].tolist(), key="setup_comp")
-                target_comp_id = companies[companies['name'] == target_comp]['id'].iloc[0]
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    p_num = st.number_input("期数", min_value=1, value=1)
-                with col2:
-                    s_date = st.date_input("開始日")
-                with col3:
-                    e_date = st.date_input("終了日")
-                    
-                if st.button("会計期を登録"):
-                    success, msg = processor.add_fiscal_period(
-                        int(target_comp_id), p_num, s_date.strftime('%Y-%m-%d'), e_date.strftime('%Y-%m-%d')
-                    )
-                    if success:
-                        st.success(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
-                
-                st.subheader("登録済み会計期")
-                st.dataframe(processor.get_company_periods(target_comp_id), use_container_width=True)
-            else:
-                st.warning("先に会社を登録してください")
-
-else:
-    st.title("👋 ようこそ")
-    st.info("左側のサイドバーから会社と会計期を選択してください。")
-    
-    if st.session_state.page == "システム設定":
-        # システム設定ページは会社未選択でも表示
-        st.title("⚙️ システム設定")
-        # (上記と同じ設定UIを表示...)
+    else:
+        st.warning("### ⚠️ 会計期間が選択されていません")
+        st.markdown("""
+        <div class="warning-box">
+            <strong>会計期間を登録してください</strong><br><br>
+            左サイドバーの「システム設定」→「会計期間設定」タブから<br>
+            会計期間を追加してください。
+        </div>
+        """, unsafe_allow_html=True)
