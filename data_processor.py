@@ -120,6 +120,16 @@ class DataProcessor:
             "減価償却費", "貸倒損失(販)", "雑費", "少額交際費"
         ]
         
+        # 補助科目が設定できる親項目（売上と原価を追加）
+        self.parent_items_with_sub_accounts = [
+            "売上高",
+            "売上原価",
+            "外注費",
+            "広告宣伝費",
+            "旅費交通費",
+            "地代家賃"
+        ]
+        
         # 計算項目リスト (ユーザーが編集できない項目)
         self.calculated_items = [
             "売上総損益金額", "販売管理費計", "営業損益金額",
@@ -1183,6 +1193,101 @@ class DataProcessor:
             if conn:
                 conn.rollback()
             return False, str(e)
+        finally:
+            if conn:
+                conn.close()
+
+    def create_forecast_template(self, fiscal_period_id, scenario="現実"):
+        """予測データ入力用のExcelテンプレートを作成"""
+        # 会計期間情報を取得
+        period_info = self.get_period_info(fiscal_period_id)
+        if not period_info:
+            return None
+        
+        # 月リストを取得
+        comp_id = period_info['comp_id']
+        months = self.get_fiscal_months(comp_id, fiscal_period_id)
+        
+        # テンプレートDataFrameを作成
+        template_df = pd.DataFrame({
+            '項目名': self.all_items
+        })
+        
+        # 各月の列を追加（初期値0）
+        for month in months:
+            template_df[month] = 0
+        
+        return template_df
+    
+    def save_forecast_from_excel(self, fiscal_period_id, scenario, imported_df):
+        """ExcelからインポートされたDataFrameを予測データとして保存"""
+        conn = None
+        try:
+            sys.stderr.write(f"💾 予測データ一括保存開始: シナリオ={scenario}\n")
+            sys.stderr.write(f"   項目数: {len(imported_df)}\n")
+            sys.stderr.flush()
+            
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # 月のカラムを取得
+            months = [col for col in imported_df.columns if col != '項目名']
+            sys.stderr.write(f"   月数: {len(months)}\n")
+            sys.stderr.flush()
+            
+            # バッチ処理用のデータを準備
+            batch_data = []
+            for _, row in imported_df.iterrows():
+                item_name = row['項目名']
+                for month in months:
+                    amount = row[month]
+                    if pd.notna(amount) and amount != 0:
+                        batch_data.append((
+                            fiscal_period_id,
+                            scenario,
+                            item_name,
+                            month,
+                            float(amount)
+                        ))
+            
+            sys.stderr.write(f"   保存データ件数: {len(batch_data)}\n")
+            sys.stderr.flush()
+            
+            if batch_data:
+                if self.use_postgres:
+                    # PostgreSQL用のUPSERT（バッチ）
+                    from psycopg2.extras import execute_values
+                    execute_values(
+                        cursor,
+                        """
+                        INSERT INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) 
+                        VALUES %s
+                        ON CONFLICT (fiscal_period_id, scenario, item_name, month) 
+                        DO UPDATE SET amount = EXCLUDED.amount
+                        """,
+                        batch_data
+                    )
+                else:
+                    # SQLite用のUPSERT（バッチ）
+                    cursor.executemany(
+                        "INSERT OR REPLACE INTO forecast_data (fiscal_period_id, scenario, item_name, month, amount) VALUES (?, ?, ?, ?, ?)",
+                        batch_data
+                    )
+            
+            conn.commit()
+            sys.stderr.write(f"✅ 予測データ一括保存成功: {len(batch_data)}件\n")
+            sys.stderr.flush()
+            return True, f"{len(batch_data)}件の予測データをインポートしました"
+        
+        except Exception as e:
+            sys.stderr.write(f"❌ 予測データインポートエラー: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
+            if conn:
+                conn.rollback()
+            return False, str(e)
+        
         finally:
             if conn:
                 conn.close()
