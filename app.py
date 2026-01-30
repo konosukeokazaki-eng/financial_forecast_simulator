@@ -18,214 +18,239 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# カスタムCSS
+# カスタムCSS - ビジネスライクなデザイン
 st.markdown("""
 <style>
     /* メインコンテナ */
     .main {
         padding: 0rem 1rem;
+        background-color: #f5f7fa;
     }
     
     /* タイトル */
     h1 {
-        color: #1f77b4;
+        color: #1a1a2e;
         font-weight: 700;
         margin-bottom: 0.5rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        border-left: 4px solid #2e7d32;
+        padding-left: 1rem;
     }
     
     h2 {
         color: #2c3e50;
         font-weight: 600;
-        border-bottom: 2px solid #1f77b4;
+        border-bottom: 2px solid #2e7d32;
         padding-bottom: 0.5rem;
         margin-top: 2rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
     h3 {
         color: #34495e;
         font-weight: 600;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
-    /* サマリーカード */
+    /* サマリーカード - 洗練されたビジネススタイル */
     .summary-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 8px;
         color: white;
         margin-bottom: 1rem;
-    }
-    
-    .summary-card-green {
-        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        color: white;
-        margin-bottom: 1rem;
-    }
-    
-    .summary-card-orange {
-        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        color: white;
-        margin-bottom: 1rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #5a67d8;
     }
     
     .summary-card-blue {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
         padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 8px;
         color: white;
-        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(30, 60, 114, 0.3);
+        border-left: 4px solid #4a90e2;
     }
     
-    .summary-card-red {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    .summary-card-green {
+        background: linear-gradient(135deg, #2e7d32 0%, #43a047 100%);
         padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 8px;
         color: white;
-        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+        border-left: 4px solid #66bb6a;
+    }
+    
+    .summary-card-orange {
+        background: linear-gradient(135deg, #e65100 0%, #f57c00 100%);
+        padding: 1.5rem;
+        border-radius: 8px;
+        color: white;
+        box-shadow: 0 4px 12px rgba(230, 81, 0, 0.3);
+        border-left: 4px solid #ff9800;
+    }
+    
+    .summary-card-purple {
+        background: linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%);
+        padding: 1.5rem;
+        border-radius: 8px;
+        color: white;
+        box-shadow: 0 4px 12px rgba(106, 27, 154, 0.3);
+        border-left: 4px solid #ab47bc;
+    }
+    
+    .summary-card-teal {
+        background: linear-gradient(135deg, #00695c 0%, #00897b 100%);
+        padding: 1.5rem;
+        border-radius: 8px;
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 105, 92, 0.3);
+        border-left: 4px solid #26a69a;
     }
     
     .card-title {
         font-size: 0.9rem;
         font-weight: 500;
-        opacity: 0.9;
-        margin-bottom: 0.3rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.95;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .card-value {
         font-size: 2rem;
         font-weight: 700;
-        margin: 0;
+        margin-bottom: 0.3rem;
+        font-family: 'Courier New', monospace;
     }
     
     .card-subtitle {
         font-size: 0.85rem;
-        opacity: 0.85;
-        margin-top: 0.3rem;
+        opacity: 0.9;
+        font-weight: 400;
     }
     
-    /* サイドバー */
-    .css-1d391kg {
-        background-color: #f8f9fa;
-    }
-    
-    /* ボタン */
-    .stButton>button {
-        border-radius: 20px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    
-    /* データフレーム */
-    .dataframe {
-        font-size: 0.9rem;
-    }
-    
-    /* インフォボックス */
+    /* インフォボックス - プロフェッショナル */
     .info-box {
-        background-color: #024270;
-        padding: 1rem;
-        border-left: 4px solid #1f77b4;
+        background-color: #e3f2fd;
+        border-left: 4px solid #1976d2;
+        padding: 1rem 1.5rem;
         border-radius: 4px;
-        margin: 1rem 0;
-        color: white;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     
     .warning-box {
-        background-color: #ff8ca1;
-        padding: 1rem;
-        border-left: 4px solid #ff7f0e;
+        background-color: #fff3e0;
+        border-left: 4px solid #f57c00;
+        padding: 1rem 1.5rem;
         border-radius: 4px;
-        margin: 1rem 0;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     
     .success-box {
-        background-color: #d4edda;
-        padding: 1rem;
-        border-left: 4px solid #2ca02c;
+        background-color: #e8f5e9;
+        border-left: 4px solid #43a047;
+        padding: 1rem 1.5rem;
         border-radius: 4px;
-        margin: 1rem 0;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     
-    /* タブ */
+    /* KPI カード */
+    .kpi-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1rem;
+    }
+    
+    .kpi-label {
+        font-size: 0.85rem;
+        color: #757575;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+    }
+    
+    .kpi-value {
+        font-size: 2.2rem;
+        color: #1a1a2e;
+        font-weight: 700;
+        font-family: 'Courier New', monospace;
+    }
+    
+    .kpi-change {
+        font-size: 0.9rem;
+        margin-top: 0.3rem;
+    }
+    
+    .kpi-positive {
+        color: #2e7d32;
+        font-weight: 600;
+    }
+    
+    .kpi-negative {
+        color: #c62828;
+        font-weight: 600;
+    }
+    
+    /* テーブルスタイル */
+    .dataframe {
+        border: 1px solid #e0e0e0 !important;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    /* ボタンスタイル */
+    .stButton > button {
+        border-radius: 4px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* サイドバー */
+    [data-testid="stSidebar"] {
+        background-color: #1a1a2e;
+    }
+    
+    [data-testid="stSidebar"] .stMarkdown {
+        color: #ffffff;
+    }
+    
+    /* タブスタイル */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
+        background-color: white;
+        padding: 0.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     
     .stTabs [data-baseweb="tab"] {
-        border-radius: 4px 4px 0 0;
-        padding: 10px 20px;
         font-weight: 600;
+        color: #424242;
+        border-radius: 4px;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #2e7d32;
+        color: white;
     }
 </style>
 """, unsafe_allow_html=True)
-
-# 初期化
-if 'page' not in st.session_state:
-    st.session_state.page = "着地予測ダッシュボード"
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-
-# --------------------------------------------------------------------------------
-# シンプルな認証機能
-# --------------------------------------------------------------------------------
-def check_password():
-    """パスワードチェック関数"""
-    def password_entered():
-        """パスワードが入力されたときの処理"""
-        if st.session_state["password"] == st.secrets.get("password", "admin123"):
-            st.session_state.authenticated = True
-            st.session_state.username = "admin"
-            del st.session_state["password"]  # パスワードを削除
-        else:
-            st.session_state.authenticated = False
-
-    if not st.session_state.authenticated:
-        # ログイン画面
-        st.markdown("""
-        <div style='text-align: center; padding: 2rem;'>
-            <h1 style='color: #1f77b4; font-size: 3rem; margin-bottom: 1rem;'>📊</h1>
-            <h1 style='color: #2c3e50;'>財務予測シミュレーター</h1>
-            <p style='color: #7f8c8d; font-size: 1.1rem;'>ログインして開始してください</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.text_input(
-                "パスワード",
-                type="password",
-                key="password",
-                on_change=password_entered,
-                placeholder="パスワードを入力してください"
-            )
-            
-            if "password" in st.session_state:
-                st.error("❌ パスワードが正しくありません")
-        
-        return False
-    else:
-        return True
-
-# 認証チェック
-if not check_password():
-    st.stop()
-
-# ログイン成功 - メインアプリケーション
 
 # 初期化
 if 'processor' not in st.session_state:
@@ -430,6 +455,9 @@ else:
     menu_options = [
         "着地予測ダッシュボード",
         "損益計算書 (PL)",
+        "キャッシュフロー計算書 (CF)",
+        "経営指標ダッシュボード",
+        "損益分岐点分析",
         "予測 VS 実績比較",
         "期間比較分析",
         "実績データ入力",
@@ -1061,6 +1089,483 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         st.cache_data.clear()
                         st.rerun()
             
+        
+        
+        elif st.session_state.page == "キャッシュフロー計算書 (CF)":
+            st.title("💰 キャッシュフロー計算書")
+            
+            st.markdown("""
+            <div class="info-box">
+                <strong>💡 概要:</strong> 資金の流れを「営業活動」「投資活動」「財務活動」に分けて把握します。
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # CFデータを計算
+            cf_data = processor.calculate_cash_flow(st.session_state.selected_period_id)
+            
+            if cf_data:
+                # 各カテゴリのサマリーカード
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    operating_cf_total = sum([v for v in cf_data.get("営業活動によるキャッシュフロー", {}).values() if pd.notna(v)])
+                    st.markdown(f"""
+                    <div class="summary-card-blue">
+                        <div class="card-title">営業活動CF</div>
+                        <div class="card-value">¥{safe_int(operating_cf_total):,}</div>
+                        <div class="card-subtitle">本業で稼いだ現金</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    investing_cf_total = sum([v for v in cf_data.get("投資活動によるキャッシュフロー", {}).values() if pd.notna(v)])
+                    st.markdown(f"""
+                    <div class="summary-card-orange">
+                        <div class="card-title">投資活動CF</div>
+                        <div class="card-value">¥{safe_int(investing_cf_total):,}</div>
+                        <div class="card-subtitle">設備投資などの支出</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col3:
+                    financing_cf_total = sum([v for v in cf_data.get("財務活動によるキャッシュフロー", {}).values() if pd.notna(v)])
+                    st.markdown(f"""
+                    <div class="summary-card-purple">
+                        <div class="card-title">財務活動CF</div>
+                        <div class="card-value">¥{safe_int(financing_cf_total):,}</div>
+                        <div class="card-subtitle">借入・返済の収支</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # 詳細テーブル
+                st.markdown("### 📊 月次キャッシュフロー推移")
+                
+                cf_rows = []
+                for category, month_data in cf_data.items():
+                    row = {"項目": category}
+                    row.update(month_data)
+                    cf_rows.append(row)
+                
+                if cf_rows:
+                    cf_df = pd.DataFrame(cf_rows)
+                    st.dataframe(cf_df, width="stretch", height=300)
+                    
+                    # グラフ
+                    st.markdown("### 📈 キャッシュフロー推移グラフ")
+                    fig = go.Figure()
+                    
+                    for category in cf_data.keys():
+                        months_list = list(cf_data[category].keys())
+                        values_list = [cf_data[category][m] for m in months_list]
+                        
+                        fig.add_trace(go.Scatter(
+                            x=months_list,
+                            y=values_list,
+                            mode='lines+markers',
+                            name=category,
+                            line=dict(width=3)
+                        ))
+                    
+                    fig.update_layout(
+                        xaxis_title="月",
+                        yaxis_title="金額 (円)",
+                        hovermode='x unified',
+                        height=500,
+                        template="plotly_white"
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("キャッシュフローデータがありません。")
+        
+        elif st.session_state.page == "経営指標ダッシュボード":
+            st.title("📊 経営指標ダッシュボード")
+            
+            st.markdown("""
+            <div class="info-box">
+                <strong>💡 概要:</strong> 企業の収益性、効率性、安全性を数値で評価します。
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 経営指標を計算
+            indicators = processor.calculate_financial_indicators(st.session_state.selected_period_id)
+            
+            if indicators:
+                # 最新月の指標を取得
+                latest_month = list(indicators.keys())[-1] if indicators else None
+                
+                if latest_month:
+                    latest_indicators = indicators[latest_month]
+                    
+                    # KPIカード
+                    st.markdown("### 📈 主要経営指標（最新月）")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.markdown(f"""
+                        <div class="kpi-card">
+                            <div class="kpi-label">粗利率</div>
+                            <div class="kpi-value">{latest_indicators['粗利率']:.1f}%</div>
+                            <div class="kpi-change kpi-{'positive' if latest_indicators['粗利率'] > 30 else 'negative'}">
+                                {'✓ 良好' if latest_indicators['粗利率'] > 30 else '△ 要改善'}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.markdown(f"""
+                        <div class="kpi-card">
+                            <div class="kpi-label">営業利益率</div>
+                            <div class="kpi-value">{latest_indicators['営業利益率']:.1f}%</div>
+                            <div class="kpi-change kpi-{'positive' if latest_indicators['営業利益率'] > 5 else 'negative'}">
+                                {'✓ 良好' if latest_indicators['営業利益率'] > 5 else '△ 要改善'}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col3:
+                        st.markdown(f"""
+                        <div class="kpi-card">
+                            <div class="kpi-label">経常利益率</div>
+                            <div class="kpi-value">{latest_indicators['経常利益率']:.1f}%</div>
+                            <div class="kpi-change kpi-{'positive' if latest_indicators['経常利益率'] > 3 else 'negative'}">
+                                {'✓ 良好' if latest_indicators['経常利益率'] > 3 else '△ 要改善'}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col4:
+                        st.markdown(f"""
+                        <div class="kpi-card">
+                            <div class="kpi-label">当期純利益率</div>
+                            <div class="kpi-value">{latest_indicators['当期純利益率']:.1f}%</div>
+                            <div class="kpi-change kpi-{'positive' if latest_indicators['当期純利益率'] > 2 else 'negative'}">
+                                {'✓ 良好' if latest_indicators['当期純利益率'] > 2 else '△ 要改善'}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # 月次推移グラフ
+                    st.markdown("### 📈 収益性指標の推移")
+                    
+                    months_list = list(indicators.keys())
+                    
+                    fig = go.Figure()
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list,
+                        y=[indicators[m]['粗利率'] for m in months_list],
+                        mode='lines+markers',
+                        name='粗利率',
+                        line=dict(color='#2e7d32', width=3)
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list,
+                        y=[indicators[m]['営業利益率'] for m in months_list],
+                        mode='lines+markers',
+                        name='営業利益率',
+                        line=dict(color='#1976d2', width=3)
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list,
+                        y=[indicators[m]['経常利益率'] for m in months_list],
+                        mode='lines+markers',
+                        name='経常利益率',
+                        line=dict(color='#f57c00', width=3)
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list,
+                        y=[indicators[m]['当期純利益率'] for m in months_list],
+                        mode='lines+markers',
+                        name='当期純利益率',
+                        line=dict(color='#6a1b9a', width=3)
+                    ))
+                    
+                    fig.update_layout(
+                        xaxis_title="月",
+                        yaxis_title="利益率 (%)",
+                        hovermode='x unified',
+                        height=500,
+                        template="plotly_white"
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # 推奨改善アクション
+                    st.markdown("### 💡 推奨改善アクション")
+                    
+                    if latest_indicators['粗利率'] < 30:
+                        st.markdown("""
+                        <div class="warning-box">
+                            <strong>⚠️ 粗利率が低い</strong><br>
+                            • 価格設定の見直し<br>
+                            • 原価削減施策の検討<br>
+                            • 高付加価値商品へのシフト
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    if latest_indicators['営業利益率'] < 5:
+                        st.markdown("""
+                        <div class="warning-box">
+                            <strong>⚠️ 営業利益率が低い</strong><br>
+                            • 販管費の見直し<br>
+                            • 業務効率化の推進<br>
+                            • 固定費の削減検討
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    if latest_indicators['経常利益率'] > 3 and latest_indicators['営業利益率'] > 5:
+                        st.markdown("""
+                        <div class="success-box">
+                            <strong>✓ 良好な収益性</strong><br>
+                            現在の収益構造を維持しつつ、さらなる成長を目指しましょう。
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.warning("経営指標データがありません。")
+        
+        elif st.session_state.page == "損益分岐点分析":
+            st.title("📉 損益分岐点分析")
+            
+            st.markdown("""
+            <div class="info-box">
+                <strong>💡 概要:</strong> 赤字にならない最低売上高を計算し、経営の安全性を評価します。
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 損益分岐点を計算（予測データを使用）
+            forecasts = load_forecast_data_cached(
+                st.session_state.selected_period_id,
+                st.session_state.scenario,
+                processor
+            )
+            
+            if not forecasts.empty:
+                months = [col for col in forecasts.columns if col not in ['項目名']]
+                
+                # 売上高
+                sales_row = forecasts[forecasts['項目名'] == '売上高']
+                total_sales = 0
+                if not sales_row.empty:
+                    for month in months:
+                        if month in sales_row.columns:
+                            val = sales_row[month].iloc[0]
+                            if pd.notna(val):
+                                total_sales += float(val)
+                
+                # 変動費（売上原価）
+                vc_row = forecasts[forecasts['項目名'] == '売上原価']
+                total_vc = 0
+                if not vc_row.empty:
+                    for month in months:
+                        if month in vc_row.columns:
+                            val = vc_row[month].iloc[0]
+                            if pd.notna(val):
+                                total_vc += float(val)
+                
+                # 固定費（販管費）
+                total_fc = 0
+                for item in processor.ga_items:
+                    item_row = forecasts[forecasts['項目名'] == item]
+                    if not item_row.empty:
+                        for month in months:
+                            if month in item_row.columns:
+                                val = item_row[month].iloc[0]
+                                if pd.notna(val):
+                                    total_fc += float(val)
+                
+                # 計算
+                contribution_margin = total_sales - total_vc
+                contribution_margin_ratio = (contribution_margin / total_sales * 100) if total_sales > 0 else 0
+                breakeven_sales = (total_fc / (contribution_margin_ratio / 100)) if contribution_margin_ratio > 0 else 0
+                safety_margin = total_sales - breakeven_sales
+                safety_margin_ratio = (safety_margin / total_sales * 100) if total_sales > 0 else 0
+                
+                # サマリーカード
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.markdown(f"""
+                    <div class="summary-card-blue">
+                        <div class="card-title">損益分岐点売上高</div>
+                        <div class="card-value">¥{safe_int(breakeven_sales):,}</div>
+                        <div class="card-subtitle">この売上で利益ゼロ</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown(f"""
+                    <div class="summary-card-green">
+                        <div class="card-title">安全余裕額</div>
+                        <div class="card-value">¥{safe_int(safety_margin):,}</div>
+                        <div class="card-subtitle">赤字までの余裕</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col3:
+                    st.markdown(f"""
+                    <div class="summary-card-{'green' if safety_margin_ratio > 20 else 'orange'}">
+                        <div class="card-title">安全余裕率</div>
+                        <div class="card-value">{safety_margin_ratio:.1f}%</div>
+                        <div class="card-subtitle">{'安全' if safety_margin_ratio > 20 else '注意'}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # 詳細分析
+                st.markdown("### 📊 詳細分析")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("""
+                    <div class="kpi-card">
+                        <h4>費用構造</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    analysis_data = {
+                        "項目": ["売上高", "変動費", "限界利益", "固定費", "営業利益"],
+                        "金額": [total_sales, total_vc, contribution_margin, total_fc, contribution_margin - total_fc],
+                        "構成比(%)": [
+                            100,
+                            (total_vc / total_sales * 100) if total_sales > 0 else 0,
+                            (contribution_margin / total_sales * 100) if total_sales > 0 else 0,
+                            (total_fc / total_sales * 100) if total_sales > 0 else 0,
+                            ((contribution_margin - total_fc) / total_sales * 100) if total_sales > 0 else 0
+                        ]
+                    }
+                    
+                    analysis_df = pd.DataFrame(analysis_data)
+                    st.dataframe(
+                        analysis_df.style.format({"金額": "¥{:,.0f}", "構成比(%)": "{:.1f}%"}),
+                        width="stretch"
+                    )
+                
+                with col2:
+                    st.markdown("""
+                    <div class="kpi-card">
+                        <h4>重要指標</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    metrics_data = {
+                        "指標": ["限界利益率", "損益分岐点比率", "安全余裕率", "固定費回収率"],
+                        "値": [
+                            f"{contribution_margin_ratio:.1f}%",
+                            f"{(breakeven_sales / total_sales * 100) if total_sales > 0 else 0:.1f}%",
+                            f"{safety_margin_ratio:.1f}%",
+                            f"{(contribution_margin / total_fc * 100) if total_fc > 0 else 0:.1f}%"
+                        ],
+                        "評価": [
+                            "良好" if contribution_margin_ratio > 40 else "要改善",
+                            "良好" if (breakeven_sales / total_sales * 100) < 80 else "要改善",
+                            "良好" if safety_margin_ratio > 20 else "要注意",
+                            "良好" if (contribution_margin / total_fc * 100) > 120 else "要改善"
+                        ]
+                    }
+                    
+                    metrics_df = pd.DataFrame(metrics_data)
+                    st.dataframe(metrics_df, width="stretch")
+                
+                # グラフ
+                st.markdown("### 📈 損益分岐点グラフ")
+                
+                # X軸（売上高の範囲）
+                x_range = np.linspace(0, total_sales * 1.5, 100)
+                
+                # 総費用線（固定費 + 変動費）
+                variable_cost_ratio = total_vc / total_sales if total_sales > 0 else 0
+                total_cost_line = total_fc + (x_range * variable_cost_ratio)
+                
+                # 売上高線
+                sales_line = x_range
+                
+                fig = go.Figure()
+                
+                # 売上高線
+                fig.add_trace(go.Scatter(
+                    x=x_range,
+                    y=sales_line,
+                    mode='lines',
+                    name='売上高',
+                    line=dict(color='#2e7d32', width=3)
+                ))
+                
+                # 総費用線
+                fig.add_trace(go.Scatter(
+                    x=x_range,
+                    y=total_cost_line,
+                    mode='lines',
+                    name='総費用',
+                    line=dict(color='#c62828', width=3)
+                ))
+                
+                # 損益分岐点
+                fig.add_trace(go.Scatter(
+                    x=[breakeven_sales],
+                    y=[breakeven_sales],
+                    mode='markers',
+                    name='損益分岐点',
+                    marker=dict(size=15, color='#f57c00')
+                ))
+                
+                # 現在の売上
+                current_total_cost = total_fc + (total_sales * variable_cost_ratio)
+                fig.add_trace(go.Scatter(
+                    x=[total_sales],
+                    y=[current_total_cost],
+                    mode='markers',
+                    name='現在位置',
+                    marker=dict(size=15, color='#1976d2', symbol='star')
+                ))
+                
+                fig.update_layout(
+                    xaxis_title="売上高 (円)",
+                    yaxis_title="金額 (円)",
+                    hovermode='closest',
+                    height=500,
+                    template="plotly_white"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # 改善提案
+                st.markdown("### 💡 改善提案")
+                
+                if safety_margin_ratio < 10:
+                    st.markdown("""
+                    <div class="warning-box">
+                        <strong>⚠️ 危険水準：安全余裕率が10%未満</strong><br>
+                        <strong>至急対応が必要：</strong><br>
+                        • 固定費の大幅削減を検討<br>
+                        • 売上拡大策の即時実行<br>
+                        • 変動費率の改善（仕入先交渉など）<br>
+                        • 資金繰り計画の見直し
+                    </div>
+                    """, unsafe_allow_html=True)
+                elif safety_margin_ratio < 20:
+                    st.markdown("""
+                    <div class="warning-box">
+                        <strong>⚠️ 注意水準：安全余裕率が20%未満</strong><br>
+                        <strong>改善施策：</strong><br>
+                        • 固定費の削減余地を調査<br>
+                        • 売上増加施策の検討<br>
+                        • 利益率の高い商品の強化
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown("""
+                    <div class="success-box">
+                        <strong>✓ 良好な水準：安全余裕率が20%以上</strong><br>
+                        現在の経営は安全です。さらなる成長を目指しましょう。
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("予測データがありません。予測データを入力してください。")
         
         elif st.session_state.page == "予測 VS 実績比較":
             st.title("📊 予測 VS 実績比較")
