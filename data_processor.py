@@ -1443,3 +1443,305 @@ class DataProcessor:
         finally:
             if conn:
                 conn.close()
+
+    def calculate_bs_data(self, fiscal_period_id):
+        """貸借対照表データを計算（簡易版）"""
+        try:
+            # 実際のBSデータが必要だが、簡易的にPLから推計
+            # 本来はBS専用のデータ入力が必要
+            
+            # ダミーデータを返す（実装例）
+            bs_data = {
+                '流動資産': {
+                    '現金及び預金': 50000000,
+                    '売掛金': 30000000,
+                    '棚卸資産': 20000000,
+                },
+                '固定資産': {
+                    '有形固定資産': 80000000,
+                    '無形固定資産': 10000000,
+                },
+                '流動負債': {
+                    '買掛金': 25000000,
+                    '短期借入金': 30000000,
+                },
+                '固定負債': {
+                    '長期借入金': 50000000,
+                },
+                '純資産': {
+                    '資本金': 30000000,
+                    '利益剰余金': 55000000,
+                }
+            }
+            
+            return bs_data
+        except Exception as e:
+            sys.stderr.write(f"❌ BS計算エラー: {e}\n")
+            return {}
+    
+    def calculate_cf_data(self, fiscal_period_id):
+        """キャッシュフロー計算書データを計算"""
+        try:
+            # PLデータから簡易的にCFを計算
+            actuals = self.load_actual_data(fiscal_period_id)
+            forecasts = self.load_forecast_data(fiscal_period_id, "現実")
+            
+            # 営業CFの計算（簡易版）
+            operating_cf = {}
+            
+            # 売上高から売掛金増減を考慮（簡易的に90%を現金化と仮定）
+            if not forecasts.empty:
+                sales_row = forecasts[forecasts['項目名'] == '売上高']
+                if not sales_row.empty:
+                    months = [col for col in sales_row.columns if col not in ['項目名']]
+                    for month in months:
+                        sales = sales_row[month].iloc[0] if month in sales_row.columns else 0
+                        operating_cf[month] = sales * 0.9  # 簡易的に90%を現金化
+            
+            # 投資CF（簡易版）
+            investing_cf = {}
+            for month in operating_cf.keys():
+                investing_cf[month] = -5000000  # 月次固定の設備投資
+            
+            # 財務CF（簡易版）
+            financing_cf = {}
+            for month in operating_cf.keys():
+                financing_cf[month] = -2000000  # 月次借入金返済
+            
+            return {
+                '営業CF': operating_cf,
+                '投資CF': investing_cf,
+                '財務CF': financing_cf
+            }
+        except Exception as e:
+            sys.stderr.write(f"❌ CF計算エラー: {e}\n")
+            return {}
+    
+    def calculate_financial_ratios(self, fiscal_period_id):
+        """経営指標を計算"""
+        try:
+            # PLデータを取得
+            actuals = self.load_actual_data(fiscal_period_id)
+            
+            if actuals.empty:
+                return {}
+            
+            months = [col for col in actuals.columns if col not in ['項目名']]
+            
+            # 売上高
+            sales = 0
+            sales_row = actuals[actuals['項目名'] == '売上高']
+            if not sales_row.empty:
+                for month in months:
+                    if month in sales_row.columns:
+                        val = sales_row[month].iloc[0]
+                        if pd.notna(val):
+                            sales += float(val)
+            
+            # 売上原価
+            cogs = 0
+            cogs_row = actuals[actuals['項目名'] == '売上原価']
+            if not cogs_row.empty:
+                for month in months:
+                    if month in cogs_row.columns:
+                        val = cogs_row[month].iloc[0]
+                        if pd.notna(val):
+                            cogs += float(val)
+            
+            # 営業利益
+            operating_profit = 0
+            op_row = actuals[actuals['項目名'] == '営業損益金額']
+            if not op_row.empty:
+                for month in months:
+                    if month in op_row.columns:
+                        val = op_row[month].iloc[0]
+                        if pd.notna(val):
+                            operating_profit += float(val)
+            
+            # 当期純利益
+            net_profit = 0
+            net_row = actuals[actuals['項目名'] == '当期純損益金額']
+            if not net_row.empty:
+                for month in months:
+                    if month in net_row.columns:
+                        val = net_row[month].iloc[0]
+                        if pd.notna(val):
+                            net_profit += float(val)
+            
+            # BSデータ（簡易版）
+            total_assets = 190000000  # ダミー
+            total_equity = 85000000   # ダミー
+            current_assets = 100000000  # ダミー
+            current_liabilities = 55000000  # ダミー
+            
+            # 経営指標を計算
+            ratios = {
+                '売上高': sales,
+                '売上総利益': sales - cogs,
+                '営業利益': operating_profit,
+                '当期純利益': net_profit,
+                '売上総利益率': ((sales - cogs) / sales * 100) if sales > 0 else 0,
+                '営業利益率': (operating_profit / sales * 100) if sales > 0 else 0,
+                '当期純利益率': (net_profit / sales * 100) if sales > 0 else 0,
+                'ROA': (net_profit / total_assets * 100) if total_assets > 0 else 0,
+                'ROE': (net_profit / total_equity * 100) if total_equity > 0 else 0,
+                '流動比率': (current_assets / current_liabilities * 100) if current_liabilities > 0 else 0,
+                '自己資本比率': (total_equity / total_assets * 100) if total_assets > 0 else 0,
+            }
+            
+            return ratios
+        except Exception as e:
+            sys.stderr.write(f"❌ 経営指標計算エラー: {e}\n")
+            return {}
+    
+    def calculate_breakeven_analysis(self, fiscal_period_id):
+        """損益分岐点分析"""
+        try:
+            forecasts = self.load_forecast_data(fiscal_period_id, "現実")
+            
+            if forecasts.empty:
+                return {}
+            
+            months = [col for col in forecasts.columns if col not in ['項目名']]
+            
+            # 売上高
+            sales = 0
+            sales_row = forecasts[forecasts['項目名'] == '売上高']
+            if not sales_row.empty:
+                for month in months:
+                    if month in sales_row.columns:
+                        val = sales_row[month].iloc[0]
+                        if pd.notna(val):
+                            sales += float(val)
+            
+            # 変動費（売上原価と仮定）
+            variable_costs = 0
+            vc_row = forecasts[forecasts['項目名'] == '売上原価']
+            if not vc_row.empty:
+                for month in months:
+                    if month in vc_row.columns:
+                        val = vc_row[month].iloc[0]
+                        if pd.notna(val):
+                            variable_costs += float(val)
+            
+            # 固定費（販管費の合計と仮定）
+            fixed_costs = 0
+            for item in self.ga_items:
+                item_row = forecasts[forecasts['項目名'] == item]
+                if not item_row.empty:
+                    for month in months:
+                        if month in item_row.columns:
+                            val = item_row[month].iloc[0]
+                            if pd.notna(val):
+                                fixed_costs += float(val)
+            
+            # 限界利益率
+            contribution_margin_ratio = ((sales - variable_costs) / sales) if sales > 0 else 0
+            
+            # 損益分岐点売上高
+            breakeven_sales = (fixed_costs / contribution_margin_ratio) if contribution_margin_ratio > 0 else 0
+            
+            # 安全余裕率
+            safety_margin_ratio = ((sales - breakeven_sales) / sales * 100) if sales > 0 else 0
+            
+            return {
+                '売上高': sales,
+                '変動費': variable_costs,
+                '固定費': fixed_costs,
+                '限界利益': sales - variable_costs,
+                '限界利益率': contribution_margin_ratio * 100,
+                '損益分岐点売上高': breakeven_sales,
+                '安全余裕率': safety_margin_ratio,
+                '損益分岐点比率': (breakeven_sales / sales * 100) if sales > 0 else 0
+            }
+        except Exception as e:
+            sys.stderr.write(f"❌ 損益分岐点分析エラー: {e}\n")
+            return {}
+
+    def calculate_balance_sheet(self, fiscal_period_id):
+        """貸借対照表を計算"""
+        # 簡易BS（将来的に拡張可能）
+        bs_items = {
+            "資産の部": {
+                "流動資産": ["現金及び預金", "売掛金", "棚卸資産", "その他流動資産"],
+                "固定資産": ["有形固定資産", "無形固定資産", "投資その他の資産"]
+            },
+            "負債の部": {
+                "流動負債": ["買掛金", "短期借入金", "未払金", "その他流動負債"],
+                "固定負債": ["長期借入金", "その他固定負債"]
+            },
+            "純資産の部": {
+                "株主資本": ["資本金", "利益剰余金"]
+            }
+        }
+        return bs_items
+    
+    def calculate_cash_flow(self, fiscal_period_id):
+        """キャッシュフロー計算書を計算（間接法）"""
+        # 実績データを取得
+        actuals = self.load_actual_data(fiscal_period_id)
+        
+        # 営業CF、投資CF、財務CFの計算
+        cf_data = {
+            "営業活動によるキャッシュフロー": {},
+            "投資活動によるキャッシュフロー": {},
+            "財務活動によるキャッシュフロー": {}
+        }
+        
+        # 営業CFの計算（簡易版：税引前利益をベース）
+        net_income_row = actuals[actuals['項目名'] == '税引前当期純損益金額']
+        if not net_income_row.empty:
+            months = [col for col in actuals.columns if col not in ['項目名']]
+            for month in months:
+                if month in net_income_row.columns:
+                    cf_data["営業活動によるキャッシュフロー"][month] = net_income_row[month].iloc[0]
+        
+        return cf_data
+    
+    def calculate_financial_indicators(self, fiscal_period_id):
+        """経営指標を計算"""
+        actuals = self.load_actual_data(fiscal_period_id)
+        months = [col for col in actuals.columns if col not in ['項目名']]
+        
+        # 必要な項目を取得
+        sales = actuals[actuals['項目名'] == '売上高']
+        cogs = actuals[actuals['項目名'] == '売上原価']
+        operating_profit = actuals[actuals['項目名'] == '営業損益金額']
+        ordinary_profit = actuals[actuals['項目名'] == '経常損益金額']
+        net_profit = actuals[actuals['項目名'] == '当期純損益金額']
+        
+        indicators = {}
+        
+        for month in months:
+            month_indicators = {}
+            
+            # 売上高
+            sales_val = float(sales[month].iloc[0]) if not sales.empty and month in sales.columns else 0
+            
+            # 売上原価
+            cogs_val = float(cogs[month].iloc[0]) if not cogs.empty and month in cogs.columns else 0
+            
+            # 営業利益
+            op_val = float(operating_profit[month].iloc[0]) if not operating_profit.empty and month in operating_profit.columns else 0
+            
+            # 経常利益
+            ord_val = float(ordinary_profit[month].iloc[0]) if not ordinary_profit.empty and month in ordinary_profit.columns else 0
+            
+            # 当期純利益
+            net_val = float(net_profit[month].iloc[0]) if not net_profit.empty and month in net_profit.columns else 0
+            
+            # 粗利率
+            month_indicators['粗利率'] = ((sales_val - cogs_val) / sales_val * 100) if sales_val != 0 else 0
+            
+            # 営業利益率
+            month_indicators['営業利益率'] = (op_val / sales_val * 100) if sales_val != 0 else 0
+            
+            # 経常利益率
+            month_indicators['経常利益率'] = (ord_val / sales_val * 100) if sales_val != 0 else 0
+            
+            # 当期純利益率
+            month_indicators['当期純利益率'] = (net_val / sales_val * 100) if sales_val != 0 else 0
+            
+            indicators[month] = month_indicators
+        
+        return indicators
