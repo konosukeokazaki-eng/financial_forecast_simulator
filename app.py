@@ -1181,15 +1181,89 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             )
 
         elif st.session_state.page == "予測データ入力":
-            st.title("予測データ入力")
+            st.title("月次計画（予測入力）")
             
-            st.markdown(f"""
-            <div class="info-box">
-                <strong>シナリオ: {st.session_state.scenario}</strong> | 
-                実績締月: {st.session_state.current_month} 以降のデータを編集してください。<br>
-                💡 <strong>使い方:</strong> 表内の数値を直接編集 → 下部の保存ボタンをクリック
-            </div>
-            """, unsafe_allow_html=True)
+            # ヘッダー情報
+            col1, col2, col3 = st.columns([2, 2, 2])
+            with col1:
+                st.markdown(f"**シナリオ:** {st.session_state.scenario}")
+            with col2:
+                st.markdown(f"**実績締月:** {st.session_state.current_month}")
+            with col3:
+                st.markdown(f"**期間:** {st.session_state.selected_period_num}期")
+            
+            st.markdown("---")
+            
+            # 一括入力機能（Manageboard風）
+            with st.expander("🔧 入力アシスト機能", expanded=False):
+                st.markdown("#### 一括入力・コピー機能")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("**1. 前期実績をコピー**")
+                    if st.button("📋 前期実績をコピー", use_container_width=True):
+                        # 前期のデータを現在のシナリオにコピー
+                        st.info("前期実績コピー機能は今後実装予定です")
+                
+                with col2:
+                    st.markdown("**2. 一括入力（毎月同額）**")
+                    
+                    # 項目選択
+                    editable_items_list = [item for item in processor.all_items if item not in processor.calculated_items]
+                    selected_item = st.selectbox(
+                        "項目を選択",
+                        editable_items_list,
+                        key="bulk_input_item"
+                    )
+                    
+                    # 金額入力
+                    bulk_amount = st.number_input(
+                        "毎月の金額",
+                        value=0,
+                        step=1000,
+                        key="bulk_amount"
+                    )
+                    
+                    if st.button("✏️ 全月に適用", use_container_width=True, key="apply_bulk"):
+                        if bulk_amount != 0:
+                            # 全月に同じ金額を設定
+                            values = {month: bulk_amount for month in months}
+                            success, msg = processor.save_forecast_item(
+                                st.session_state.selected_period_id,
+                                st.session_state.scenario,
+                                selected_item,
+                                values
+                            )
+                            if success:
+                                st.success(f"✅ {selected_item}に全月¥{bulk_amount:,}を設定しました")
+                                # キャッシュクリア
+                                for key in ['forecasts_df', 'forecast_data_cache', 'pl_df']:
+                                    if key in st.session_state:
+                                        del st.session_state[key]
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {msg}")
+                
+                st.markdown("---")
+                
+                # 前年比率での計算
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**3. 前年×係数で計算**")
+                    ratio = st.number_input(
+                        "係数（例: 1.1 = 前年の110%）",
+                        value=1.0,
+                        step=0.1,
+                        min_value=0.1,
+                        max_value=10.0,
+                        key="ratio_input"
+                    )
+                    
+                    if st.button("🔢 前年×係数で計算", use_container_width=True):
+                        st.info("前年比率計算機能は今後実装予定です")
+            
+            st.markdown("---")
             
             # 予測データと補助科目データを取得
             forecast_data = forecasts_df.copy()
@@ -1261,7 +1335,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 )
             
             # データエディタで全体を表示・編集
-            st.markdown("### 📊 予測損益計算書（全項目）")
+            st.markdown("### 予測損益計算書（スプレッドシート）")
+            st.markdown("💡 表内の数値を直接編集できます。編集後は必ず下部の保存ボタンをクリックしてください。")
             
             edited_df = st.data_editor(
                 edit_df,
