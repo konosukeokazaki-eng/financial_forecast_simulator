@@ -18,185 +18,122 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# カスタムCSS - ビジネスライクなデザイン
+# カスタムCSS - Manageboard風デザイン
 st.markdown("""
 <style>
     /* メインコンテナ */
     .main {
         padding: 0rem 1rem;
-        background-color: #f5f7fa;
+        background-color: #f8f9fa;
     }
     
     /* タイトル */
     h1 {
         color: #1a1a2e;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        border-left: 4px solid #2e7d32;
-        padding-left: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 1.75rem;
     }
     
     h2 {
         color: #2c3e50;
         font-weight: 600;
-        border-bottom: 2px solid #2e7d32;
-        padding-bottom: 0.5rem;
         margin-top: 2rem;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin-bottom: 1rem;
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 1.25rem;
     }
     
     h3 {
         color: #34495e;
         font-weight: 600;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 1.1rem;
     }
     
-    /* サマリーカード - 洗練されたビジネススタイル */
-    .summary-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 8px;
-        color: white;
-        margin-bottom: 1rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid #5a67d8;
-    }
-    
-    .summary-card-blue {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        padding: 1.5rem;
-        border-radius: 8px;
-        color: white;
-        box-shadow: 0 4px 12px rgba(30, 60, 114, 0.3);
-        border-left: 4px solid #4a90e2;
-    }
-    
-    .summary-card-green {
-        background: linear-gradient(135deg, #2e7d32 0%, #43a047 100%);
-        padding: 1.5rem;
-        border-radius: 8px;
-        color: white;
-        box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
-        border-left: 4px solid #66bb6a;
-    }
-    
-    .summary-card-orange {
-        background: linear-gradient(135deg, #e65100 0%, #f57c00 100%);
-        padding: 1.5rem;
-        border-radius: 8px;
-        color: white;
-        box-shadow: 0 4px 12px rgba(230, 81, 0, 0.3);
-        border-left: 4px solid #ff9800;
-    }
-    
-    .summary-card-purple {
-        background: linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%);
-        padding: 1.5rem;
-        border-radius: 8px;
-        color: white;
-        box-shadow: 0 4px 12px rgba(106, 27, 154, 0.3);
-        border-left: 4px solid #ab47bc;
-    }
-    
-    .summary-card-teal {
-        background: linear-gradient(135deg, #00695c 0%, #00897b 100%);
-        padding: 1.5rem;
-        border-radius: 8px;
-        color: white;
-        box-shadow: 0 4px 12px rgba(0, 105, 92, 0.3);
-        border-left: 4px solid #26a69a;
-    }
-    
-    .card-title {
-        font-size: 0.9rem;
-        font-weight: 500;
-        margin-bottom: 0.5rem;
-        opacity: 0.95;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .card-value {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 0.3rem;
-        font-family: 'Courier New', monospace;
-    }
-    
-    .card-subtitle {
-        font-size: 0.85rem;
-        opacity: 0.9;
-        font-weight: 400;
-    }
-    
-    /* インフォボックス - プロフェッショナル */
-    .info-box {
-        background-color: #e3f2fd;
-        border-left: 4px solid #1976d2;
-        padding: 1rem 1.5rem;
-        border-radius: 4px;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    }
-    
-    .warning-box {
-        background-color: #fff3e0;
-        border-left: 4px solid #f57c00;
-        padding: 1rem 1.5rem;
-        border-radius: 4px;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    }
-    
-    .success-box {
-        background-color: #e8f5e9;
-        border-left: 4px solid #43a047;
-        padding: 1rem 1.5rem;
-        border-radius: 4px;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    }
-    
-    /* KPI カード */
-    .kpi-card {
+    /* 金額カード - Manageboard風 */
+    .amount-card {
         background: white;
         padding: 1.5rem;
         border-radius: 8px;
         border: 1px solid #e0e0e0;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
         margin-bottom: 1rem;
     }
     
-    .kpi-label {
-        font-size: 0.85rem;
-        color: #757575;
+    .amount-card-label {
+        font-size: 0.75rem;
+        color: #9e9e9e;
         font-weight: 500;
+        margin-bottom: 0.3rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 0.5rem;
     }
     
-    .kpi-value {
-        font-size: 2.2rem;
-        color: #1a1a2e;
+    .amount-card-value {
+        font-size: 1.8rem;
         font-weight: 700;
-        font-family: 'Courier New', monospace;
+        color: #1a1a2e;
+        margin-bottom: 0.5rem;
+        font-family: 'Segoe UI', sans-serif;
     }
     
-    .kpi-change {
+    .amount-card-sub {
+        font-size: 0.85rem;
+        color: #757575;
+        margin-top: 0.5rem;
+    }
+    
+    /* サイドバー - Manageboard風ダークテーマ */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    }
+    
+    [data-testid="stSidebar"] .stMarkdown {
+        color: #e2e8f0;
+    }
+    
+    [data-testid="stSidebar"] h3 {
+        color: #f1f5f9;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+        padding-left: 0.5rem;
+    }
+    
+    /* サイドバーボタン */
+    [data-testid="stSidebar"] .stButton > button {
+        width: 100%;
+        text-align: left;
+        background-color: transparent;
+        color: #e2e8f0;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        margin-bottom: 0.25rem;
+        font-weight: 500;
         font-size: 0.9rem;
-        margin-top: 0.3rem;
+        transition: all 0.2s ease;
     }
     
-    .kpi-positive {
-        color: #2e7d32;
-        font-weight: 600;
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        transform: none;
+        box-shadow: none;
     }
     
-    .kpi-negative {
-        color: #c62828;
-        font-weight: 600;
+    /* インフォボックス */
+    .info-box {
+        background-color: #e3f2fd;
+        border-left: 3px solid #1976d2;
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
     }
     
     /* テーブルスタイル */
@@ -204,50 +141,50 @@ st.markdown("""
         border: 1px solid #e0e0e0 !important;
         border-radius: 4px;
         overflow: hidden;
+        font-size: 0.9rem;
     }
     
     /* ボタンスタイル */
     .stButton > button {
-        border-radius: 4px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        font-size: 0.85rem;
-        transition: all 0.3s ease;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+        transition: all 0.2s ease;
     }
     
     .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    }
-    
-    /* サイドバー */
-    [data-testid="stSidebar"] {
-        background-color: #1a1a2e;
-    }
-    
-    [data-testid="stSidebar"] .stMarkdown {
-        color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
     
     /* タブスタイル */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: white;
-        padding: 0.5rem;
+        gap: 4px;
+        background-color: #f8f9fa;
+        padding: 0.25rem;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     
     .stTabs [data-baseweb="tab"] {
-        font-weight: 600;
-        color: #424242;
-        border-radius: 4px;
+        font-weight: 500;
+        color: #64748b;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: #2e7d32;
-        color: white;
+        background-color: white;
+        color: #1976d2;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* セパレーター */
+    hr {
+        border: none;
+        border-top: 1px solid #e0e0e0;
+        margin: 1.5rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -456,28 +393,58 @@ else:
 
     # メニュー
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📋 メニュー")
     
-    menu_options = [
-        "着地予測ダッシュボード",
-        "損益計算書 (PL)",
-        "キャッシュフロー計算書 (CF)",
-        "経営指標ダッシュボード",
-        "損益分岐点分析",
-        "予測 VS 実績比較",
-        "期間比較分析",
-        "実績データ入力",
-        "予測データ入力",
-        "データインポート",
-        "シナリオ一括設定",
-        "システム設定"
-    ]
+    # 階層型ナビゲーション
+    st.sidebar.markdown("### 📊 ダッシュボード")
+    if st.sidebar.button("📊 着地予測", use_container_width=True, key="nav_dashboard"):
+        st.session_state.page = "着地予測ダッシュボード"
     
-    st.session_state.page = st.sidebar.radio(
-        "ページ移動",
-        menu_options,
-        label_visibility="collapsed"
-    )
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📝 データ入力")
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("実績", use_container_width=True, key="nav_actual"):
+            st.session_state.page = "実績データ入力"
+    with col2:
+        if st.button("予測", use_container_width=True, key="nav_forecast"):
+            st.session_state.page = "予測データ入力"
+    
+    if st.sidebar.button("📥 データ取込", use_container_width=True, key="nav_import"):
+        st.session_state.page = "データインポート"
+    
+    if st.sidebar.button("🔄 シナリオ一括設定", use_container_width=True, key="nav_scenario"):
+        st.session_state.page = "シナリオ一括設定"
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📈 財務諸表")
+    if st.sidebar.button("📋 損益計算書 (PL)", use_container_width=True, key="nav_pl"):
+        st.session_state.page = "損益計算書 (PL)"
+    if st.sidebar.button("💰 貸借対照表 (BS)", use_container_width=True, key="nav_bs"):
+        st.session_state.page = "貸借対照表 (BS)"
+    if st.sidebar.button("💵 CF計算書", use_container_width=True, key="nav_cf"):
+        st.session_state.page = "キャッシュフロー計算書 (CF)"
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📊 分析レポート")
+    if st.sidebar.button("📊 予実比較", use_container_width=True, key="nav_comparison"):
+        st.session_state.page = "予測 VS 実績比較"
+    if st.sidebar.button("🔀 シナリオ比較", use_container_width=True, key="nav_scenario_comp"):
+        st.session_state.page = "シナリオ比較"
+    if st.sidebar.button("📅 期間比較", use_container_width=True, key="nav_period"):
+        st.session_state.page = "期間比較分析"
+    if st.sidebar.button("📈 経営指標", use_container_width=True, key="nav_metrics"):
+        st.session_state.page = "経営指標ダッシュボード"
+    if st.sidebar.button("📉 損益分岐点", use_container_width=True, key="nav_breakeven"):
+        st.session_state.page = "損益分岐点分析"
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### ⚙️ 設定")
+    if st.sidebar.button("⚙️ システム設定", use_container_width=True, key="nav_settings"):
+        st.session_state.page = "システム設定"
+    
+    # ページ情報を保持（後方互換性のため）
+    if 'page' not in st.session_state:
+        st.session_state.page = "着地予測ダッシュボード"
 
 # --------------------------------------------------------------------------------
 # ヘルパー関数
@@ -1705,6 +1672,180 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 )
             else:
                 st.warning("比較するデータがありません。")
+        
+        
+        elif st.session_state.page == "シナリオ比較":
+            st.title("🔀 シナリオ比較")
+            
+            st.markdown("""
+            <div class="info-box">
+                <strong>💡 概要:</strong> 3つのシナリオ（現実・楽観・悲観）を横並びで比較します。
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 3シナリオのデータを取得
+            scenarios = ["現実", "楽観", "悲観"]
+            scenario_data = {}
+            
+            for scenario in scenarios:
+                forecast_data = load_forecast_data_cached(
+                    st.session_state.selected_period_id,
+                    scenario,
+                    processor
+                )
+                
+                if not forecast_data.empty:
+                    # 合計を計算
+                    month_cols = [col for col in forecast_data.columns if col not in ['項目名']]
+                    scenario_data[scenario] = {}
+                    
+                    for item in processor.all_items:
+                        item_row = forecast_data[forecast_data['項目名'] == item]
+                        if not item_row.empty:
+                            total = 0
+                            for month in month_cols:
+                                if month in item_row.columns:
+                                    val = item_row[month].iloc[0]
+                                    if pd.notna(val):
+                                        total += float(val)
+                            scenario_data[scenario][item] = total
+            
+            if scenario_data:
+                # 比較テーブル
+                st.markdown("### 📊 シナリオ別 損益比較（通期）")
+                
+                comparison_rows = []
+                
+                # 主要項目のみ表示
+                key_items = [
+                    "売上高", "売上原価", "販売費及び一般管理費合計",
+                    "営業損益金額", "経常損益金額", "当期純損益金額"
+                ]
+                
+                for item in key_items:
+                    if item in scenario_data.get("現実", {}):
+                        row = {"項目": item}
+                        
+                        base_value = scenario_data["現実"].get(item, 0)
+                        row["現実"] = base_value
+                        
+                        for scenario in ["楽観", "悲観"]:
+                            value = scenario_data[scenario].get(item, 0)
+                            row[scenario] = value
+                            
+                            # 差異率を計算
+                            if base_value != 0:
+                                diff_pct = ((value - base_value) / base_value * 100)
+                                row[f"{scenario}_diff"] = f"{diff_pct:+.1f}%"
+                            else:
+                                row[f"{scenario}_diff"] = "-"
+                        
+                        comparison_rows.append(row)
+                
+                # 利益率を追加
+                if "売上高" in scenario_data.get("現実", {}):
+                    for profit_item, label in [
+                        ("営業損益金額", "営業利益率"),
+                        ("経常損益金額", "経常利益率"),
+                        ("当期純損益金額", "純利益率")
+                    ]:
+                        row = {"項目": label}
+                        
+                        for scenario in scenarios:
+                            sales = scenario_data[scenario].get("売上高", 0)
+                            profit = scenario_data[scenario].get(profit_item, 0)
+                            
+                            if sales > 0:
+                                rate = (profit / sales * 100)
+                                row[scenario] = rate
+                            else:
+                                row[scenario] = 0
+                        
+                        # 差異ポイント
+                        base_rate = row.get("現実", 0)
+                        for scenario in ["楽観", "悲観"]:
+                            rate = row.get(scenario, 0)
+                            diff_pt = rate - base_rate
+                            row[f"{scenario}_diff"] = f"{diff_pt:+.1f}pt"
+                        
+                        comparison_rows.append(row)
+                
+                comparison_df = pd.DataFrame(comparison_rows)
+                
+                # フォーマット設定
+                def format_row(row):
+                    if "率" in row['項目']:
+                        # 利益率の行
+                        return {
+                            '項目': row['項目'],
+                            '現実': f"{row['現実']:.1f}%",
+                            '楽観': f"{row['楽観']:.1f}%",
+                            '楽観_差異': row['楽観_diff'],
+                            '悲観': f"{row['悲観']:.1f}%",
+                            '悲観_差異': row['悲観_diff']
+                        }
+                    else:
+                        # 金額の行
+                        return {
+                            '項目': row['項目'],
+                            '現実': f"¥{safe_int(row['現実']):,}",
+                            '楽観': f"¥{safe_int(row['楽観']):,}",
+                            '楽観_差異': row['楽観_diff'],
+                            '悲観': f"¥{safe_int(row['悲観']):,}",
+                            '悲観_差異': row['悲観_diff']
+                        }
+                
+                formatted_rows = [format_row(row) for _, row in comparison_df.iterrows()]
+                display_df = pd.DataFrame(formatted_rows)
+                
+                # カラム名を整理
+                display_df.columns = ['項目', '現実', '楽観', '差異', '悲観', '差異 ']
+                
+                st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    height=500,
+                    hide_index=True
+                )
+                
+                st.markdown("---")
+                
+                # グラフ: 営業利益の比較
+                st.markdown("### 📈 営業利益の比較")
+                
+                operating_profits = []
+                for scenario in scenarios:
+                    operating_profits.append(scenario_data[scenario].get("営業損益金額", 0))
+                
+                fig = go.Figure(data=[
+                    go.Bar(
+                        x=scenarios,
+                        y=operating_profits,
+                        marker_color=['#1976d2', '#2e7d32', '#f57c00'],
+                        text=[f"¥{safe_int(v):,}" for v in operating_profits],
+                        textposition='auto',
+                    )
+                ])
+                
+                fig.update_layout(
+                    yaxis_title="営業利益（円）",
+                    height=400,
+                    template="plotly_white"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # CSVダウンロード
+                st.markdown("---")
+                csv = display_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    label="📥 CSV形式でダウンロード",
+                    data=csv,
+                    file_name=f"scenario_comparison_{st.session_state.selected_period_id}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.warning("シナリオデータがありません。")
         
         elif st.session_state.page == "期間比較分析":
             st.title("📈 期間比較分析")
