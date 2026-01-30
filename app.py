@@ -18,172 +18,341 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# カスタムCSS - Manageboard風デザイン
+# カスタムCSS - Manageboard風デザイン（実際のUIに準拠）
 st.markdown("""
 <style>
-    /* メインコンテナ */
+    /* 全体背景 - Manageboardの明るいグレー */
     .main {
         padding: 0rem 1rem;
-        background-color: #f8f9fa;
+        background-color: #fafbfc;
     }
     
-    /* タイトル */
+    /* タイトル - よりシンプルに */
     h1 {
-        color: #1a1a2e;
+        color: #2c3e50;
         font-weight: 600;
-        margin-bottom: 1rem;
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+        margin-bottom: 1.5rem;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 1.75rem;
     }
     
     h2 {
-        color: #2c3e50;
+        color: #34495e;
         font-weight: 600;
         margin-top: 2rem;
         margin-bottom: 1rem;
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 1.25rem;
     }
     
     h3 {
-        color: #34495e;
+        color: #5a6c7d;
         font-weight: 600;
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-        font-size: 1.1rem;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 1rem;
     }
     
-    /* 金額カード - Manageboard風 */
+    /* 金額カード - Manageboardスタイル */
     .amount-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 8px;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        background: #ffffff;
+        padding: 1.25rem 1.5rem;
+        border-radius: 6px;
+        border: 1px solid #e1e8ed;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+    
+    .amount-card:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
     
     .amount-card-label {
         font-size: 0.75rem;
-        color: #9e9e9e;
-        font-weight: 500;
-        margin-bottom: 0.3rem;
+        color: #8a9ba8;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
     
     .amount-card-value {
-        font-size: 1.8rem;
+        font-size: 1.75rem;
         font-weight: 700;
-        color: #1a1a2e;
+        color: #2c3e50;
         margin-bottom: 0.5rem;
-        font-family: 'Segoe UI', sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
     
     .amount-card-sub {
-        font-size: 0.85rem;
-        color: #757575;
-        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: #8a9ba8;
+        margin-top: 0.3rem;
     }
     
-    /* サイドバー - Manageboard風ダークテーマ */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    /* サマリーカード - よりフラットに */
+    .summary-card {
+        background: #ffffff;
+        padding: 1.25rem 1.5rem;
+        border-radius: 6px;
+        border: 1px solid #e1e8ed;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        margin-bottom: 1rem;
     }
     
-    [data-testid="stSidebar"] .stMarkdown {
-        color: #e2e8f0;
+    .summary-card-blue {
+        background: #ffffff;
+        padding: 1.25rem 1.5rem;
+        border-radius: 6px;
+        border-left: 3px solid #3b82f6;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        margin-bottom: 1rem;
     }
     
-    [data-testid="stSidebar"] h3 {
-        color: #f1f5f9;
+    .summary-card-green {
+        background: #ffffff;
+        padding: 1.25rem 1.5rem;
+        border-radius: 6px;
+        border-left: 3px solid #10b981;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        margin-bottom: 1rem;
+    }
+    
+    .summary-card-orange {
+        background: #ffffff;
+        padding: 1.25rem 1.5rem;
+        border-radius: 6px;
+        border-left: 3px solid #f59e0b;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        margin-bottom: 1rem;
+    }
+    
+    .summary-card-purple {
+        background: #ffffff;
+        padding: 1.25rem 1.5rem;
+        border-radius: 6px;
+        border-left: 3px solid #8b5cf6;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        margin-bottom: 1rem;
+    }
+    
+    .card-title {
         font-size: 0.75rem;
         font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-top: 1.5rem;
         margin-bottom: 0.5rem;
-        padding-left: 0.5rem;
+        color: #8a9ba8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
-    /* サイドバーボタン */
-    [data-testid="stSidebar"] .stButton > button {
-        width: 100%;
-        text-align: left;
-        background-color: transparent;
-        color: #e2e8f0;
-        border: none;
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
-        margin-bottom: 0.25rem;
-        font-weight: 500;
-        font-size: 0.9rem;
-        transition: all 0.2s ease;
+    .card-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0.3rem;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #2c3e50;
     }
     
-    [data-testid="stSidebar"] .stButton > button:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        transform: none;
-        box-shadow: none;
+    .card-subtitle {
+        font-size: 0.8rem;
+        color: #8a9ba8;
+        font-weight: 400;
     }
     
     /* インフォボックス */
     .info-box {
-        background-color: #e3f2fd;
-        border-left: 3px solid #1976d2;
-        padding: 0.75rem 1rem;
-        border-radius: 4px;
-        margin-bottom: 1rem;
-        font-size: 0.9rem;
+        background-color: #f0f9ff;
+        border-left: 3px solid #3b82f6;
+        padding: 0.875rem 1.25rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+        color: #1e40af;
+    }
+    
+    .warning-box {
+        background-color: #fffbeb;
+        border-left: 3px solid #f59e0b;
+        padding: 0.875rem 1.25rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+        color: #92400e;
+    }
+    
+    .success-box {
+        background-color: #f0fdf4;
+        border-left: 3px solid #10b981;
+        padding: 0.875rem 1.25rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+        color: #065f46;
     }
     
     /* テーブルスタイル */
     .dataframe {
-        border: 1px solid #e0e0e0 !important;
-        border-radius: 4px;
+        border: 1px solid #e1e8ed !important;
+        border-radius: 6px;
         overflow: hidden;
-        font-size: 0.9rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        font-size: 0.875rem;
+    }
+    
+    .dataframe thead tr th {
+        background-color: #f8fafc !important;
+        color: #475569 !important;
+        font-weight: 600 !important;
+        padding: 12px 16px !important;
+        border-bottom: 2px solid #e1e8ed !important;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .dataframe tbody tr {
+        border-bottom: 1px solid #f1f5f9 !important;
+    }
+    
+    .dataframe tbody tr:hover {
+        background-color: #f8fafc !important;
+    }
+    
+    .dataframe tbody td {
+        padding: 12px 16px !important;
+        color: #334155;
     }
     
     /* ボタンスタイル */
     .stButton > button {
         border-radius: 6px;
         font-weight: 500;
-        font-size: 0.9rem;
+        font-size: 0.875rem;
         padding: 0.5rem 1rem;
         transition: all 0.2s ease;
+        border: 1px solid #e1e8ed;
+        background-color: #ffffff;
+        color: #475569;
     }
     
     .stButton > button:hover {
+        background-color: #f8fafc;
+        border-color: #cbd5e1;
         transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    }
+    
+    .stButton > button[kind="primary"] {
+        background-color: #3b82f6;
+        color: white;
+        border: none;
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        background-color: #2563eb;
+    }
+    
+    /* サイドバー - Manageboard風 */
+    [data-testid="stSidebar"] {
+        background-color: #f8fafc;
+        border-right: 1px solid #e1e8ed;
+    }
+    
+    [data-testid="stSidebar"] .stMarkdown {
+        color: #334155;
+    }
+    
+    /* セクション見出し（サイドバー内） */
+    [data-testid="stSidebar"] h3 {
+        color: #64748b;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
+        padding-left: 0.5rem;
+    }
+    
+    /* サイドバーのボタン */
+    [data-testid="stSidebar"] .stButton > button {
+        width: 100%;
+        text-align: left;
+        padding: 0.625rem 1rem;
+        margin-bottom: 0.25rem;
+        background-color: transparent;
+        border: none;
+        color: #475569;
+        font-weight: 500;
+        font-size: 0.875rem;
+        border-radius: 6px;
+    }
+    
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background-color: #e2e8f0;
+        transform: none;
+        box-shadow: none;
     }
     
     /* タブスタイル */
     .stTabs [data-baseweb="tab-list"] {
         gap: 4px;
-        background-color: #f8f9fa;
-        padding: 0.25rem;
-        border-radius: 8px;
+        background-color: transparent;
+        padding: 0;
+        border-bottom: 2px solid #e1e8ed;
     }
     
     .stTabs [data-baseweb="tab"] {
         font-weight: 500;
         color: #64748b;
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
-        font-size: 0.9rem;
+        border-radius: 0;
+        padding: 0.75rem 1.5rem;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        background-color: transparent;
+        font-size: 0.875rem;
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: white;
-        color: #1976d2;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        background-color: transparent;
+        color: #3b82f6;
+        border-bottom: 2px solid #3b82f6;
+        font-weight: 600;
+    }
+    
+    /* セレクトボックス */
+    .stSelectbox > div > div {
+        background-color: #ffffff;
+        border: 1px solid #e1e8ed;
+        border-radius: 6px;
+        font-size: 0.875rem;
+    }
+    
+    /* データエディタ */
+    [data-testid="stDataFrameResizable"] {
+        border: 1px solid #e1e8ed;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    
+    /* メトリクス */
+    [data-testid="stMetricValue"] {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-size: 0.75rem;
+        color: #8a9ba8;
+        font-weight: 600;
+        text-transform: uppercase;
     }
     
     /* セパレーター */
     hr {
         border: none;
-        border-top: 1px solid #e0e0e0;
+        border-top: 1px solid #e1e8ed;
         margin: 1.5rem 0;
     }
 </style>
