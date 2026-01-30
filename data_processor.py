@@ -809,10 +809,12 @@ class DataProcessor:
         if isinstance(fiscal_period_id, bytes):
             fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
 
-        return self._read_sql_query(
-            "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ?",
-            params=(fiscal_period_id, scenario)
-        )
+        if self.use_postgres:
+            query = "SELECT * FROM sub_accounts WHERE fiscal_period_id = %s AND scenario = %s"
+        else:
+            query = "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ?"
+        
+        return self._read_sql_query(query, params=(fiscal_period_id, scenario))
 
     def get_sub_accounts_for_parent(self, fiscal_period_id, scenario, parent_item):
         """親項目に紐づく補助科目を取得"""
@@ -820,10 +822,12 @@ class DataProcessor:
         if isinstance(fiscal_period_id, bytes):
             fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
 
-        return self._read_sql_query(
-            "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ?",
-            params=(fiscal_period_id, scenario, parent_item)
-        )
+        if self.use_postgres:
+            query = "SELECT * FROM sub_accounts WHERE fiscal_period_id = %s AND scenario = %s AND parent_item = %s"
+        else:
+            query = "SELECT * FROM sub_accounts WHERE fiscal_period_id = ? AND scenario = ? AND parent_item = ?"
+        
+        return self._read_sql_query(query, params=(fiscal_period_id, scenario, parent_item))
 
     def save_sub_account(self, fiscal_period_id, scenario, parent_item, sub_account_name, values_dict):
         """補助科目データを保存"""
