@@ -660,7 +660,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         forecasts_df = st.session_state.forecasts_df.copy()
         sub_accounts_df = st.session_state.sub_accounts_df.copy()
         
-        # シナリオ調整（キャッシュ）
+        # シナリオ調整（キャッシュ & ベクトル化）
         adjustment_key = (st.session_state.scenario, st.session_state.current_month)
         if st.session_state.scenario != "現実":
             if 'scenario_adjustment_cache' not in st.session_state or st.session_state.get('adjustment_key') != adjustment_key:
@@ -670,29 +670,41 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 # DataFrameに存在する月のみを使用
                 available_forecast_months = [m for m in forecast_months if m in forecasts_df.columns]
                 
-                for item in processor.all_items:
-                    if item == "売上高":
-                        forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 + rate)
-                    elif item == "売上原価":
-                        forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.5)
-                    elif item in processor.ga_items:
-                        forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.3)
+                # ベクトル化: 条件に応じて一括調整
+                if available_forecast_months:
+                    # 売上高: +rate
+                    forecasts_df.loc[forecasts_df['項目名'] == '売上高', available_forecast_months] *= (1 + rate)
+                    
+                    # 売上原価: -rate*0.5
+                    forecasts_df.loc[forecasts_df['項目名'] == '売上原価', available_forecast_months] *= (1 - rate * 0.5)
+                    
+                    # 販管費: -rate*0.3 (一括)
+                    ga_mask = forecasts_df['項目名'].isin(processor.ga_items)
+                    forecasts_df.loc[ga_mask, available_forecast_months] *= (1 - rate * 0.3)
                 
                 st.session_state.scenario_adjustment_cache = forecasts_df.copy()
                 st.session_state.adjustment_key = adjustment_key
             else:
                 forecasts_df = st.session_state.scenario_adjustment_cache.copy()
         
-        # 補助科目合計の反映（キャッシュ）
+        # 補助科目合計の反映（最適化）
         if not sub_accounts_df.empty:
-            if 'sub_account_aggregation_cache' not in st.session_state:
+            sub_cache_key = (st.session_state.selected_period_id, st.session_state.scenario)
+            if 'sub_account_aggregation_cache' not in st.session_state or st.session_state.get('sub_cache_key') != sub_cache_key:
+                # groupbyで集計（高速）
                 aggregated = sub_accounts_df.groupby(['parent_item', 'month'])['amount'].sum().reset_index()
-                for _, row in aggregated.iterrows():
-                    parent = row['parent_item']
-                    month = row['month']
-                    amount = row['amount']
-                    forecasts_df.loc[forecasts_df['項目名'] == parent, month] = amount
+                
+                # ピボットテーブルで一括更新（高速化）
+                pivot = aggregated.pivot(index='parent_item', columns='month', values='amount')
+                
+                for parent in pivot.index:
+                    mask = forecasts_df['項目名'] == parent
+                    for month in pivot.columns:
+                        if month in forecasts_df.columns:
+                            forecasts_df.loc[mask, month] = pivot.loc[parent, month]
+                
                 st.session_state.sub_account_aggregation_cache = forecasts_df.copy()
+                st.session_state.sub_cache_key = sub_cache_key
             else:
                 forecasts_df = st.session_state.sub_account_aggregation_cache.copy()
         
@@ -935,91 +947,46 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             <div class="info-box">
                 <strong>シナリオ: {st.session_state.scenario}</strong> | 
                 実績締月: {st.session_state.current_month} 以降のデータを編集してください。<br>
-                💡 <strong>使い方:</strong> 項目をクリック → 行を追加/編集 → 自動保存
+                💡 <strong>使い方:</strong> 表内の数値を直接編集 → 下部の保存ボタンをクリック
             </div>
             """, unsafe_allow_html=True)
             
-            # 予測データを取得（キャッシュ付き）
-            forecast_data = load_forecast_data_cached(
-                st.session_state.selected_period_id,
-                st.session_state.scenario,
-                processor
-            )
-            
-            # 補助科目データを取得（キャッシュ付き）
+            # 予測データと補助科目データを取得
+            forecast_data = forecasts_df.copy()
             sub_accounts_data = load_sub_accounts_cached(
                 st.session_state.selected_period_id,
                 st.session_state.scenario,
                 processor
             )
             
-            # 展開状態を管理
-            if 'expanded_forecast_item' not in st.session_state:
-                st.session_state.expanded_forecast_item = None
+            # 編集可能な全項目のリストを作成
+            editable_items = [item for item in processor.all_items if item not in processor.calculated_items]
             
-            # PLの構造を定義（カテゴリ別）
-            pl_categories = {
-                "売上": ["売上高"],
-                "売上原価": ["売上原価"],
-                "人件費": ["役員報酬", "給料手当", "賞与", "法定福利費", "福利厚生費"],
-                "採用・外注": ["採用教育費", "外注費"],
-                "販売費": ["荷造運賃", "広告宣伝費", "販売手数料", "販売促進費"],
-                "一般管理費": [
-                    "交際費", "会議費", "旅費交通費", "通信費", "消耗品費", 
-                    "修繕費", "事務用品費", "水道光熱費", "新聞図書費", "諸会費",
-                    "支払手数料", "車両費", "地代家賃", "賃借料", "保険料",
-                    "租税公課", "支払報酬料", "研究開発費", "研修費", "減価償却費",
-                    "貸倒損失(販)", "雑費", "少額交際費"
-                ],
-                "営業外・特別損益": [
-                    "営業外収益合計", "営業外費用合計", 
-                    "特別利益合計", "特別損失合計"
-                ],
-                "税金": ["法人税、住民税及び事業税"]
-            }
+            # テーブルデータを構築
+            table_rows = []
             
-            # カテゴリ選択
-            selected_category = st.selectbox(
-                "カテゴリを選択",
-                list(pl_categories.keys()),
-                key="forecast_category"
-            )
-            
-            items_in_category = pl_categories[selected_category]
-            
-            # 項目を選択
-            editable_items = [item for item in items_in_category if item not in processor.calculated_items]
-            
-            if not editable_items:
-                st.warning("このカテゴリには編集可能な項目がありません。")
-            else:
-                selected_item = st.selectbox(
-                    "編集する項目を選択",
-                    editable_items,
-                    key="forecast_item_select"
-                )
-                
-                # テーブル形式でデータを表示・編集
-                st.markdown(f"### 📊 {selected_item} の予測データ")
-                
-                # 基本項目データの準備
-                item_row_data = {"項目名": selected_item, "タイプ": "要約"}
-                item_data = forecast_data[forecast_data['項目名'] == selected_item]
+            for item in editable_items:
+                # 基本項目の行
+                item_row = {"項目名": item, "タイプ": "基本", "親項目": item}
+                item_data = forecast_data[forecast_data['項目名'] == item]
                 
                 for month in months:
                     if not item_data.empty and month in item_data.columns:
                         val = item_data[month].iloc[0]
-                        item_row_data[month] = float(val) if pd.notna(val) else 0.0
+                        item_row[month] = float(val) if pd.notna(val) else 0.0
                     else:
-                        item_row_data[month] = 0.0
+                        item_row[month] = 0.0
                 
-                # 補助科目データの準備
-                sub_rows = []
-                if selected_item in processor.parent_items_with_sub_accounts:
-                    item_subs = sub_accounts_data[sub_accounts_data['parent_item'] == selected_item]
+                table_rows.append(item_row)
+                
+                # 補助科目の行（あれば）
+                if item in processor.parent_items_with_sub_accounts:
+                    item_subs = sub_accounts_data[sub_accounts_data['parent_item'] == item]
+                    
                     for sub_name in item_subs['sub_account_name'].unique():
-                        sub_row = {"項目名": f"  └ {sub_name}", "タイプ": "詳細"}
+                        sub_row = {"項目名": f"  └ {sub_name}", "タイプ": "補助", "親項目": item}
                         sub_data = item_subs[item_subs['sub_account_name'] == sub_name]
+                        
                         for month in months:
                             month_data = sub_data[sub_data['month'] == month]
                             if not month_data.empty:
@@ -1027,90 +994,149 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 sub_row[month] = float(val) if pd.notna(val) else 0.0
                             else:
                                 sub_row[month] = 0.0
-                        sub_rows.append(sub_row)
-                
-                # DataFrameに変換
-                all_rows = [item_row_data] + sub_rows
-                edit_df = pd.DataFrame(all_rows)
-                
-                # 合計列を追加
-                month_cols = [m for m in months if m in edit_df.columns]
-                edit_df['合計'] = edit_df[month_cols].sum(axis=1)
-                
-                # データエディタで編集
-                column_config = {
-                    "項目名": st.column_config.TextColumn("項目名", disabled=True, width="medium"),
-                    "タイプ": st.column_config.TextColumn("タイプ", disabled=True, width="small"),
-                    "合計": st.column_config.NumberColumn("合計", format="¥%d", disabled=True, width="medium")
-                }
-                
-                for month in month_cols:
-                    column_config[month] = st.column_config.NumberColumn(
-                        month,
-                        format="¥%d",
-                        width="small"
-                    )
-                
-                edited_df = st.data_editor(
-                    edit_df,
-                    column_config=column_config,
-                    use_container_width=True,
-                    num_rows="dynamic",  # 行の追加・削除を許可
-                    key=f"editor_{selected_item}"
-                )
-                
-                # 保存ボタン
-                col1, col2, col3 = st.columns([2, 2, 1])
-                
-                with col1:
-                    if st.button("💾 変更を保存", type="primary", key="save_forecast_table"):
-                        # 基本項目の保存
-                        main_row = edited_df[edited_df['タイプ'] == '要約'].iloc[0]
-                        main_values = {month: main_row[month] for month in month_cols}
                         
-                        success, msg = processor.save_forecast_item(
+                        table_rows.append(sub_row)
+            
+            # DataFrameに変換
+            edit_df = pd.DataFrame(table_rows)
+            
+            # 合計列を追加
+            month_cols = [m for m in months if m in edit_df.columns]
+            edit_df['合計'] = edit_df[month_cols].sum(axis=1)
+            
+            # カラム設定
+            column_config = {
+                "項目名": st.column_config.TextColumn("項目名", width="large", disabled=True),
+                "タイプ": st.column_config.TextColumn("タイプ", width="small", disabled=True),
+                "親項目": None,  # 非表示
+                "合計": st.column_config.NumberColumn("合計", format="¥%.0f", disabled=True, width="medium")
+            }
+            
+            for month in month_cols:
+                column_config[month] = st.column_config.NumberColumn(
+                    month,
+                    format="¥%.0f",
+                    width="small",
+                    help=f"{month}の予測値"
+                )
+            
+            # データエディタで全体を表示・編集
+            st.markdown("### 📊 予測損益計算書（全項目）")
+            
+            edited_df = st.data_editor(
+                edit_df,
+                column_config=column_config,
+                use_container_width=True,
+                height=600,
+                key="forecast_pl_editor",
+                hide_index=True
+            )
+            
+            # 保存ボタン
+            col1, col2, col3 = st.columns([2, 2, 1])
+            
+            with col1:
+                if st.button("💾 すべての変更を保存", type="primary", key="save_all_forecast"):
+                    with st.spinner("保存中..."):
+                        success_count = 0
+                        error_count = 0
+                        
+                        # 基本項目を保存
+                        for _, row in edited_df[edited_df['タイプ'] == '基本'].iterrows():
+                            item_name = row['項目名']
+                            values = {month: row[month] for month in month_cols}
+                            
+                            success, msg = processor.save_forecast_item(
+                                st.session_state.selected_period_id,
+                                st.session_state.scenario,
+                                item_name,
+                                values
+                            )
+                            
+                            if success:
+                                success_count += 1
+                            else:
+                                error_count += 1
+                                st.error(f"❌ {item_name}: {msg}")
+                        
+                        # 補助科目を保存
+                        for _, row in edited_df[edited_df['タイプ'] == '補助'].iterrows():
+                            full_name = row['項目名']
+                            sub_name = full_name.replace('  └ ', '')
+                            parent_item = row['親項目']  # 親項目情報を直接取得
+                            
+                            values = {month: row[month] for month in month_cols}
+                            
+                            success, msg = processor.save_sub_account(
+                                st.session_state.selected_period_id,
+                                st.session_state.scenario,
+                                parent_item,
+                                sub_name,
+                                values
+                            )
+                            
+                            if success:
+                                success_count += 1
+                            else:
+                                error_count += 1
+                                st.error(f"❌ {sub_name}: {msg}")
+                        
+                        if error_count == 0:
+                            st.success(f"✅ {success_count}件のデータを保存しました")
+                            # キャッシュクリア
+                            st.cache_data.clear()
+                            if 'forecasts_df' in st.session_state:
+                                del st.session_state.forecasts_df
+                            if 'sub_accounts_df' in st.session_state:
+                                del st.session_state.sub_accounts_df
+                            if 'pl_df' in st.session_state:
+                                del st.session_state.pl_df
+                            st.rerun()
+                        else:
+                            st.warning(f"⚠️ {success_count}件成功、{error_count}件失敗")
+            
+            with col2:
+                # 補助科目の追加機能
+                with st.expander("➕ 補助科目を追加"):
+                    parent_item = st.selectbox(
+                        "親項目を選択",
+                        processor.parent_items_with_sub_accounts,
+                        key="add_sub_parent"
+                    )
+                    
+                    new_sub_name = st.text_input(
+                        "補助科目名",
+                        key="add_sub_name",
+                        placeholder="例: 国内売上"
+                    )
+                    
+                    if new_sub_name and st.button("追加", key="add_sub_confirm"):
+                        # 初期値はすべて0
+                        values = {month: 0.0 for month in months}
+                        
+                        success, msg = processor.save_sub_account(
                             st.session_state.selected_period_id,
                             st.session_state.scenario,
-                            selected_item,
-                            main_values
+                            parent_item,
+                            new_sub_name,
+                            values
                         )
                         
                         if success:
-                            # 補助科目の保存
-                            sub_rows_df = edited_df[edited_df['タイプ'] == '詳細']
-                            for _, row in sub_rows_df.iterrows():
-                                sub_name = row['項目名'].replace('  └ ', '')
-                                sub_values = {month: row[month] for month in month_cols}
-                                processor.save_sub_account(
-                                    st.session_state.selected_period_id,
-                                    st.session_state.scenario,
-                                    selected_item,
-                                    sub_name,
-                                    sub_values
-                                )
-                            
-                            st.success("✅ データを保存しました")
-                            # キャッシュクリア
+                            st.success(f"✅ {new_sub_name}を追加しました")
                             st.cache_data.clear()
                             st.rerun()
                         else:
-                            st.error(f"❌ 保存に失敗: {msg}")
-                
-                with col2:
-                    if selected_item in processor.parent_items_with_sub_accounts:
-                        if st.button("🗑️ 補助科目を全期から削除", key="delete_sub_all"):
-                            # 削除する補助科目を選択
-                            sub_names = [row['項目名'].replace('  └ ', '') for _, row in edited_df[edited_df['タイプ'] == '詳細'].iterrows()]
-                            if sub_names:
-                                selected_sub = st.selectbox("削除する補助科目", sub_names, key="sub_to_delete")
-                                if st.button("確認：全期から削除", key="confirm_delete"):
-                                    # TODO: 全期削除の実装
-                                    st.warning("全期削除機能は実装中です")
-                
-                with col3:
-                    if st.button("🔄 リセット"):
-                        st.cache_data.clear()
-                        st.rerun()
+                            st.error(f"❌ {msg}")
+            
+            with col3:
+                if st.button("🔄 リセット", key="reset_forecast"):
+                    st.cache_data.clear()
+                    if 'forecasts_df' in st.session_state:
+                        del st.session_state.forecasts_df
+                    if 'sub_accounts_df' in st.session_state:
+                        del st.session_state.sub_accounts_df
+                    st.rerun()
             
         
         
