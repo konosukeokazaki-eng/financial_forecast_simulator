@@ -258,32 +258,32 @@ if 'processor' not in st.session_state:
 processor = st.session_state.processor
 
 # キャッシュ付きデータ読み込み関数（高速化）
-@st.cache_data(ttl=60)  # 60秒間キャッシュ
+@st.cache_data(ttl=600)  # 10分間キャッシュ（パフォーマンス改善）
 def load_actual_data_cached(period_id, _processor):
     """実績データをキャッシュ付きで読み込み"""
     return _processor.load_actual_data(period_id)
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=600)  # 10分間キャッシュ（パフォーマンス改善）
 def load_forecast_data_cached(period_id, scenario, _processor):
     """予測データをキャッシュ付きで読み込み"""
     return _processor.load_forecast_data(period_id, scenario)
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=600)  # 10分間キャッシュ（パフォーマンス改善）
 def load_sub_accounts_cached(period_id, scenario, _processor):
     """補助科目データをキャッシュ付きで読み込み"""
     return _processor.load_sub_accounts(period_id, scenario)
 
-@st.cache_data(ttl=300)  # 5分間キャッシュ（変更頻度が低い）
+@st.cache_data(ttl=3600)  # 1時間キャッシュ（マスタデータ）
 def get_companies_cached(_processor):
     """会社一覧をキャッシュ付きで取得"""
     return _processor.get_companies()
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=3600)  # 1時間キャッシュ（マスタデータ）
 def get_company_periods_cached(comp_id, _processor):
     """会計期間一覧をキャッシュ付きで取得"""
     return _processor.get_company_periods(comp_id)
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=3600)  # 1時間キャッシュ（マスタデータ）
 def get_fiscal_months_cached(comp_id, period_id, _processor):
     """会計月一覧をキャッシュ付きで取得"""
     return _processor.get_fiscal_months(comp_id, period_id)
@@ -307,6 +307,12 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
+
+# セッション状態の初期化
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = True  # ログイン機能を一時的に無効化
+if 'username' not in st.session_state:
+    st.session_state.username = "ユーザー"
 
 # ユーザー情報とログアウト
 st.sidebar.markdown(f"**👤 {st.session_state.username}**")
@@ -642,50 +648,67 @@ if st.session_state.page == "システム設定":
 # データの読み込み（期が選択されている場合のみ）
 if 'selected_period_id' in st.session_state and st.session_state.selected_period_id is not None:
         # キャッシュされたデータを使用
-        if 'actuals_df' not in st.session_state:
-            st.session_state.actuals_df = load_actual_data_cached(st.session_state.selected_period_id, processor)
-        if 'forecasts_df' not in st.session_state:
-            st.session_state.forecasts_df = load_forecast_data_cached(st.session_state.selected_period_id, "現実", processor)
+        with st.spinner('データを読み込んでいます...'):
+            if 'actuals_df' not in st.session_state:
+                st.session_state.actuals_df = load_actual_data_cached(st.session_state.selected_period_id, processor)
+            if 'forecasts_df' not in st.session_state:
+                st.session_state.forecasts_df = load_forecast_data_cached(st.session_state.selected_period_id, "現実", processor)
+            if 'sub_accounts_df' not in st.session_state:
+                st.session_state.sub_accounts_df = load_sub_accounts_cached(st.session_state.selected_period_id, st.session_state.scenario, processor)
             
         actuals_df = st.session_state.actuals_df.copy()
         forecasts_df = st.session_state.forecasts_df.copy()
+        sub_accounts_df = st.session_state.sub_accounts_df.copy()
         
-        # シナリオ調整
+        # シナリオ調整（キャッシュ）
+        adjustment_key = (st.session_state.scenario, st.session_state.current_month)
         if st.session_state.scenario != "現実":
-            rate = st.session_state.scenario_rates[st.session_state.scenario]
-            split_idx = months.index(st.session_state.current_month) + 1 if st.session_state.current_month in months else 0
-            forecast_months = months[split_idx:]
-            # DataFrameに存在する月のみを使用
-            available_forecast_months = [m for m in forecast_months if m in forecasts_df.columns]
-            
-            for item in processor.all_items:
-                if item == "売上高":
-                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 + rate)
-                elif item == "売上原価":
-                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.5)
-                elif item in processor.ga_items:
-                    forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.3)
-                    
-            st.session_state.adjusted_forecasts_df = forecasts_df.copy()
+            if 'scenario_adjustment_cache' not in st.session_state or st.session_state.get('adjustment_key') != adjustment_key:
+                rate = st.session_state.scenario_rates[st.session_state.scenario]
+                split_idx = months.index(st.session_state.current_month) + 1 if st.session_state.current_month in months else 0
+                forecast_months = months[split_idx:]
+                # DataFrameに存在する月のみを使用
+                available_forecast_months = [m for m in forecast_months if m in forecasts_df.columns]
+                
+                for item in processor.all_items:
+                    if item == "売上高":
+                        forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 + rate)
+                    elif item == "売上原価":
+                        forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.5)
+                    elif item in processor.ga_items:
+                        forecasts_df.loc[forecasts_df['項目名'] == item, available_forecast_months] *= (1 - rate * 0.3)
+                
+                st.session_state.scenario_adjustment_cache = forecasts_df.copy()
+                st.session_state.adjustment_key = adjustment_key
+            else:
+                forecasts_df = st.session_state.scenario_adjustment_cache.copy()
         
-        # 補助科目合計の反映
-        sub_accounts_df = processor.load_sub_accounts(st.session_state.selected_period_id, st.session_state.scenario)
+        # 補助科目合計の反映（キャッシュ）
         if not sub_accounts_df.empty:
-            aggregated = sub_accounts_df.groupby(['parent_item', 'month'])['amount'].sum().reset_index()
-            for _, row in aggregated.iterrows():
-                parent = row['parent_item']
-                month = row['month']
-                amount = row['amount']
-                forecasts_df.loc[forecasts_df['項目名'] == parent, month] = amount
+            if 'sub_account_aggregation_cache' not in st.session_state:
+                aggregated = sub_accounts_df.groupby(['parent_item', 'month'])['amount'].sum().reset_index()
+                for _, row in aggregated.iterrows():
+                    parent = row['parent_item']
+                    month = row['month']
+                    amount = row['amount']
+                    forecasts_df.loc[forecasts_df['項目名'] == parent, month] = amount
+                st.session_state.sub_account_aggregation_cache = forecasts_df.copy()
+            else:
+                forecasts_df = st.session_state.sub_account_aggregation_cache.copy()
         
-        # PL計算
-        split_idx = months.index(st.session_state.current_month) + 1 if st.session_state.current_month in months else 0
-        pl_df = processor.calculate_pl(
-            actuals_df,
-            forecasts_df,
-            split_idx,
-            months
-        )
+        # PL計算（キャッシュ）
+        if 'pl_df' not in st.session_state or st.session_state.get('pl_cache_key') != (st.session_state.selected_period_id, st.session_state.scenario, st.session_state.current_month):
+            split_idx = months.index(st.session_state.current_month) + 1 if st.session_state.current_month in months else 0
+            pl_df = processor.calculate_pl(
+                actuals_df,
+                forecasts_df,
+                split_idx,
+                months
+            )
+            st.session_state.pl_df = pl_df
+            st.session_state.pl_cache_key = (st.session_state.selected_period_id, st.session_state.scenario, st.session_state.current_month)
+        else:
+            pl_df = st.session_state.pl_df
         
         # 表示モードでフィルタ
         if st.session_state.display_mode == "要約":
