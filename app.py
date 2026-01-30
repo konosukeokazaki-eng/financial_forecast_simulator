@@ -264,7 +264,7 @@ st.markdown("""
     
     /* セクション見出し（サイドバー内） */
     [data-testid="stSidebar"] h3 {
-        color: #64748b;
+        color: #334155;
         font-size: 0.7rem;
         font-weight: 700;
         text-transform: uppercase;
@@ -563,13 +563,13 @@ else:
     # メニュー
     st.sidebar.markdown("---")
     
-    # 階層型ナビゲーション
-    st.sidebar.markdown("### 📊 ダッシュボード")
-    if st.sidebar.button("📊 着地予測", use_container_width=True, key="nav_dashboard"):
+    # 階層型ナビゲーション（アイコンなし）
+    st.sidebar.markdown("### ダッシュボード")
+    if st.sidebar.button("着地予測", use_container_width=True, key="nav_dashboard"):
         st.session_state.page = "着地予測ダッシュボード"
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📝 データ入力")
+    st.sidebar.markdown("### データ入力")
     col1, col2 = st.sidebar.columns(2)
     with col1:
         if st.button("実績", use_container_width=True, key="nav_actual"):
@@ -578,37 +578,37 @@ else:
         if st.button("予測", use_container_width=True, key="nav_forecast"):
             st.session_state.page = "予測データ入力"
     
-    if st.sidebar.button("📥 データ取込", use_container_width=True, key="nav_import"):
+    if st.sidebar.button("データ取込", use_container_width=True, key="nav_import"):
         st.session_state.page = "データインポート"
     
-    if st.sidebar.button("🔄 シナリオ一括設定", use_container_width=True, key="nav_scenario"):
+    if st.sidebar.button("シナリオ一括設定", use_container_width=True, key="nav_scenario"):
         st.session_state.page = "シナリオ一括設定"
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📈 財務諸表")
-    if st.sidebar.button("📋 損益計算書 (PL)", use_container_width=True, key="nav_pl"):
+    st.sidebar.markdown("### 財務諸表")
+    if st.sidebar.button("損益計算書 (PL)", use_container_width=True, key="nav_pl"):
         st.session_state.page = "損益計算書 (PL)"
-    if st.sidebar.button("💰 貸借対照表 (BS)", use_container_width=True, key="nav_bs"):
+    if st.sidebar.button("貸借対照表 (BS)", use_container_width=True, key="nav_bs"):
         st.session_state.page = "貸借対照表 (BS)"
-    if st.sidebar.button("💵 CF計算書", use_container_width=True, key="nav_cf"):
+    if st.sidebar.button("CF計算書", use_container_width=True, key="nav_cf"):
         st.session_state.page = "キャッシュフロー計算書 (CF)"
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📊 分析レポート")
-    if st.sidebar.button("📊 予実比較", use_container_width=True, key="nav_comparison"):
+    st.sidebar.markdown("### 分析レポート")
+    if st.sidebar.button("予実比較", use_container_width=True, key="nav_comparison"):
         st.session_state.page = "予測 VS 実績比較"
-    if st.sidebar.button("🔀 シナリオ比較", use_container_width=True, key="nav_scenario_comp"):
+    if st.sidebar.button("シナリオ比較", use_container_width=True, key="nav_scenario_comp"):
         st.session_state.page = "シナリオ比較"
-    if st.sidebar.button("📅 期間比較", use_container_width=True, key="nav_period"):
+    if st.sidebar.button("期間比較", use_container_width=True, key="nav_period"):
         st.session_state.page = "期間比較分析"
-    if st.sidebar.button("📈 経営指標", use_container_width=True, key="nav_metrics"):
+    if st.sidebar.button("経営指標", use_container_width=True, key="nav_metrics"):
         st.session_state.page = "経営指標ダッシュボード"
-    if st.sidebar.button("📉 損益分岐点", use_container_width=True, key="nav_breakeven"):
+    if st.sidebar.button("損益分岐点", use_container_width=True, key="nav_breakeven"):
         st.session_state.page = "損益分岐点分析"
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ⚙️ 設定")
-    if st.sidebar.button("⚙️ システム設定", use_container_width=True, key="nav_settings"):
+    st.sidebar.markdown("### 設定")
+    if st.sidebar.button("システム設定", use_container_width=True, key="nav_settings"):
         st.session_state.page = "システム設定"
     
     # ページ情報を保持（後方互換性のため）
@@ -636,7 +636,7 @@ def format_percent(val):
 
 # システム設定ページ（会社未登録時でも表示）
 if st.session_state.page == "システム設定":
-    st.title("⚙️ システム設定")
+    st.title("システム設定")
     
     tab1, tab2, tab3 = st.tabs(["🏢 会社設定", "📅 会計期間設定", "🔍 データベース診断"])
     
@@ -869,177 +869,280 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         # --------------------------------------------------------------------------------
         
         if st.session_state.page == "着地予測ダッシュボード":
-            st.title("📊 着地予測ダッシュボード")
+            st.title("財務予測シミュレーター")
             
-            st.markdown(f"""
-            <div class="info-box">
-                <strong>🏢 {st.session_state.selected_comp_name}</strong> | 
-                第{st.session_state.selected_period_num}期 | 
-                実績: {st.session_state.start_date} 〜 {st.session_state.current_month} | 
-                シナリオ: <strong>{st.session_state.scenario}</strong>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # KPIサマリーカード
-            col1, col2, col3, col4, col5 = st.columns(5)
-            
+            # ヘッダー（3列）
+            col1, col2, col3 = st.columns([3, 2, 2])
             with col1:
-                sales_total = pl_display[pl_display['項目名'] == '売上高']['合計'].iloc[0]
-                st.markdown(f"""
-                <div class="summary-card-blue">
-                    <div class="card-title">売上高</div>
-                    <div class="card-value">¥{safe_int(sales_total):,}</div>
-                    <div class="card-subtitle">期末着地予測</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
+                st.markdown(f"**{st.session_state.selected_comp_name}** | 第{st.session_state.selected_period_num}期")
             with col2:
-                gp_total = pl_display[pl_display['項目名'] == '売上総損益金額']['合計'].iloc[0]
-                gp_rate = (gp_total / sales_total * 100) if sales_total != 0 else 0
-                st.markdown(f"""
-                <div class="summary-card-green">
-                    <div class="card-title">売上総利益</div>
-                    <div class="card-value">¥{safe_int(gp_total):,}</div>
-                    <div class="card-subtitle">粗利率: {gp_rate:.1f}%</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
+                st.markdown(f"実績: {st.session_state.start_date} 〜 {st.session_state.current_month}")
             with col3:
-                op_total = pl_display[pl_display['項目名'] == '営業損益金額']['合計'].iloc[0]
-                op_rate = (op_total / sales_total * 100) if sales_total != 0 else 0
+                scenario_options = ["現実", "楽観", "悲観"]
+                current_idx = scenario_options.index(st.session_state.scenario) if st.session_state.scenario in scenario_options else 0
+                selected_scenario = st.selectbox(
+                    "シナリオ切替", 
+                    scenario_options,
+                    index=current_idx,
+                    key="dashboard_scenario_selector",
+                    label_visibility="collapsed"
+                )
+                if selected_scenario != st.session_state.scenario:
+                    st.session_state.scenario = selected_scenario
+                    # キャッシュをクリア
+                    for key in ['pl_df', 'forecast_data_cache', 'sub_account_aggregation_cache']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.rerun()
+            
+            st.markdown("---")
+            
+            # 主要金額カード（3列）- Manageboard風
+            col1, col2, col3 = st.columns(3)
+            
+            # 予測・実績・前年の計算
+            sales_forecast = pl_display[pl_display['項目名'] == '売上高']['合計'].iloc[0] if not pl_display.empty else 0
+            op_forecast = pl_display[pl_display['項目名'] == '営業損益金額']['合計'].iloc[0] if not pl_display.empty else 0
+            ord_forecast = pl_display[pl_display['項目名'] == '経常損益金額']['合計'].iloc[0] if not pl_display.empty else 0
+            
+            # 実績（現在月まで）
+            actual_months = [m for m in months if m <= st.session_state.current_month]
+            sales_actual = 0
+            op_actual = 0
+            ord_actual = 0
+            
+            if not actuals_df.empty and actual_months:
+                sales_row = actuals_df[actuals_df['項目名'] == '売上高']
+                op_row = actuals_df[actuals_df['項目名'] == '営業損益金額']
+                ord_row = actuals_df[actuals_df['項目名'] == '経常損益金額']
+                
+                if not sales_row.empty:
+                    for m in actual_months:
+                        if m in sales_row.columns:
+                            val = sales_row[m].iloc[0]
+                            sales_actual += float(val) if pd.notna(val) else 0
+                
+                if not op_row.empty:
+                    for m in actual_months:
+                        if m in op_row.columns:
+                            val = op_row[m].iloc[0]
+                            op_actual += float(val) if pd.notna(val) else 0
+                
+                if not ord_row.empty:
+                    for m in actual_months:
+                        if m in ord_row.columns:
+                            val = ord_row[m].iloc[0]
+                            ord_actual += float(val) if pd.notna(val) else 0
+            
+            # カード1: 売上高
+            with col1:
                 st.markdown(f"""
-                <div class="summary-card-orange">
-                    <div class="card-title">営業利益</div>
-                    <div class="card-value">¥{safe_int(op_total):,}</div>
-                    <div class="card-subtitle">営業利益率: {op_rate:.1f}%</div>
+                <div class="amount-card">
+                    <div class="amount-card-label">売上高</div>
+                    
+                    <div style="margin-bottom: 0.75rem;">
+                        <div style="font-size: 0.7rem; color: #8a9ba8;">予測（通期）</div>
+                        <div class="amount-card-value">¥{safe_int(sales_forecast):,}</div>
+                    </div>
+                    
+                    <div style="padding-top: 0.5rem; border-top: 1px solid #f1f5f9;">
+                        <div style="font-size: 0.7rem; color: #8a9ba8;">実績（{st.session_state.start_date}〜{st.session_state.current_month}）</div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: #475569;">
+                            ¥{safe_int(sales_actual):,}
+                        </div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
             
-            with col4:
-                ord_total = pl_display[pl_display['項目名'] == '経常損益金額']['合計'].iloc[0]
-                ord_rate = (ord_total / sales_total * 100) if sales_total != 0 else 0
+            # カード2: 営業利益
+            with col2:
                 st.markdown(f"""
-                <div class="summary-card">
-                    <div class="card-title">経常利益</div>
-                    <div class="card-value">¥{safe_int(ord_total):,}</div>
-                    <div class="card-subtitle">経常利益率: {ord_rate:.1f}%</div>
+                <div class="amount-card">
+                    <div class="amount-card-label">営業利益</div>
+                    
+                    <div style="margin-bottom: 0.75rem;">
+                        <div style="font-size: 0.7rem; color: #8a9ba8;">予測（通期）</div>
+                        <div class="amount-card-value">¥{safe_int(op_forecast):,}</div>
+                    </div>
+                    
+                    <div style="padding-top: 0.5rem; border-top: 1px solid #f1f5f9;">
+                        <div style="font-size: 0.7rem; color: #8a9ba8;">実績（{st.session_state.start_date}〜{st.session_state.current_month}）</div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: #475569;">
+                            ¥{safe_int(op_actual):,}
+                        </div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
             
-            with col5:
-                net_total = pl_display[pl_display['項目名'] == '当期純損益金額']['合計'].iloc[0]
-                net_rate = (net_total / sales_total * 100) if sales_total != 0 else 0
-                color_class = "summary-card-green" if net_total >= 0 else "summary-card-red"
+            # カード3: 経常利益
+            with col3:
                 st.markdown(f"""
-                <div class="{color_class}">
-                    <div class="card-title">当期純利益</div>
-                    <div class="card-value">¥{safe_int(net_total):,}</div>
-                    <div class="card-subtitle">純利益率: {net_rate:.1f}%</div>
+                <div class="amount-card">
+                    <div class="amount-card-label">経常利益</div>
+                    
+                    <div style="margin-bottom: 0.75rem;">
+                        <div style="font-size: 0.7rem; color: #8a9ba8;">予測（通期）</div>
+                        <div class="amount-card-value">¥{safe_int(ord_forecast):,}</div>
+                    </div>
+                    
+                    <div style="padding-top: 0.5rem; border-top: 1px solid #f1f5f9;">
+                        <div style="font-size: 0.7rem; color: #8a9ba8;">実績（{st.session_state.start_date}〜{st.session_state.current_month}）</div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: #475569;">
+                            ¥{safe_int(ord_actual):,}
+                        </div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
             
             st.markdown("---")
             
-            # タブで表示切り替え
-            tab1, tab2 = st.tabs(["📊 損益計算書", "📈 グラフ分析"])
+            # 月次推移グラフ（Manageboard風）
+            st.markdown("### 月次推移")
             
-            with tab1:
-                st.subheader("期末着地予測 損益計算書")
+            # 実績と予測を分ける
+            actual_months_list = [m for m in months if m <= st.session_state.current_month]
+            forecast_months_list = [m for m in months if m > st.session_state.current_month]
+            
+            # データ取得
+            sales_row = pl_df[pl_df['項目名'] == '売上高']
+            op_row = pl_df[pl_df['項目名'] == '営業損益金額']
+            
+            if not sales_row.empty:
+                # 実績データ
+                sales_actual_data = []
+                for m in actual_months_list:
+                    if m in sales_row.columns:
+                        val = sales_row[m].iloc[0]
+                        sales_actual_data.append(float(val) if pd.notna(val) else 0)
+                    else:
+                        sales_actual_data.append(0)
                 
-                # スタイル付きデータフレーム
-                def highlight_summary(row):
-                    if row['タイプ'] == '要約':
-                        return ['background-color: #5db5f5; font-weight: bold'] * len(row)
-                    return [''] * len(row)
+                # 予測データ
+                sales_forecast_data = []
+                for m in forecast_months_list:
+                    if m in sales_row.columns:
+                        val = sales_row[m].iloc[0]
+                        sales_forecast_data.append(float(val) if pd.notna(val) else 0)
+                    else:
+                        sales_forecast_data.append(0)
                 
-                # タイプ列を使ってスタイルを適用してから削除
-                styled_df = pl_display.style\
-                    .apply(highlight_summary, axis=1)\
-                    .format(lambda x: f"¥{safe_int(x):,}" if isinstance(x, (int, float)) else x)
+                # 営業利益データ
+                op_data = []
+                for m in months:
+                    if m in op_row.columns:
+                        val = op_row[m].iloc[0]
+                        op_data.append(float(val) if pd.notna(val) else 0)
+                    else:
+                        op_data.append(0)
                 
-                st.dataframe(styled_df, width="stretch", height=500)
-                
-            with tab2:
-                st.subheader("月次推移グラフ")
-                
-                # グラフ用データの準備
+                # グラフ作成（Manageboard風カラー）
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
                 
-                # 売上高（棒グラフ）
+                # 実績（濃いブルー）
                 fig.add_trace(
                     go.Bar(
-                        x=months,
-                        y=pl_df[pl_df['項目名'] == '売上高'][months].iloc[0],
-                        name="売上高",
-                        marker_color='#4facfe'
+                        x=actual_months_list,
+                        y=sales_actual_data,
+                        name="売上高（実績）",
+                        marker_color='#3b82f6',
+                        opacity=0.9
                     ),
                     secondary_y=False
                 )
                 
-                # 営業利益（折れ線グラフ）
+                # 予測（薄いブルー）
+                fig.add_trace(
+                    go.Bar(
+                        x=forecast_months_list,
+                        y=sales_forecast_data,
+                        name="売上高（予測）",
+                        marker_color='#93c5fd',
+                        opacity=0.7
+                    ),
+                    secondary_y=False
+                )
+                
+                # 営業利益（オレンジ線）
                 fig.add_trace(
                     go.Scatter(
                         x=months,
-                        y=pl_df[pl_df['項目名'] == '営業損益金額'][months].iloc[0],
+                        y=op_data,
                         name="営業利益",
-                        line=dict(color='#f5576c', width=3)
+                        line=dict(color='#f59e0b', width=3),
+                        mode='lines+markers',
+                        marker=dict(size=6)
                     ),
                     secondary_y=True
                 )
                 
-                # 実績/予測の境界線
-                try:
-                    # add_vlineの代わりに、より安定したadd_shapeを使用して境界線を描画
-                    fig.add_shape(
-                        type="line",
-                        x0=st.session_state.current_month,
-                        x1=st.session_state.current_month,
-                        y0=0,
-                        y1=1,
-                        yref="paper",
-                        line=dict(color="gray", width=2, dash="dash")
-                    )
-                    # 境界線のラベルを追加
-                    fig.add_annotation(
-                        x=st.session_state.current_month,
-                        y=1,
-                        yref="paper",
-                        text="実績/予測 境界",
-                        showarrow=False,
-                        xanchor="left",
-                        textangle=-90
-                    )
-                except Exception as e:
-                    # 万が一エラーが発生した場合は境界線なしで続行
-                    st.sidebar.error(f"グラフ境界線の描画エラー: {e}")
-                
+                # Manageboard風レイアウト
                 fig.update_layout(
-                    title_text="売上高と営業利益の推移",
-                    hovermode="x unified",
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    template='plotly_white',
+                    paper_bgcolor='#fafbfc',
+                    plot_bgcolor='#ffffff',
+                    font=dict(
+                        family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                        size=12,
+                        color='#475569'
+                    ),
+                    xaxis=dict(
+                        title="月",
+                        gridcolor='#f1f5f9',
+                        linecolor='#e1e8ed',
+                        tickfont=dict(color='#64748b', size=11)
+                    ),
+                    yaxis=dict(
+                        title="売上高（円）",
+                        gridcolor='#f1f5f9',
+                        linecolor='#e1e8ed',
+                        tickfont=dict(color='#64748b', size=11)
+                    ),
+                    yaxis2=dict(
+                        title="営業利益（円）",
+                        overlaying='y',
+                        side='right',
+                        gridcolor='#f1f5f9',
+                        linecolor='#e1e8ed',
+                        tickfont=dict(color='#64748b', size=11)
+                    ),
+                    legend=dict(
+                        bgcolor='rgba(255,255,255,0.9)',
+                        bordercolor='#e1e8ed',
+                        borderwidth=1,
+                        font=dict(size=11, color='#475569'),
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    ),
+                    hovermode='x unified',
+                    height=400,
+                    barmode='group'
                 )
                 
-                fig.update_yaxes(title_text="売上高 (円)", secondary_y=False)
-                fig.update_yaxes(title_text="営業利益 (円)", secondary_y=True)
-                
-                st.plotly_chart(fig, width="stretch")
-                
-                # 費用構成の円グラフ
-                st.subheader("費用構成分析（通期予測）")
-                
-                ga_items_data = pl_df[pl_df['項目名'].isin(processor.ga_items)]
-                fig_pie = px.pie(
-                    ga_items_data,
-                    values='合計',
-                    names='項目名',
-                    title="販売管理費の内訳",
-                    hole=0.4,
-                    color_discrete_sequence=px.colors.qualitative.Pastel
-                )
-                st.plotly_chart(fig_pie, width="stretch")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # 主要指標（Manageboard風）
+            st.markdown("### 主要指標")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            gp_rate = ((sales_forecast - pl_display[pl_display['項目名'] == '売上原価']['合計'].iloc[0]) / sales_forecast * 100) if sales_forecast != 0 else 0
+            op_rate = (op_forecast / sales_forecast * 100) if sales_forecast != 0 else 0
+            ord_rate = (ord_forecast / sales_forecast * 100) if sales_forecast != 0 else 0
+            
+            with col1:
+                st.metric("粗利率", f"{gp_rate:.1f}%")
+            with col2:
+                st.metric("営業利益率", f"{op_rate:.1f}%")
+            with col3:
+                st.metric("経常利益率", f"{ord_rate:.1f}%")
 
         elif st.session_state.page == "損益計算書 (PL)":
-            st.title("📄 損益計算書 (PL)")
+            st.title("損益計算書 (PL)")
             
             st.markdown(f"""
             <div class="info-box">
@@ -1077,7 +1180,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             )
 
         elif st.session_state.page == "予測データ入力":
-            st.title("🔮 予測データ入力")
+            st.title("予測データ入力")
             
             st.markdown(f"""
             <div class="info-box">
@@ -1277,7 +1380,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         
         
         elif st.session_state.page == "キャッシュフロー計算書 (CF)":
-            st.title("💰 キャッシュフロー計算書")
+            st.title("キャッシュフロー計算書")
             
             st.markdown("""
             <div class="info-box">
@@ -1364,7 +1467,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.warning("キャッシュフローデータがありません。")
         
         elif st.session_state.page == "経営指標ダッシュボード":
-            st.title("📊 経営指標ダッシュボード")
+            st.title("経営指標")
             
             st.markdown("""
             <div class="info-box">
@@ -1514,7 +1617,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.warning("経営指標データがありません。")
         
         elif st.session_state.page == "損益分岐点分析":
-            st.title("📉 損益分岐点分析")
+            st.title("損益分岐点分析")
             
             st.markdown("""
             <div class="info-box">
@@ -1753,7 +1856,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.warning("予測データがありません。予測データを入力してください。")
         
         elif st.session_state.page == "予測 VS 実績比較":
-            st.title("📊 予測 VS 実績比較")
+            st.title("予実比較")
             
             st.markdown("""
             <div class="info-box">
@@ -1844,7 +1947,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         
         
         elif st.session_state.page == "シナリオ比較":
-            st.title("🔀 シナリオ比較")
+            st.title("シナリオ比較")
             
             st.markdown("""
             <div class="info-box">
@@ -2017,7 +2120,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.warning("シナリオデータがありません。")
         
         elif st.session_state.page == "期間比較分析":
-            st.title("📈 期間比較分析")
+            st.title("期間比較")
             
             st.markdown("""
             <div class="info-box">
@@ -2116,7 +2219,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         st.warning("比較するデータがありません。")
         
         elif st.session_state.page == "データインポート":
-            st.title("📥 データインポート")
+            st.title("データ取込")
             
             # タブで実績データと予測データを分ける
             tab1, tab2 = st.tabs(["💰 実績データインポート", "📊 予測データインポート"])
@@ -2349,7 +2452,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 st.error(f"❌ インポートに失敗しました: {info}")
         
         elif st.session_state.page == "シナリオ一括設定":
-            st.title("🎯 シナリオ一括設定")
+            st.title("シナリオ一括設定")
             
             st.markdown("""
             <div class="info-box">
@@ -2435,7 +2538,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
 else:
     # 会社または期が未登録の場合
     if companies.empty:
-        st.title("👋 ようこそ！財務予測シミュレーターへ")
+        st.title("財務予測シミュレーター")
         
         st.markdown("""
         <div style="background-color: #e3f2fd; padding: 2rem; border-radius: 10px; margin: 2rem 0;">
