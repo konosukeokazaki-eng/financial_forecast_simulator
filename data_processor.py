@@ -1299,3 +1299,147 @@ class DataProcessor:
         finally:
             if conn:
                 conn.close()
+
+    def delete_sub_account_all_periods(self, comp_id, scenario, parent_item, sub_account_name):
+        """特定の補助科目を全期から削除"""
+        conn = None
+        try:
+            sys.stderr.write(f"🗑️ 全期削除開始: {parent_item} -> {sub_account_name}\n")
+            sys.stderr.flush()
+            
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # この会社のすべての期を取得
+            periods = self.get_company_periods(comp_id)
+            
+            deleted_count = 0
+            for _, period in periods.iterrows():
+                period_id = period['id']
+                
+                if self.use_postgres:
+                    cursor.execute(
+                        """
+                        DELETE FROM sub_accounts 
+                        WHERE fiscal_period_id = %s 
+                        AND scenario = %s 
+                        AND parent_item = %s 
+                        AND sub_account_name = %s
+                        """,
+                        (period_id, scenario, parent_item, sub_account_name)
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        DELETE FROM sub_accounts 
+                        WHERE fiscal_period_id = ? 
+                        AND scenario = ? 
+                        AND parent_item = ? 
+                        AND sub_account_name = ?
+                        """,
+                        (period_id, scenario, parent_item, sub_account_name)
+                    )
+                
+                deleted_count += cursor.rowcount
+            
+            conn.commit()
+            sys.stderr.write(f"✅ 全期削除成功: {deleted_count}件削除\n")
+            sys.stderr.flush()
+            return True, f"{len(periods)}期から削除しました（{deleted_count}件）"
+        
+        except Exception as e:
+            sys.stderr.write(f"❌ 全期削除エラー: {e}\n")
+            sys.stderr.flush()
+            if conn:
+                conn.rollback()
+            return False, str(e)
+        
+        finally:
+            if conn:
+                conn.close()
+    
+    def copy_sub_account_to_all_periods(self, comp_id, source_period_id, scenario, parent_item, sub_account_name):
+        """補助科目を他の全期にコピー"""
+        conn = None
+        try:
+            sys.stderr.write(f"📋 全期コピー開始: {parent_item} -> {sub_account_name}\n")
+            sys.stderr.flush()
+            
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # ソース期のデータを取得
+            if self.use_postgres:
+                cursor.execute(
+                    """
+                    SELECT month, amount 
+                    FROM sub_accounts 
+                    WHERE fiscal_period_id = %s 
+                    AND scenario = %s 
+                    AND parent_item = %s 
+                    AND sub_account_name = %s
+                    """,
+                    (source_period_id, scenario, parent_item, sub_account_name)
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT month, amount 
+                    FROM sub_accounts 
+                    WHERE fiscal_period_id = ? 
+                    AND scenario = ? 
+                    AND parent_item = ? 
+                    AND sub_account_name = ?
+                    """,
+                    (source_period_id, scenario, parent_item, sub_account_name)
+                )
+            
+            source_data = cursor.fetchall()
+            
+            if not source_data:
+                return False, "コピー元のデータが見つかりません"
+            
+            # この会社のすべての期を取得
+            periods = self.get_company_periods(comp_id)
+            
+            copied_count = 0
+            for _, period in periods.iterrows():
+                period_id = period['id']
+                
+                if period_id == source_period_id:
+                    continue  # ソース期はスキップ
+                
+                # 各月のデータを挿入
+                for month, amount in source_data:
+                    if self.use_postgres:
+                        cursor.execute(
+                            """
+                            INSERT INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) 
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (fiscal_period_id, scenario, parent_item, sub_account_name, month) 
+                            DO UPDATE SET amount = EXCLUDED.amount
+                            """,
+                            (period_id, scenario, parent_item, sub_account_name, month, amount)
+                        )
+                    else:
+                        cursor.execute(
+                            "INSERT OR REPLACE INTO sub_accounts (fiscal_period_id, scenario, parent_item, sub_account_name, month, amount) VALUES (?, ?, ?, ?, ?, ?)",
+                            (period_id, scenario, parent_item, sub_account_name, month, amount)
+                        )
+                    copied_count += 1
+            
+            conn.commit()
+            sys.stderr.write(f"✅ 全期コピー成功: {copied_count}件追加\n")
+            sys.stderr.flush()
+            return True, f"{len(periods)-1}期にコピーしました（{copied_count}件）"
+        
+        except Exception as e:
+            sys.stderr.write(f"❌ 全期コピーエラー: {e}\n")
+            sys.stderr.flush()
+            if conn:
+                conn.rollback()
+            return False, str(e)
+        
+        finally:
+            if conn:
+                conn.close()
