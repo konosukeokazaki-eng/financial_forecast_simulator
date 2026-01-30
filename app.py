@@ -263,6 +263,16 @@ def get_fiscal_months_cached(comp_id, period_id, _processor):
     """会計月一覧をキャッシュ付きで取得"""
     return _processor.get_fiscal_months(comp_id, period_id)
 
+# ヘルパー関数: 安全なint変換
+def safe_int(value):
+    """NaN/None対応の安全なint変換"""
+    try:
+        if pd.isna(value) or value is None:
+            return 0
+        return int(float(value))
+    except (ValueError, TypeError):
+        return 0
+
 # サイドバー
 st.sidebar.markdown("""
 <div style='text-align: center; padding: 1rem 0;'>
@@ -440,7 +450,7 @@ def format_currency(val):
     """通貨フォーマット"""
     if pd.isna(val):
         return "¥0"
-    return f"¥{int(val):,}"
+    return f"¥{safe_int(val):,}"
 
 def format_percent(val):
     """パーセントフォーマット"""
@@ -677,7 +687,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.markdown(f"""
                 <div class="summary-card-blue">
                     <div class="card-title">売上高</div>
-                    <div class="card-value">¥{int(sales_total):,}</div>
+                    <div class="card-value">¥{safe_int(sales_total):,}</div>
                     <div class="card-subtitle">期末着地予測</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -688,7 +698,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.markdown(f"""
                 <div class="summary-card-green">
                     <div class="card-title">売上総利益</div>
-                    <div class="card-value">¥{int(gp_total):,}</div>
+                    <div class="card-value">¥{safe_int(gp_total):,}</div>
                     <div class="card-subtitle">粗利率: {gp_rate:.1f}%</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -699,7 +709,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.markdown(f"""
                 <div class="summary-card-orange">
                     <div class="card-title">営業利益</div>
-                    <div class="card-value">¥{int(op_total):,}</div>
+                    <div class="card-value">¥{safe_int(op_total):,}</div>
                     <div class="card-subtitle">営業利益率: {op_rate:.1f}%</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -710,7 +720,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.markdown(f"""
                 <div class="summary-card">
                     <div class="card-title">経常利益</div>
-                    <div class="card-value">¥{int(ord_total):,}</div>
+                    <div class="card-value">¥{safe_int(ord_total):,}</div>
                     <div class="card-subtitle">経常利益率: {ord_rate:.1f}%</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -722,7 +732,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.markdown(f"""
                 <div class="{color_class}">
                     <div class="card-title">当期純利益</div>
-                    <div class="card-value">¥{int(net_total):,}</div>
+                    <div class="card-value">¥{safe_int(net_total):,}</div>
                     <div class="card-subtitle">純利益率: {net_rate:.1f}%</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -744,7 +754,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 # タイプ列を使ってスタイルを適用してから削除
                 styled_df = pl_display.style\
                     .apply(highlight_summary, axis=1)\
-                    .format(lambda x: f"¥{int(x):,}" if isinstance(x, (int, float)) else x)
+                    .format(lambda x: f"¥{safe_int(x):,}" if isinstance(x, (int, float)) else x)
                 
                 st.dataframe(styled_df, width="stretch", height=500)
                 
@@ -850,8 +860,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             # フォーマット
             formatted_df = display_df.style\
-                .format(lambda x: f"¥{int(x):,}" if isinstance(x, (int, float)) else x)\
-                .apply(lambda row: ['background-color: #0b2036; font-weight: bold' if row['タイプ'] == '要約' else '' for _ in row], axis=1)
+                .format(lambda x: f"¥{safe_int(x):,}" if isinstance(x, (int, float)) else x)\
+                .apply(lambda row: ['background-color: #f8f9fa; font-weight: bold' if row['タイプ'] == '要約' else '' for _ in row], axis=1)
             
             st.dataframe(formatted_df, width="stretch", height=700)
             
@@ -943,7 +953,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             if not item_data.empty:
                                 month_cols = [m for m in months if m in item_data.columns]
                                 total = item_data[month_cols].sum(axis=1).iloc[0] if month_cols else 0
-                                st.markdown(f"<div style='text-align: right;'>合計: ¥{int(total):,}</div>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='text-align: right;'>合計: ¥{safe_int(total):,}</div>", unsafe_allow_html=True)
                         
                         # 展開されている場合、入力フォームを表示
                         if item in st.session_state.expanded_items and not is_calculated:
