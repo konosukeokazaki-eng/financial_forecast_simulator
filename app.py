@@ -1173,7 +1173,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     period1_id = st.selectbox(
                         "比較元の期",
                         all_periods['id'].tolist(),
-                        format_func=lambda x: f"第{all_periods[all_periods['id']==x]['period_number'].iloc[0]}期",
+                        format_func=lambda x: f"第{all_periods[all_periods['id']==x]['period_num'].iloc[0]}期",
                         key="period1"
                     )
                 
@@ -1181,7 +1181,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     period2_id = st.selectbox(
                         "比較先の期",
                         all_periods['id'].tolist(),
-                        format_func=lambda x: f"第{all_periods[all_periods['id']==x]['period_number'].iloc[0]}期",
+                        format_func=lambda x: f"第{all_periods[all_periods['id']==x]['period_num'].iloc[0]}期",
                         index=1 if len(all_periods) > 1 else 0,
                         key="period2"
                     )
@@ -1215,8 +1215,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         
                         period_comparison_rows.append({
                             "項目名": item,
-                            f"第{all_periods[all_periods['id']==period1_id]['period_number'].iloc[0]}期": total1,
-                            f"第{all_periods[all_periods['id']==period2_id]['period_number'].iloc[0]}期": total2,
+                            f"第{all_periods[all_periods['id']==period1_id]['period_num'].iloc[0]}期": total1,
+                            f"第{all_periods[all_periods['id']==period2_id]['period_num'].iloc[0]}期": total2,
                             "増減額": diff,
                             "成長率(%)": growth_rate
                         })
@@ -1226,8 +1226,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     if not period_comparison_df.empty:
                         formatted_period_df = period_comparison_df.style\
                             .format({
-                                f"第{all_periods[all_periods['id']==period1_id]['period_number'].iloc[0]}期": "¥{:,.0f}",
-                                f"第{all_periods[all_periods['id']==period2_id]['period_number'].iloc[0]}期": "¥{:,.0f}",
+                                f"第{all_periods[all_periods['id']==period1_id]['period_num'].iloc[0]}期": "¥{:,.0f}",
+                                f"第{all_periods[all_periods['id']==period2_id]['period_num'].iloc[0]}期": "¥{:,.0f}",
                                 "増減額": "¥{:,.0f}",
                                 "成長率(%)": "{:.1f}%"
                             })\
