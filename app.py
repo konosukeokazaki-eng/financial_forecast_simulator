@@ -430,6 +430,8 @@ else:
     menu_options = [
         "着地予測ダッシュボード",
         "損益計算書 (PL)",
+        "予測 VS 実績比較",
+        "期間比較分析",
         "実績データ入力",
         "予測データ入力",
         "データインポート",
@@ -882,22 +884,32 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             <div class="info-box">
                 <strong>シナリオ: {st.session_state.scenario}</strong> | 
                 実績締月: {st.session_state.current_month} 以降のデータを編集してください。<br>
-                💡 <strong>使い方:</strong> 項目をクリックして展開 → 数値を入力 → 保存
+                💡 <strong>使い方:</strong> 項目をクリック → 行を追加/編集 → 自動保存
             </div>
             """, unsafe_allow_html=True)
             
-            # 予測PLデータ全体を取得
-            forecast_pl_df = forecasts_df.copy()
+            # 予測データを取得（キャッシュ付き）
+            forecast_data = load_forecast_data_cached(
+                st.session_state.selected_period_id,
+                st.session_state.scenario,
+                processor
+            )
+            
+            # 補助科目データを取得（キャッシュ付き）
+            sub_accounts_data = load_sub_accounts_cached(
+                st.session_state.selected_period_id,
+                st.session_state.scenario,
+                processor
+            )
             
             # 展開状態を管理
-            if 'expanded_items' not in st.session_state:
-                st.session_state.expanded_items = set()
+            if 'expanded_forecast_item' not in st.session_state:
+                st.session_state.expanded_forecast_item = None
             
-            # PLの構造を定義
-            pl_structure = {
+            # PLの構造を定義（カテゴリ別）
+            pl_categories = {
                 "売上": ["売上高"],
                 "売上原価": ["売上原価"],
-                "売上総利益": ["売上総損益金額"],
                 "人件費": ["役員報酬", "給料手当", "賞与", "法定福利費", "福利厚生費"],
                 "採用・外注": ["採用教育費", "外注費"],
                 "販売費": ["荷造運賃", "広告宣伝費", "販売手数料", "販売促進費"],
@@ -915,239 +927,329 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 "税金": ["法人税、住民税及び事業税"]
             }
             
-            # 編集不可の計算項目
-            calculated_items_set = set(processor.calculated_items)
+            # カテゴリ選択
+            selected_category = st.selectbox(
+                "カテゴリを選択",
+                list(pl_categories.keys()),
+                key="forecast_category"
+            )
             
-            # PL表示
-            st.markdown("### 📊 損益計算書（予測）")
+            items_in_category = pl_categories[selected_category]
             
-            for category, items in pl_structure.items():
-                with st.expander(f"**{category}**", expanded=True):
-                    for item in items:
-                        if item not in forecast_pl_df['項目名'].values:
-                            continue
-                        
-                        item_data = forecast_pl_df[forecast_pl_df['項目名'] == item]
-                        is_calculated = item in calculated_items_set
-                        
-                        # 項目の展開/折りたたみボタン
-                        col1, col2 = st.columns([3, 1])
-                        
-                        with col1:
-                            if is_calculated:
-                                st.markdown(f"**{item}** 🔒 (自動計算)")
+            # 項目を選択
+            editable_items = [item for item in items_in_category if item not in processor.calculated_items]
+            
+            if not editable_items:
+                st.warning("このカテゴリには編集可能な項目がありません。")
+            else:
+                selected_item = st.selectbox(
+                    "編集する項目を選択",
+                    editable_items,
+                    key="forecast_item_select"
+                )
+                
+                # テーブル形式でデータを表示・編集
+                st.markdown(f"### 📊 {selected_item} の予測データ")
+                
+                # 基本項目データの準備
+                item_row_data = {"項目名": selected_item, "タイプ": "要約"}
+                item_data = forecast_data[forecast_data['項目名'] == selected_item]
+                
+                for month in months:
+                    if not item_data.empty and month in item_data.columns:
+                        val = item_data[month].iloc[0]
+                        item_row_data[month] = float(val) if pd.notna(val) else 0.0
+                    else:
+                        item_row_data[month] = 0.0
+                
+                # 補助科目データの準備
+                sub_rows = []
+                if selected_item in processor.parent_items_with_sub_accounts:
+                    item_subs = sub_accounts_data[sub_accounts_data['parent_item'] == selected_item]
+                    for sub_name in item_subs['sub_account_name'].unique():
+                        sub_row = {"項目名": f"  └ {sub_name}", "タイプ": "詳細"}
+                        sub_data = item_subs[item_subs['sub_account_name'] == sub_name]
+                        for month in months:
+                            month_data = sub_data[sub_data['month'] == month]
+                            if not month_data.empty:
+                                val = month_data['amount'].iloc[0]
+                                sub_row[month] = float(val) if pd.notna(val) else 0.0
                             else:
-                                if st.button(
-                                    f"{'▼' if item in st.session_state.expanded_items else '▶'} {item}",
-                                    key=f"expand_{item}",
-                                    use_container_width=True
-                                ):
-                                    if item in st.session_state.expanded_items:
-                                        st.session_state.expanded_items.remove(item)
-                                    else:
-                                        st.session_state.expanded_items.add(item)
-                                    st.rerun()
+                                sub_row[month] = 0.0
+                        sub_rows.append(sub_row)
+                
+                # DataFrameに変換
+                all_rows = [item_row_data] + sub_rows
+                edit_df = pd.DataFrame(all_rows)
+                
+                # 合計列を追加
+                month_cols = [m for m in months if m in edit_df.columns]
+                edit_df['合計'] = edit_df[month_cols].sum(axis=1)
+                
+                # データエディタで編集
+                column_config = {
+                    "項目名": st.column_config.TextColumn("項目名", disabled=True, width="medium"),
+                    "タイプ": st.column_config.TextColumn("タイプ", disabled=True, width="small"),
+                    "合計": st.column_config.NumberColumn("合計", format="¥%d", disabled=True, width="medium")
+                }
+                
+                for month in month_cols:
+                    column_config[month] = st.column_config.NumberColumn(
+                        month,
+                        format="¥%d",
+                        width="small"
+                    )
+                
+                edited_df = st.data_editor(
+                    edit_df,
+                    column_config=column_config,
+                    use_container_width=True,
+                    num_rows="dynamic",  # 行の追加・削除を許可
+                    key=f"editor_{selected_item}"
+                )
+                
+                # 保存ボタン
+                col1, col2, col3 = st.columns([2, 2, 1])
+                
+                with col1:
+                    if st.button("💾 変更を保存", type="primary", key="save_forecast_table"):
+                        # 基本項目の保存
+                        main_row = edited_df[edited_df['タイプ'] == '要約'].iloc[0]
+                        main_values = {month: main_row[month] for month in month_cols}
                         
-                        with col2:
-                            # 合計値を表示
-                            if not item_data.empty:
-                                month_cols = [m for m in months if m in item_data.columns]
-                                total = item_data[month_cols].sum(axis=1).iloc[0] if month_cols else 0
-                                st.markdown(f"<div style='text-align: right;'>合計: ¥{safe_int(total):,}</div>", unsafe_allow_html=True)
+                        success, msg = processor.save_forecast_item(
+                            st.session_state.selected_period_id,
+                            st.session_state.scenario,
+                            selected_item,
+                            main_values
+                        )
                         
-                        # 展開されている場合、入力フォームを表示
-                        if item in st.session_state.expanded_items and not is_calculated:
-                            with st.container():
-                                st.markdown("---")
-                                
-                                # 補助科目がある場合は表示
-                                if item in processor.parent_items_with_sub_accounts:
-                                    sub_accounts = processor.get_sub_accounts_for_parent(
-                                        st.session_state.selected_period_id,
-                                        st.session_state.scenario,
-                                        item
-                                    )
-                                    
-                                    if not sub_accounts.empty:
-                                        st.markdown(f"**📋 {item}の内訳（補助科目）**")
-                                        for _, sub in sub_accounts.iterrows():
-                                            sub_name = sub['sub_account_name']
-                                            with st.expander(f"🔹 {sub_name}"):
-                                                # 補助科目の編集フォーム
-                                                cols_sub = st.columns(4)
-                                                sub_values = {}
-                                                
-                                                for i, month in enumerate(months):
-                                                    with cols_sub[i % 4]:
-                                                        current_val = 0.0
-                                                        if month in sub.index:
-                                                            val = sub[month]
-                                                            if pd.notna(val):
-                                                                current_val = float(val)
-                                                        
-                                                        new_val = st.number_input(
-                                                            month,
-                                                            value=current_val,
-                                                            step=10000.0,
-                                                            format="%.0f",
-                                                            key=f"sub_{item}_{sub_name}_{month}"
-                                                        )
-                                                        sub_values[month] = new_val
-                                                
-                                                col_save, col_delete = st.columns([1, 1])
-                                                with col_save:
-                                                    if st.button("💾 保存", key=f"save_sub_{item}_{sub_name}", type="primary"):
-                                                        success, msg = processor.save_sub_account(
-                                                            st.session_state.selected_period_id,
-                                                            st.session_state.scenario,
-                                                            item,
-                                                            sub_name,
-                                                            sub_values
-                                                        )
-                                                        if success:
-                                                            st.success(msg)
-                                                            st.rerun()
-                                                        else:
-                                                            st.error(msg)
-                                                
-                                                with col_delete:
-                                                    if st.button("🗑️ 削除", key=f"del_sub_{item}_{sub_name}"):
-                                                        success, msg = processor.delete_sub_account(
-                                                            st.session_state.selected_period_id,
-                                                            st.session_state.scenario,
-                                                            item,
-                                                            sub_name
-                                                        )
-                                                        if success:
-                                                            st.success(msg)
-                                                            st.rerun()
-                                                        else:
-                                                            st.error(msg)
-                                
-                                # 新しい補助科目の追加フォーム
-                                if item in processor.parent_items_with_sub_accounts:
-                                    with st.expander("➕ 新しい補助科目を追加"):
-                                        new_sub_name = st.text_input(
-                                            "補助科目名",
-                                            key=f"new_sub_{item}",
-                                            placeholder="例: 国内売上、海外売上"
-                                        )
-                                        
-                                        if new_sub_name:
-                                            cols_new = st.columns(4)
-                                            new_sub_values = {}
-                                            
-                                            for i, month in enumerate(months):
-                                                with cols_new[i % 4]:
-                                                    val = st.number_input(
-                                                        month,
-                                                        value=0.0,
-                                                        step=10000.0,
-                                                        format="%.0f",
-                                                        key=f"new_sub_{item}_{new_sub_name}_{month}"
-                                                    )
-                                                    new_sub_values[month] = val
-                                            
-                                            if st.button("💾 補助科目を追加", key=f"add_sub_{item}", type="primary"):
-                                                success, msg = processor.save_sub_account(
-                                                    st.session_state.selected_period_id,
-                                                    st.session_state.scenario,
-                                                    item,
-                                                    new_sub_name,
-                                                    new_sub_values
-                                                )
-                                                if success:
-                                                    st.success(msg)
-                                                    st.rerun()
-                                                else:
-                                                    st.error(msg)
-                                
-                                # 基本項目の入力フォーム
-                                st.markdown(f"**💰 {item} の月次予測値**")
-                                
-                                cols = st.columns(4)
-                                item_values = {}
-                                
-                                for i, month in enumerate(months):
-                                    with cols[i % 4]:
-                                        current_val = 0.0
-                                        if not item_data.empty and month in item_data.columns:
-                                            val = item_data[month].iloc[0]
-                                            if pd.notna(val):
-                                                current_val = float(val)
-                                        
-                                        new_val = st.number_input(
-                                            month,
-                                            value=current_val,
-                                            step=10000.0,
-                                            format="%.0f",
-                                            key=f"forecast_{item}_{month}"
-                                        )
-                                        item_values[month] = new_val
-                                
-                                if st.button("💾 保存", key=f"save_{item}", type="primary"):
-                                    success, msg = processor.save_forecast_item(
-                                        st.session_state.selected_period_id,
-                                        st.session_state.scenario,
-                                        item,
-                                        item_values
-                                    )
-                                    if success:
-                                        st.success(msg)
-                                        if 'forecasts_df' in st.session_state:
-                                            del st.session_state.forecasts_df
-                                        st.rerun()
-                                    else:
-                                        st.error(msg)
-                                
-                                st.markdown("---")
+                        if success:
+                            # 補助科目の保存
+                            sub_rows_df = edited_df[edited_df['タイプ'] == '詳細']
+                            for _, row in sub_rows_df.iterrows():
+                                sub_name = row['項目名'].replace('  └ ', '')
+                                sub_values = {month: row[month] for month in month_cols}
+                                processor.save_sub_account(
+                                    st.session_state.selected_period_id,
+                                    st.session_state.scenario,
+                                    selected_item,
+                                    sub_name,
+                                    sub_values
+                                )
+                            
+                            st.success("✅ データを保存しました")
+                            # キャッシュクリア
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error(f"❌ 保存に失敗: {msg}")
+                
+                with col2:
+                    if selected_item in processor.parent_items_with_sub_accounts:
+                        if st.button("🗑️ 補助科目を全期から削除", key="delete_sub_all"):
+                            # 削除する補助科目を選択
+                            sub_names = [row['項目名'].replace('  └ ', '') for _, row in edited_df[edited_df['タイプ'] == '詳細'].iterrows()]
+                            if sub_names:
+                                selected_sub = st.selectbox("削除する補助科目", sub_names, key="sub_to_delete")
+                                if st.button("確認：全期から削除", key="confirm_delete"):
+                                    # TODO: 全期削除の実装
+                                    st.warning("全期削除機能は実装中です")
+                
+                with col3:
+                    if st.button("🔄 リセット"):
+                        st.cache_data.clear()
+                        st.rerun()
+            
+        
+        elif st.session_state.page == "予測 VS 実績比較":
+            st.title("📊 予測 VS 実績比較")
             
             st.markdown("""
             <div class="info-box">
-                <strong>💡 使い方:</strong> 月次の実績データを入力してください。
+                <strong>💡 使い方:</strong> 予測値と実績値の差異を分析します。達成率や乖離額を確認できます。
             </div>
             """, unsafe_allow_html=True)
             
-            # 編集可能な項目
-            editable_items = [item for item in processor.all_items if item not in processor.calculated_items]
+            # 実績データと予測データを取得
+            actuals = actuals_df.copy()
+            forecasts = load_forecast_data_cached(
+                st.session_state.selected_period_id,
+                st.session_state.scenario,
+                processor
+            )
             
-            selected_item = st.selectbox("編集する項目", editable_items)
+            # 比較テーブルを作成
+            comparison_rows = []
             
-            st.markdown(f"### {selected_item} の実績値入力")
+            for item in processor.all_items:
+                actual_row = actuals[actuals['項目名'] == item]
+                forecast_row = forecasts[forecasts['項目名'] == item]
+                
+                if actual_row.empty or forecast_row.empty:
+                    continue
+                
+                row_data = {"項目名": item}
+                
+                # 実績合計
+                actual_total = 0
+                for month in months:
+                    if month in actual_row.columns:
+                        val = actual_row[month].iloc[0]
+                        if pd.notna(val):
+                            actual_total += float(val)
+                
+                # 予測合計
+                forecast_total = 0
+                for month in months:
+                    if month in forecast_row.columns:
+                        val = forecast_row[month].iloc[0]
+                        if pd.notna(val):
+                            forecast_total += float(val)
+                
+                # 差異計算
+                diff = actual_total - forecast_total
+                diff_rate = (diff / forecast_total * 100) if forecast_total != 0 else 0
+                achievement_rate = (actual_total / forecast_total * 100) if forecast_total != 0 else 0
+                
+                row_data["実績"] = actual_total
+                row_data["予測"] = forecast_total
+                row_data["差異"] = diff
+                row_data["差異率(%)"] = diff_rate
+                row_data["達成率(%)"] = achievement_rate
+                
+                comparison_rows.append(row_data)
             
-            cols = st.columns(4)
-            new_values = {}
-            current_values = actuals_df[actuals_df['項目名'] == selected_item]
+            comparison_df = pd.DataFrame(comparison_rows)
             
-            for i, month in enumerate(months):
-                with cols[i % 4]:
-                    current_val = 0.0
-                    if not current_values.empty and month in current_values.columns:
-                        current_val = current_values[month].iloc[0]
-                    
-                    new_val = st.number_input(
-                        f"{month}",
-                        value=float(current_val),
-                        step=10000.0,
-                        format="%.0f",
-                        key=f"actual_{selected_item}_{month}"
+            # フォーマットして表示
+            if not comparison_df.empty:
+                formatted_df = comparison_df.style\
+                    .format({
+                        "実績": "¥{:,.0f}",
+                        "予測": "¥{:,.0f}",
+                        "差異": "¥{:,.0f}",
+                        "差異率(%)": "{:.1f}%",
+                        "達成率(%)": "{:.1f}%"
+                    })\
+                    .applymap(
+                        lambda x: 'background-color: #d4edda' if isinstance(x, (int, float)) and x > 0 else 
+                                  ('background-color: #f8d7da' if isinstance(x, (int, float)) and x < 0 else ''),
+                        subset=['差異', '差異率(%)']
                     )
-                    new_values[month] = new_val
-            
-            if st.button("💾 保存", type="primary"):
-                success, msg = processor.save_actual_item(
-                    st.session_state.selected_period_id,
-                    selected_item,
-                    new_values
+                
+                st.dataframe(formatted_df, width="stretch", height=600)
+                
+                # CSVダウンロード
+                csv = comparison_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    "📥 比較結果をCSVダウンロード",
+                    csv,
+                    "forecast_vs_actual_comparison.csv",
+                    "text/csv",
+                    key='download_comparison'
                 )
-                if success:
-                    st.success(msg)
-                    # キャッシュクリア
-                    if 'actuals_df' in st.session_state:
-                        del st.session_state.actuals_df
-                    st.rerun()
+            else:
+                st.warning("比較するデータがありません。")
+        
+        elif st.session_state.page == "期間比較分析":
+            st.title("📈 期間比較分析")
+            
+            st.markdown("""
+            <div class="info-box">
+                <strong>💡 使い方:</strong> 異なる会計期間のデータを比較します。前期比、成長率などを確認できます。
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 期間選択
+            all_periods = get_company_periods_cached(st.session_state.selected_comp_id, processor)
+            
+            if len(all_periods) < 2:
+                st.warning("比較するには2期以上のデータが必要です。")
+            else:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    period1_id = st.selectbox(
+                        "比較元の期",
+                        all_periods['id'].tolist(),
+                        format_func=lambda x: f"第{all_periods[all_periods['id']==x]['period_number'].iloc[0]}期",
+                        key="period1"
+                    )
+                
+                with col2:
+                    period2_id = st.selectbox(
+                        "比較先の期",
+                        all_periods['id'].tolist(),
+                        format_func=lambda x: f"第{all_periods[all_periods['id']==x]['period_number'].iloc[0]}期",
+                        index=1 if len(all_periods) > 1 else 0,
+                        key="period2"
+                    )
+                
+                if period1_id == period2_id:
+                    st.warning("異なる期を選択してください。")
                 else:
-                    st.error(msg)
+                    # 両期間のデータを取得
+                    data1 = load_actual_data_cached(period1_id, processor)
+                    data2 = load_actual_data_cached(period2_id, processor)
+                    
+                    months1 = get_fiscal_months_cached(st.session_state.selected_comp_id, period1_id, processor)
+                    months2 = get_fiscal_months_cached(st.session_state.selected_comp_id, period2_id, processor)
+                    
+                    # 比較テーブルを作成
+                    period_comparison_rows = []
+                    
+                    for item in processor.all_items:
+                        row1 = data1[data1['項目名'] == item]
+                        row2 = data2[data2['項目名'] == item]
+                        
+                        if row1.empty or row2.empty:
+                            continue
+                        
+                        # 合計計算
+                        total1 = sum([float(row1[m].iloc[0]) if m in row1.columns and pd.notna(row1[m].iloc[0]) else 0 for m in months1])
+                        total2 = sum([float(row2[m].iloc[0]) if m in row2.columns and pd.notna(row2[m].iloc[0]) else 0 for m in months2])
+                        
+                        diff = total2 - total1
+                        growth_rate = (diff / total1 * 100) if total1 != 0 else 0
+                        
+                        period_comparison_rows.append({
+                            "項目名": item,
+                            f"第{all_periods[all_periods['id']==period1_id]['period_number'].iloc[0]}期": total1,
+                            f"第{all_periods[all_periods['id']==period2_id]['period_number'].iloc[0]}期": total2,
+                            "増減額": diff,
+                            "成長率(%)": growth_rate
+                        })
+                    
+                    period_comparison_df = pd.DataFrame(period_comparison_rows)
+                    
+                    if not period_comparison_df.empty:
+                        formatted_period_df = period_comparison_df.style\
+                            .format({
+                                f"第{all_periods[all_periods['id']==period1_id]['period_number'].iloc[0]}期": "¥{:,.0f}",
+                                f"第{all_periods[all_periods['id']==period2_id]['period_number'].iloc[0]}期": "¥{:,.0f}",
+                                "増減額": "¥{:,.0f}",
+                                "成長率(%)": "{:.1f}%"
+                            })\
+                            .applymap(
+                                lambda x: 'background-color: #d4edda' if isinstance(x, (int, float)) and x > 0 else 
+                                          ('background-color: #f8d7da' if isinstance(x, (int, float)) and x < 0 else ''),
+                                subset=['増減額', '成長率(%)']
+                            )
+                        
+                        st.dataframe(formatted_period_df, width="stretch", height=600)
+                        
+                        # CSVダウンロード
+                        csv = period_comparison_df.to_csv(index=False).encode('utf-8-sig')
+                        st.download_button(
+                            "📥 期間比較結果をCSVダウンロード",
+                            csv,
+                            "period_comparison.csv",
+                            "text/csv",
+                            key='download_period_comparison'
+                        )
+                    else:
+                        st.warning("比較するデータがありません。")
         
         elif st.session_state.page == "データインポート":
             st.title("📥 データインポート")
