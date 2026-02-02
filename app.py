@@ -8,6 +8,7 @@ import sqlite3
 import os
 import tempfile
 from data_processor import DataProcessor
+from cf_analyzer import CashFlowAnalyzer
 from datetime import datetime
 
 # ページ設定 - 完全ライトモード
@@ -563,6 +564,11 @@ if 'processor' not in st.session_state:
     st.session_state.processor = DataProcessor()
 processor = st.session_state.processor
 
+# CFアナライザーの初期化
+if 'cf_analyzer' not in st.session_state:
+    st.session_state.cf_analyzer = CashFlowAnalyzer(processor)
+cf_analyzer = st.session_state.cf_analyzer
+
 # キャッシュ付きデータ読み込み関数（高速化）
 @st.cache_data(ttl=600)  # 10分間キャッシュ（パフォーマンス改善）
 def load_actual_data_cached(period_id, _processor):
@@ -765,7 +771,9 @@ else:
     
     # 階層型ナビゲーション（アイコンなし）
     st.sidebar.markdown("### ダッシュボード")
-    if st.sidebar.button("着地予測", use_container_width=True, key="nav_dashboard"):
+    if st.sidebar.button("📊 CFO意思決定支援", use_container_width=True, key="nav_cfo_dashboard"):
+        st.session_state.page = "CFO意思決定支援ダッシュボード"
+    if st.sidebar.button("着地予測（PL）", use_container_width=True, key="nav_dashboard"):
         st.session_state.page = "着地予測ダッシュボード"
     
     st.sidebar.markdown("---")
@@ -1495,6 +1503,259 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     if st.button("閉じる", key="close_drill"):
                         st.session_state.drill_item = None
                         st.rerun()
+
+        elif st.session_state.page == "CFO意思決定支援ダッシュボード":
+            # ダッシュボードヘッダー
+            st.markdown(f"""
+            <div class="dashboard-header fade-in">
+                <h1 class="dashboard-title">💰 CFO意思決定支援ダッシュボード</h1>
+                <p class="dashboard-subtitle">{st.session_state.selected_comp_name} | 第{st.session_state.selected_period_num}期 | {st.session_state.start_date} 〜 {st.session_state.end_date}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # アラート表示エリア
+            st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+            
+            # サンプルアラート（実データ連携は次フェーズで実装）
+            st.warning("🚨 **資金注意**: 現金残高が固定費の8.5ヶ月分です。資金計画の見直しを推奨します。")
+            
+            st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+            
+            # KPIカード（3列）
+            col1, col2, col3 = st.columns(3)
+            
+            # サンプルデータ（実データ連携は次フェーズ）
+            with col1:
+                st.markdown(f"""
+                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);">
+                    <div class="kpi-card-title">税引後キャッシュフロー</div>
+                    <div class="kpi-card-value">¥31,500,000</div>
+                    <div class="kpi-card-subtitle">当月実績</div>
+                    <div class="kpi-card-trend">
+                        <span>▲</span>
+                        <span>前月比: +8.3%</span>
+                    </div>
+                    <div class="kpi-card-decoration"></div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #10B981 0%, #34D399 100%);">
+                    <div class="kpi-card-title">3ヶ月後現金残高（予測）</div>
+                    <div class="kpi-card-value">¥380,000,000</div>
+                    <div class="kpi-card-subtitle">標準シナリオ</div>
+                    <div class="kpi-card-trend">
+                        <span>▼</span>
+                        <span>現在比: -5.2%</span>
+                    </div>
+                    <div class="kpi-card-decoration"></div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);">
+                    <div class="kpi-card-title">資金耐久月数</div>
+                    <div class="kpi-card-value">8.5ヶ月</div>
+                    <div class="kpi-card-subtitle">現金残高 ÷ 月間固定費</div>
+                    <div class="kpi-card-trend">
+                        <span style="color: #F59E0B;">⚠️</span>
+                        <span>注意水準（6-12ヶ月）</span>
+                    </div>
+                    <div class="kpi-card-decoration"></div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<div style='height: 32px;'></div>", unsafe_allow_html=True)
+            
+            # キャッシュフロー推移と予測グラフ
+            st.markdown('<div class="section-card fade-in">', unsafe_allow_html=True)
+            st.markdown('<h3 class="section-title">📈 キャッシュフロー推移と予測</h3>', unsafe_allow_html=True)
+            
+            # サンプルデータでグラフ作成
+            sample_months = ['3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '1月', '2月']
+            sample_actual = [35000000, 28000000, 32000000, 31000000, 29000000, 31500000, None, None, None, None, None, None]
+            sample_forecast_std = [None, None, None, None, None, 31500000, 32000000, 33000000, 34000000, 35000000, 36000000, 37000000]
+            sample_forecast_opt = [None, None, None, None, None, 31500000, 34000000, 36000000, 38000000, 40000000, 42000000, 44000000]
+            sample_forecast_pes = [None, None, None, None, None, 31500000, 30000000, 29000000, 28000000, 27000000, 26000000, 25000000]
+            
+            fig = go.Figure()
+            
+            # 実績（太い線）
+            fig.add_trace(go.Scatter(
+                x=sample_months,
+                y=sample_actual,
+                name='実績',
+                mode='lines+markers',
+                line=dict(color='#3B82F6', width=4),
+                marker=dict(size=10, color='#3B82F6', line=dict(color='white', width=2)),
+                hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
+            ))
+            
+            # 予測-標準（破線）
+            fig.add_trace(go.Scatter(
+                x=sample_months,
+                y=sample_forecast_std,
+                name='予測（標準）',
+                mode='lines+markers',
+                line=dict(color='#10B981', width=3, dash='dash'),
+                marker=dict(size=8, color='#10B981'),
+                hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
+            ))
+            
+            # 予測-楽観（細線）
+            fig.add_trace(go.Scatter(
+                x=sample_months,
+                y=sample_forecast_opt,
+                name='予測（楽観）',
+                mode='lines',
+                line=dict(color='#34D399', width=2, dash='dot'),
+                hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
+            ))
+            
+            # 予測-悲観（細線）
+            fig.add_trace(go.Scatter(
+                x=sample_months,
+                y=sample_forecast_pes,
+                name='予測（悲観）',
+                mode='lines',
+                line=dict(color='#F59E0B', width=2, dash='dot'),
+                hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
+            ))
+            
+            fig.update_layout(
+                template='plotly_white',
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Inter, sans-serif", size=13, color='#1F2937'),
+                xaxis=dict(
+                    title="",
+                    showgrid=False,
+                    showline=True,
+                    linewidth=1,
+                    linecolor='#E5E7EB',
+                    tickfont=dict(color='#6B7280', size=12)
+                ),
+                yaxis=dict(
+                    title="営業キャッシュフロー",
+                    title_font=dict(size=14, color='#374151'),
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='#F3F4F6',
+                    showline=False,
+                    tickfont=dict(color='#6B7280', size=12),
+                    tickformat=',.0f'
+                ),
+                legend=dict(
+                    bgcolor='rgba(255, 255, 255, 0.8)',
+                    bordercolor='#E5E7EB',
+                    borderwidth=1,
+                    font=dict(size=12, color='#1F2937'),
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                ),
+                hovermode='x unified',
+                height=400,
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+            
+            # 2カラムセクション
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown('<div class="section-card fade-in">', unsafe_allow_html=True)
+                st.markdown('<h3 class="section-title">💰 キャッシュフロー内訳</h3>', unsafe_allow_html=True)
+                
+                # CF内訳
+                st.markdown("""
+                <div class="metric-row">
+                    <div class="metric-name">営業CF</div>
+                    <div>
+                        <span class="metric-value">¥31,500,000</span>
+                        <span class="metric-change metric-up">▲ +5.2%</span>
+                    </div>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-name">投資CF</div>
+                    <div>
+                        <span class="metric-value">-¥2,000,000</span>
+                        <span class="metric-change metric-down">▼ 設備投資</span>
+                    </div>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-name">財務CF</div>
+                    <div>
+                        <span class="metric-value">-¥5,000,000</span>
+                        <span class="metric-change metric-down">▼ 借入返済</span>
+                    </div>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-name" style="font-weight: 600;">現金増減</div>
+                    <div>
+                        <span class="metric-value" style="color: #10B981; font-weight: 700;">¥24,500,000</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown('<div class="section-card fade-in">', unsafe_allow_html=True)
+                st.markdown('<h3 class="section-title">💡 推奨アクション</h3>', unsafe_allow_html=True)
+                
+                st.markdown("""
+                <div style="padding: 12px 0;">
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-weight: 600; color: #1F2937; margin-bottom: 8px;">
+                            ✅ 優先度: 高
+                        </div>
+                        <div style="padding-left: 16px; color: #6B7280; font-size: 0.875rem;">
+                            □ 売上債権の早期回収<br>
+                            &nbsp;&nbsp;&nbsp;→ 請求サイトの短縮交渉
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-weight: 600; color: #1F2937; margin-bottom: 8px;">
+                            ⚠️ 優先度: 中
+                        </div>
+                        <div style="padding-left: 16px; color: #6B7280; font-size: 0.875rem;">
+                            □ 在庫の適正化<br>
+                            &nbsp;&nbsp;&nbsp;→ 滞留在庫の処分検討
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; color: #1F2937; margin-bottom: 8px;">
+                            💼 優先度: 中
+                        </div>
+                        <div style="padding-left: 16px; color: #6B7280; font-size: 0.875rem;">
+                            □ 追加融資の検討<br>
+                            &nbsp;&nbsp;&nbsp;→ 銀行折衝資料の準備
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+            
+            # 注記
+            st.info("""
+            💡 **次の実装フェーズで追加予定:**
+            - 実際のBS・PLデータからの自動CF計算
+            - 過去データに基づく精緻な予測モデル
+            - カスタマイズ可能なアラート設定
+            - 詳細なシナリオ分析機能
+            """)
 
         elif st.session_state.page == "損益計算書 (PL)":
             st.title("損益計算書 (PL)")
