@@ -2483,8 +2483,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 "成長率(%)": "{:.1f}%"
                             })\
                             .applymap(
-                                lambda x: 'background-color: #6eff91' if isinstance(x, (int, float)) and x > 0 else 
-                                          ('background-color: #ff96a0' if isinstance(x, (int, float)) and x < 0 else ''),
+                                lambda x: 'background-color: #d4edda' if isinstance(x, (int, float)) and x > 0 else 
+                                          ('background-color: #f8d7da' if isinstance(x, (int, float)) and x < 0 else ''),
                                 subset=['増減額', '成長率(%)']
                             )
                         
@@ -2780,8 +2780,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             )
                             if success:
                                 st.success(f"✅ {info}")
-                                # キャッシュクリア
-                                for key in ['forecasts_df', 'forecast_imported_df', 'show_forecast_import_button']:
+                                # 全キャッシュをクリア
+                                st.cache_data.clear()
+                                # すべての関連キャッシュを削除
+                                for key in ['forecasts_df', 'forecast_imported_df', 'show_forecast_import_button',
+                                           'pl_df', 'sub_accounts_df', 'actuals_df',
+                                           'scenario_adjustment_cache', 'sub_account_aggregation_cache',
+                                           'forecast_input_cache_key', 'forecast_input_data',
+                                           'adjustment_key', 'sub_cache_key', 'pl_cache_key']:
                                     if key in st.session_state:
                                         del st.session_state[key]
                                 st.rerun()
