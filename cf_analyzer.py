@@ -554,3 +554,309 @@ class CashFlowAnalyzer:
                 ])
         
         return suggestions
+    
+    def save_bs_to_db(self, period_id, bs_data):
+        """
+        BSデータをデータベースに保存
+        
+        Args:
+            period_id: 会計期間ID
+            bs_data: BSデータ（DataFrame）
+            
+        Returns:
+            bool: 成功/失敗
+        """
+        try:
+            import sqlite3
+            
+            conn = self.processor.get_connection()
+            cursor = conn.cursor()
+            
+            # 月度列を取得
+            month_cols = [col for col in bs_data.columns if '月度' in str(col)]
+            
+            for month_col in month_cols:
+                month = month_col.replace('月度', '月')
+                
+                # BS項目から値を取得
+                def get_value(item_name):
+                    row = bs_data[bs_data['勘定科目'].str.contains(item_name, na=False)]
+                    if not row.empty and month_col in row.columns:
+                        val = row[month_col].iloc[0]
+                        return float(val) if pd.notna(val) else 0
+                    return 0
+                
+                # データを準備
+                data = {
+                    'fiscal_period_id': period_id,
+                    'month': month,
+                    'cash_and_deposits': get_value('現金･預金合計'),
+                    'accounts_receivable': get_value('売掛金'),
+                    'inventory': get_value('棚卸資産合計'),
+                    'other_current_assets': get_value('他流動資産'),
+                    'fixed_assets': get_value('固定資産合計'),
+                    'accounts_payable': get_value('買掛金'),
+                    'short_term_debt': get_value('短期借入金'),
+                    'long_term_debt': get_value('長期借入金'),
+                }
+                
+                # UPSERTクエリ
+                cursor.execute("""
+                    INSERT INTO balance_sheet 
+                    (fiscal_period_id, month, cash_and_deposits, accounts_receivable, 
+                     inventory, other_current_assets, fixed_assets, accounts_payable,
+                     short_term_debt, long_term_debt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(fiscal_period_id, month) 
+                    DO UPDATE SET
+                        cash_and_deposits = excluded.cash_and_deposits,
+                        accounts_receivable = excluded.accounts_receivable,
+                        inventory = excluded.inventory,
+                        other_current_assets = excluded.other_current_assets,
+                        fixed_assets = excluded.fixed_assets,
+                        accounts_payable = excluded.accounts_payable,
+                        short_term_debt = excluded.short_term_debt,
+                        long_term_debt = excluded.long_term_debt
+                """, (
+                    data['fiscal_period_id'], data['month'], 
+                    data['cash_and_deposits'], data['accounts_receivable'],
+                    data['inventory'], data['other_current_assets'], 
+                    data['fixed_assets'], data['accounts_payable'],
+                    data['short_term_debt'], data['long_term_debt']
+                ))
+            
+            conn.commit()
+            sys.stderr.write(f"✅ BS保存完了: {len(month_cols)}ヶ月\n")
+            sys.stderr.flush()
+            return True
+            
+        except Exception as e:
+            sys.stderr.write(f"❌ BS保存エラー: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
+            return False
+    
+    def save_cf_to_db(self, period_id, cf_data):
+        """
+        CFデータをデータベースに保存
+        
+        Args:
+            period_id: 会計期間ID
+            cf_data: CFデータ（辞書）
+            
+        Returns:
+            bool: 成功/失敗
+        """
+        try:
+            import sqlite3
+            
+            conn = self.processor.get_connection()
+            cursor = conn.cursor()
+            
+            for month_key, cf_month in cf_data.items():
+                month = month_key.replace('月度', '月')
+                
+                # データを準備
+                operating_cf_data = cf_month.get('営業CF', {})
+                investing_cf_data = cf_month.get('投資CF', {})
+                financing_cf_data = cf_month.get('財務CF', {})
+                
+                data = {
+                    'fiscal_period_id': period_id,
+                    'month': month,
+                    'operating_cf': operating_cf_data.get('合計', 0),
+                    'profit_before_tax': operating_cf_data.get('税引前利益', 0),
+                    'depreciation': operating_cf_data.get('減価償却費', 0),
+                    'ar_change': operating_cf_data.get('売上債権の増減', 0),
+                    'inventory_change': operating_cf_data.get('棚卸資産の増減', 0),
+                    'ap_change': operating_cf_data.get('買入債務の増減', 0),
+                    'tax_paid': operating_cf_data.get('法人税の支払', 0),
+                    'investing_cf': investing_cf_data.get('合計', 0),
+                    'capex': investing_cf_data.get('固定資産の取得', 0),
+                    'financing_cf': financing_cf_data.get('合計', 0),
+                    'debt_repayment': financing_cf_data.get('借入金の返済', 0),
+                    'dividend_paid': financing_cf_data.get('配当金の支払', 0),
+                    'net_cash_change': cf_month.get('現金増減', 0),
+                    'beginning_cash': cf_month.get('期首現金', 0),
+                    'ending_cash': cf_month.get('期末現金', 0)
+                }
+                
+                # UPSERTクエリ
+                cursor.execute("""
+                    INSERT INTO cash_flow_statement 
+                    (fiscal_period_id, month, operating_cf, profit_before_tax, 
+                     depreciation, ar_change, inventory_change, ap_change, tax_paid,
+                     investing_cf, capex, financing_cf, debt_repayment, dividend_paid,
+                     net_cash_change, beginning_cash, ending_cash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(fiscal_period_id, month) 
+                    DO UPDATE SET
+                        operating_cf = excluded.operating_cf,
+                        profit_before_tax = excluded.profit_before_tax,
+                        depreciation = excluded.depreciation,
+                        ar_change = excluded.ar_change,
+                        inventory_change = excluded.inventory_change,
+                        ap_change = excluded.ap_change,
+                        tax_paid = excluded.tax_paid,
+                        investing_cf = excluded.investing_cf,
+                        capex = excluded.capex,
+                        financing_cf = excluded.financing_cf,
+                        debt_repayment = excluded.debt_repayment,
+                        dividend_paid = excluded.dividend_paid,
+                        net_cash_change = excluded.net_cash_change,
+                        beginning_cash = excluded.beginning_cash,
+                        ending_cash = excluded.ending_cash
+                """, (
+                    data['fiscal_period_id'], data['month'],
+                    data['operating_cf'], data['profit_before_tax'],
+                    data['depreciation'], data['ar_change'],
+                    data['inventory_change'], data['ap_change'], data['tax_paid'],
+                    data['investing_cf'], data['capex'],
+                    data['financing_cf'], data['debt_repayment'], data['dividend_paid'],
+                    data['net_cash_change'], data['beginning_cash'], data['ending_cash']
+                ))
+            
+            conn.commit()
+            sys.stderr.write(f"✅ CF保存完了: {len(cf_data)}ヶ月\n")
+            sys.stderr.flush()
+            return True
+            
+        except Exception as e:
+            sys.stderr.write(f"❌ CF保存エラー: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
+            return False
+    
+    def load_cf_from_db(self, period_id):
+        """
+        データベースからCFデータを読み込み
+        
+        Args:
+            period_id: 会計期間ID
+            
+        Returns:
+            dict: CFデータ
+        """
+        try:
+            import sqlite3
+            import pandas as pd
+            
+            conn = self.processor.get_connection()
+            
+            # CFデータを読み込み
+            query = """
+                SELECT * FROM cash_flow_statement 
+                WHERE fiscal_period_id = ? 
+                ORDER BY month
+            """
+            df = pd.read_sql_query(query, conn, params=(period_id,))
+            
+            if df.empty:
+                return {}
+            
+            # 辞書形式に変換
+            cf_data = {}
+            for _, row in df.iterrows():
+                month_key = row['month'] + '度'
+                cf_data[month_key] = {
+                    '営業CF': {
+                        '合計': row['operating_cf'],
+                        '税引前利益': row['profit_before_tax'],
+                        '減価償却費': row['depreciation'],
+                        '売上債権の増減': row['ar_change'],
+                        '棚卸資産の増減': row['inventory_change'],
+                        '買入債務の増減': row['ap_change'],
+                        '法人税の支払': row['tax_paid']
+                    },
+                    '投資CF': {
+                        '合計': row['investing_cf'],
+                        '固定資産の取得': row['capex']
+                    },
+                    '財務CF': {
+                        '合計': row['financing_cf'],
+                        '借入金の返済': row['debt_repayment'],
+                        '配当金の支払': row['dividend_paid']
+                    },
+                    '現金増減': row['net_cash_change'],
+                    '期首現金': row['beginning_cash'],
+                    '期末現金': row['ending_cash']
+                }
+            
+            sys.stderr.write(f"✅ CF読み込み完了: {len(cf_data)}ヶ月\n")
+            sys.stderr.flush()
+            return cf_data
+            
+        except Exception as e:
+            sys.stderr.write(f"❌ CF読み込みエラー: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
+            return {}
+    
+    def calculate_working_capital_metrics(self, bs_data, pl_data):
+        """
+        運転資本の指標を計算
+        
+        Args:
+            bs_data: BSデータ
+            pl_data: PLデータ
+            
+        Returns:
+            dict: 運転資本指標
+        """
+        try:
+            metrics = {}
+            
+            month_cols = [col for col in bs_data.columns if '月度' in str(col)]
+            
+            for month_col in month_cols:
+                month = month_col.replace('月度', '月')
+                
+                # BS項目を取得
+                def get_bs_value(item_name):
+                    row = bs_data[bs_data['勘定科目'].str.contains(item_name, na=False)]
+                    if not row.empty and month_col in row.columns:
+                        val = row[month_col].iloc[0]
+                        return float(val) if pd.notna(val) else 0
+                    return 0
+                
+                # 運転資本 = (売上債権 + 棚卸資産) - 買入債務
+                ar = get_bs_value('売掛金')
+                inventory = get_bs_value('棚卸資産合計')
+                ap = get_bs_value('買掛金')
+                working_capital = (ar + inventory) - ap
+                
+                # 売上高を取得（月次）
+                # TODO: PLデータから売上高を取得
+                sales = 150000000 / 12  # 仮の値
+                cogs = 100000000 / 12   # 仮の値
+                
+                # 回転日数
+                ar_days = (ar / sales * 30) if sales > 0 else 0
+                inventory_days = (inventory / cogs * 30) if cogs > 0 else 0
+                ap_days = (ap / cogs * 30) if cogs > 0 else 0
+                
+                # CCC（キャッシュコンバージョンサイクル）
+                ccc = ar_days + inventory_days - ap_days
+                
+                metrics[month] = {
+                    '運転資本': working_capital,
+                    '売上債権': ar,
+                    '棚卸資産': inventory,
+                    '買入債務': ap,
+                    '売上債権回転日数': ar_days,
+                    '棚卸資産回転日数': inventory_days,
+                    '買入債務回転日数': ap_days,
+                    'CCC': ccc
+                }
+            
+            return metrics
+            
+        except Exception as e:
+            sys.stderr.write(f"❌ 運転資本計算エラー: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
+            return {}
