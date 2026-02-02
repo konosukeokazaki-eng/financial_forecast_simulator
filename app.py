@@ -234,6 +234,163 @@ st.markdown("""
         color: #334155;
     }
     
+    /* マネージボード風スタイル */
+    .kpi-card {
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        color: white;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        margin-bottom: 24px;
+    }
+    
+    .kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+    }
+    
+    .kpi-card-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        opacity: 0.9;
+        margin-bottom: 12px;
+    }
+    
+    .kpi-card-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        margin-bottom: 8px;
+        line-height: 1.1;
+    }
+    
+    .kpi-card-subtitle {
+        font-size: 0.875rem;
+        opacity: 0.8;
+        margin-bottom: 12px;
+    }
+    
+    .kpi-card-trend {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        padding: 6px 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .kpi-card-decoration {
+        position: absolute;
+        right: -30px;
+        bottom: -30px;
+        width: 150px;
+        height: 150px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+    
+    .dashboard-header {
+        background: linear-gradient(90deg, #1F2937 0%, #374151 100%);
+        padding: 24px 32px;
+        border-radius: 12px;
+        margin-bottom: 32px;
+        color: white;
+    }
+    
+    .dashboard-title {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    
+    .dashboard-subtitle {
+        margin: 8px 0 0 0;
+        opacity: 0.8;
+        font-size: 0.875rem;
+    }
+    
+    .section-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        margin-bottom: 24px;
+    }
+    
+    .section-title {
+        margin: 0 0 16px 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1F2937;
+    }
+    
+    .metric-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #F3F4F6;
+    }
+    
+    .metric-row:last-child {
+        border-bottom: none;
+    }
+    
+    .metric-name {
+        font-size: 0.875rem;
+        color: #6B7280;
+        font-weight: 500;
+    }
+    
+    .metric-value {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1F2937;
+        font-variant-numeric: tabular-nums;
+    }
+    
+    .metric-change {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+    
+    .metric-up {
+        color: #10B981;
+    }
+    
+    .metric-down {
+        color: #EF4444;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .fade-in {
+        animation: fadeInUp 0.6s ease-out;
+    }
+    
+    @media (max-width: 768px) {
+        .kpi-card-value {
+            font-size: 2rem;
+        }
+        .dashboard-title {
+            font-size: 1.5rem;
+        }
+    }
+    
     /* ボタンスタイル */
     .stButton > button {
         border-radius: 6px;
@@ -940,7 +1097,15 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             st.markdown("---")
             
-            # 主要金額カード（3列）- シンプルバージョン
+            # ダッシュボードヘッダー
+            st.markdown(f"""
+            <div class="dashboard-header fade-in">
+                <h1 class="dashboard-title">📊 財務予測ダッシュボード</h1>
+                <p class="dashboard-subtitle">{st.session_state.selected_comp_name} | 第{st.session_state.selected_period_num}期 | {st.session_state.start_date} 〜 {st.session_state.end_date} | シナリオ: {st.session_state.scenario}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 主要金額カード（3列）- マネージボード風
             col1, col2, col3 = st.columns(3)
             
             # 予測・実績・前年の計算
@@ -977,29 +1142,68 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             val = ord_row[m].iloc[0]
                             ord_actual += float(val) if pd.notna(val) else 0
             
-            # カード表示（Streamlitネイティブ）
+            # 達成率計算
+            sales_achievement = (sales_actual / sales_forecast * 100) if sales_forecast != 0 else 0
+            op_achievement = (op_actual / op_forecast * 100) if op_forecast != 0 else 0
+            ord_achievement = (ord_actual / ord_forecast * 100) if ord_forecast != 0 else 0
+            
+            # KPIカード表示（マネージボード風）
             with col1:
-                st.markdown("#### 売上高")
-                st.markdown(f"**予測（通期）:** ¥{safe_int(sales_forecast):,}")
-                st.markdown(f"**実績（{st.session_state.start_date}〜{st.session_state.current_month}）:** ¥{safe_int(sales_actual):,}")
-                st.markdown("---")
+                trend_icon = "▲" if sales_achievement >= 0 else "▼"
+                st.markdown(f"""
+                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);">
+                    <div class="kpi-card-title">売上高</div>
+                    <div class="kpi-card-value">¥{safe_int(sales_forecast):,}</div>
+                    <div class="kpi-card-subtitle">通期予測</div>
+                    <div class="kpi-card-trend">
+                        <span>{trend_icon}</span>
+                        <span>実績: ¥{safe_int(sales_actual):,}</span>
+                        <span style="margin-left: 8px;">({sales_achievement:.1f}%)</span>
+                    </div>
+                    <div class="kpi-card-decoration"></div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col2:
-                st.markdown("#### 営業利益")
-                st.markdown(f"**予測（通期）:** ¥{safe_int(op_forecast):,}")
-                st.markdown(f"**実績（{st.session_state.start_date}〜{st.session_state.current_month}）:** ¥{safe_int(op_actual):,}")
-                st.markdown("---")
+                trend_icon = "▲" if op_achievement >= 0 else "▼"
+                trend_color = "#10B981" if op_forecast >= 0 else "#EF4444"
+                st.markdown(f"""
+                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #10B981 0%, #34D399 100%);">
+                    <div class="kpi-card-title">営業利益</div>
+                    <div class="kpi-card-value">¥{safe_int(op_forecast):,}</div>
+                    <div class="kpi-card-subtitle">通期予測</div>
+                    <div class="kpi-card-trend">
+                        <span>{trend_icon}</span>
+                        <span>実績: ¥{safe_int(op_actual):,}</span>
+                        <span style="margin-left: 8px;">({op_achievement:.1f}%)</span>
+                    </div>
+                    <div class="kpi-card-decoration"></div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col3:
-                st.markdown("#### 経常利益")
-                st.markdown(f"**予測（通期）:** ¥{safe_int(ord_forecast):,}")
-                st.markdown(f"**実績（{st.session_state.start_date}〜{st.session_state.current_month}）:** ¥{safe_int(ord_actual):,}")
-                st.markdown("---")
+                trend_icon = "▲" if ord_achievement >= 0 else "▼"
+                trend_color = "#10B981" if ord_forecast >= 0 else "#EF4444"
+                st.markdown(f"""
+                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);">
+                    <div class="kpi-card-title">経常利益</div>
+                    <div class="kpi-card-value">¥{safe_int(ord_forecast):,}</div>
+                    <div class="kpi-card-subtitle">通期予測</div>
+                    <div class="kpi-card-trend">
+                        <span>{trend_icon}</span>
+                        <span>実績: ¥{safe_int(ord_actual):,}</span>
+                        <span style="margin-left: 8px;">({ord_achievement:.1f}%)</span>
+                    </div>
+                    <div class="kpi-card-decoration"></div>
+                </div>
+                """, unsafe_allow_html=True)
             
-            st.markdown("---")
+            # スペース
+            st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
             
             # 月次推移グラフ（Manageboard風）
-            st.markdown("### 月次推移")
+            st.markdown('<div class="section-card fade-in">', unsafe_allow_html=True)
+            st.markdown('<h3 class="section-title">📈 月次推移</h3>', unsafe_allow_html=True)
             
             # 実績と予測を分ける
             actual_months_list = [m for m in months if m <= st.session_state.current_month]
@@ -1053,73 +1257,83 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     secondary_y=False
                 )
                 
-                # 予測（明るいシアン）
+                # 予測（明るいシアン + グラデーション効果）
                 fig.add_trace(
                     go.Bar(
                         x=forecast_months_list,
                         y=sales_forecast_data,
                         name="売上高（予測）",
-                        marker_color='#60a5fa',
-                        opacity=0.8,
+                        marker=dict(
+                            color='#60a5fa',
+                            line=dict(color='#3b82f6', width=0)
+                        ),
+                        opacity=0.7,
                         hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
                     ),
                     secondary_y=False
                 )
                 
-                # 営業利益（鮮やかなオレンジ）
+                # 営業利益（太い線 + 丸いマーカー）
                 fig.add_trace(
                     go.Scatter(
                         x=months,
                         y=op_data,
                         name="営業利益",
-                        line=dict(color='#ea580c', width=4),
+                        line=dict(color='#10B981', width=4),
                         mode='lines+markers',
-                        marker=dict(size=8, color='#ea580c'),
+                        marker=dict(
+                            size=10,
+                            color='#10B981',
+                            line=dict(color='white', width=2)
+                        ),
                         hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
                     ),
                     secondary_y=True
                 )
                 
-                # レイアウト - テキストを濃く、軸にカンマ区切り
+                # レイアウト - マネージボード風
                 fig.update_layout(
                     template='plotly_white',
-                    paper_bgcolor='#fafbfc',
-                    plot_bgcolor='#ffffff',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
                     font=dict(
-                        family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                        family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                         size=13,
-                        color='#1e293b'
+                        color='#1F2937'
                     ),
                     xaxis=dict(
-                        title="月",
-                        title_font=dict(size=14, color='#0f172a'),
-                        gridcolor='#e2e8f0',
-                        linecolor='#cbd5e1',
-                        tickfont=dict(color='#334155', size=12)
+                        title="",
+                        showgrid=False,
+                        showline=True,
+                        linewidth=1,
+                        linecolor='#E5E7EB',
+                        tickfont=dict(color='#6B7280', size=12)
                     ),
                     yaxis=dict(
-                        title="売上高（円）",
-                        title_font=dict(size=14, color='#0f172a'),
-                        gridcolor='#e2e8f0',
-                        linecolor='#cbd5e1',
-                        tickfont=dict(color='#334155', size=12),
-                        tickformat=',.0f'  # カンマ区切り
+                        title="売上高",
+                        title_font=dict(size=14, color='#374151', weight=600),
+                        showgrid=True,
+                        gridwidth=1,
+                        gridcolor='#F3F4F6',
+                        showline=False,
+                        tickfont=dict(color='#6B7280', size=12),
+                        tickformat=',.0f'
                     ),
                     yaxis2=dict(
-                        title="営業利益（円）",
-                        title_font=dict(size=14, color='#0f172a'),
+                        title="営業利益",
+                        title_font=dict(size=14, color='#374151', weight=600),
                         overlaying='y',
                         side='right',
-                        gridcolor='#e2e8f0',
-                        linecolor='#cbd5e1',
-                        tickfont=dict(color='#334155', size=12),
-                        tickformat=',.0f'  # カンマ区切り
+                        showgrid=False,
+                        showline=False,
+                        tickfont=dict(color='#6B7280', size=12),
+                        tickformat=',.0f'
                     ),
                     legend=dict(
-                        bgcolor='rgba(255,255,255,0.95)',
-                        bordercolor='#cbd5e1',
+                        bgcolor='rgba(255, 255, 255, 0.8)',
+                        bordercolor='#E5E7EB',
                         borderwidth=1,
-                        font=dict(size=12, color='#1e293b'),
+                        font=dict(size=12, color='#1F2937'),
                         orientation="h",
                         yanchor="bottom",
                         y=1.02,
@@ -1128,12 +1342,16 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     ),
                     hovermode='x unified',
                     height=450,
-                    barmode='group'
+                    barmode='group',
+                    margin=dict(l=20, r=20, t=40, b=20)
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
             
-            st.markdown("---")
+            st.markdown('</div>', unsafe_allow_html=True)  # section-card終了
+            
+            # スペース
+            st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
             
             # ワンクリック着地予測ボタン
             col1, col2 = st.columns([1, 3])
