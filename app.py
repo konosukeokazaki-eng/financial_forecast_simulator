@@ -2429,14 +2429,11 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             # ===== タブ1: 実績データインポート =====
             with tab1:
-                st.markdown("""
-                <div class="info-box">
-                    <strong>💡 使い方:</strong> 弥生会計からエクスポートしたExcelファイルをアップロードしてください。
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown("### Excelファイルから実績データを取り込む")
+                st.caption("弥生会計からエクスポートしたExcelファイルをアップロード")
                 
                 uploaded_file = st.file_uploader(
-                    "Excelファイルを選択（実績データ）",
+                    "Excelファイルを選択",
                     type=['xlsx', 'xls'],
                     help="弥生会計の月次推移表をアップロードしてください",
                     key="actual_upload"
@@ -2450,74 +2447,130 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         del st.session_state.show_import_button
                 
                 if uploaded_file:
+                    # ファイル読み込み（キャッシュ）
                     if 'imported_df' not in st.session_state:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
-                            tmp_file.write(uploaded_file.read())
-                            temp_path = tmp_file.name
-                            st.session_state.temp_path_to_delete = temp_path
+                        with st.spinner("📂 ファイルを読み込んでいます..."):
+                            try:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
+                                    tmp_file.write(uploaded_file.read())
+                                    temp_path = tmp_file.name
+                                
+                                # プレビュー読み込み（軽量処理）
+                                imported_df, info = processor.import_yayoi_excel(
+                                    temp_path, 
+                                    st.session_state.selected_period_id,
+                                    preview_only=True
+                                )
+                                
+                                # 一時ファイル削除
+                                if os.path.exists(temp_path):
+                                    os.unlink(temp_path)
+                                
+                                if imported_df is not None and not imported_df.empty:
+                                    st.session_state.imported_df = imported_df
+                                    st.session_state.show_import_button = True
+                                    st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
+                                else:
+                                    st.error("❌ ファイルの読み込みに失敗しました")
                             
-                        st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
-                        
-                        # fiscal_period_idを渡す
-                        st.session_state.imported_df, info = processor.import_yayoi_excel(
-                            temp_path, 
-                            st.session_state.selected_period_id,
-                            preview_only=True
-                        )
-                        st.session_state.show_import_button = True
-                        
-                        # 一時ファイルを削除
-                        if os.path.exists(temp_path):
-                            os.unlink(temp_path)
+                            except Exception as e:
+                                st.error(f"❌ エラー: {str(e)}")
+                                if 'imported_df' in st.session_state:
+                                    del st.session_state.imported_df
                         
                     if st.session_state.get('show_import_button'):
-                        st.subheader("📋 インポートデータ プレビュー（直接編集可能）")
+                        st.markdown("---")
+                        st.markdown("### 📋 データプレビュー")
                         
-                        st.markdown("""
-                        <div class="info-box">
-                            <strong>✏️ 編集:</strong> セルをダブルクリックして値を直接修正できます。
-                        </div>
-                        """, unsafe_allow_html=True)
+                        # データサマリー
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("項目数", len(st.session_state.imported_df))
+                        with col2:
+                            months = [c for c in st.session_state.imported_df.columns if c != '項目名']
+                            st.metric("月数", len(months))
+                        with col3:
+                            non_zero = (st.session_state.imported_df[months] != 0).sum().sum()
+                            st.metric("データ数", non_zero)
                         
-                        # 編集可能なデータエディタを使用
-                        edited_df = st.data_editor(
-                            st.session_state.imported_df,
-                            width="stretch",
-                            height=400,
-                            num_rows="fixed",  # 行の追加・削除は不可
-                            disabled=["項目名"],  # 項目名列は編集不可
-                            column_config={
-                                col: st.column_config.NumberColumn(
-                                    format="¥%d",
-                                    min_value=-999999999,
-                                    max_value=999999999
-                                ) for col in st.session_state.imported_df.columns if col != '項目名'
-                            }
-                        )
-                        
-                        # 編集後のデータを保存
-                        st.session_state.imported_df = edited_df
-                        
-                        st.markdown("""
-                        <div class="warning-box">
-                            <strong>⚠️ 注意:</strong> 上記の内容でインポートを実行すると、現在の実績データは上書きされます。
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        if st.button("✅ 上記内容でインポートを実行", type="primary", key="import_actual"):
-                            success, info = processor.save_extracted_data(
-                                st.session_state.selected_period_id,
-                                st.session_state.imported_df
+                        # プレビュー表示（編集可能）
+                        with st.expander("📊 データを確認・編集", expanded=True):
+                            edited_df = st.data_editor(
+                                st.session_state.imported_df,
+                                use_container_width=True,
+                                height=400,
+                                num_rows="fixed",
+                                disabled=["項目名"],
+                                column_config={
+                                    col: st.column_config.NumberColumn(
+                                        format="¥%d",
+                                        min_value=-999999999,
+                                        max_value=999999999
+                                    ) for col in st.session_state.imported_df.columns if col != '項目名'
+                                },
+                                key="actual_editor"
                             )
-                            if success:
-                                st.success("✅ インポートが完了しました！")
-                                # キャッシュクリア
-                                for key in ['actuals_df', 'imported_df', 'show_import_button']:
+                            
+                            # 編集を保存
+                            st.session_state.imported_df = edited_df
+                        
+                        st.markdown("---")
+                        
+                        # 警告
+                        st.warning("⚠️ インポートを実行すると、現在の実績データは上書きされます。")
+                        
+                        # インポートボタン
+                        col1, col2 = st.columns([1, 3])
+                        with col1:
+                            if st.button("✅ インポート実行", type="primary", use_container_width=True):
+                                # プログレスバー付きで保存
+                                progress_bar = st.progress(0)
+                                status_text = st.empty()
+                                
+                                try:
+                                    status_text.text("💾 データベースに保存中...")
+                                    progress_bar.progress(30)
+                                    
+                                    # 保存処理
+                                    success, info = processor.save_extracted_data(
+                                        st.session_state.selected_period_id,
+                                        st.session_state.imported_df
+                                    )
+                                    
+                                    progress_bar.progress(80)
+                                    
+                                    if success:
+                                        progress_bar.progress(100)
+                                        status_text.text("✅ 完了")
+                                        st.success("✅ インポートが完了しました！")
+                                        
+                                        # キャッシュクリア
+                                        for key in ['actuals_df', 'imported_df', 'show_import_button', 'pl_df', 'forecast_data_cache']:
+                                            if key in st.session_state:
+                                                del st.session_state[key]
+                                        
+                                        st.cache_data.clear()
+                                        
+                                        # 3秒後にリロード
+                                        import time
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        progress_bar.empty()
+                                        status_text.empty()
+                                        st.error(f"❌ インポートに失敗しました: {info}")
+                                
+                                except Exception as e:
+                                    progress_bar.empty()
+                                    status_text.empty()
+                                    st.error(f"❌ エラーが発生しました: {str(e)}")
+                        
+                        with col2:
+                            if st.button("🔄 キャンセル", use_container_width=True):
+                                for key in ['imported_df', 'show_import_button']:
                                     if key in st.session_state:
                                         del st.session_state[key]
                                 st.rerun()
-                            else:
-                                st.error(f"❌ インポートに失敗しました: {info}")
             
             # ===== タブ2: 予測データインポート =====
             with tab2:
