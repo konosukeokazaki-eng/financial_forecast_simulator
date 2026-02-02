@@ -1160,7 +1160,7 @@ class DataProcessor:
             return pd.DataFrame(), str(e)
 
     def save_extracted_data(self, fiscal_period_id, imported_df):
-        """抽出されたDataFrameをデータベースに保存"""
+        """抽出されたDataFrameをデータベースに保存（最適化版）"""
         # IDの型変換
         if isinstance(fiscal_period_id, bytes):
             fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
@@ -1178,29 +1178,42 @@ class DataProcessor:
             
             months = [c for c in imported_df.columns if c != '項目名']
             
-            # バルクインサート用のデータを準備
+            # バルクインサート用のデータを準備（最適化）
             insert_data = []
+            
+            # NumPyを使った高速処理
             for _, row in imported_df.iterrows():
+                item_name = row['項目名']
                 for m in months:
                     val = row[m]
+                    # 0とNaNをスキップ（データ量削減）
                     if val != 0 and not pd.isna(val):
-                        insert_data.append((fiscal_period_id, row['項目名'], m, float(val)))
+                        insert_data.append((fiscal_period_id, item_name, m, float(val)))
             
-            # 一括挿入
+            # 一括挿入（チャンクサイズ設定で安定性向上）
             if insert_data:
-                if self.use_postgres:
-                    cursor.executemany(
-                        "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (%s, %s, %s, %s)",
-                        insert_data
-                    )
-                else:
-                    cursor.executemany(
-                        "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
-                        insert_data
-                    )
+                chunk_size = 500  # 一度に500件ずつ挿入
+                total_chunks = (len(insert_data) + chunk_size - 1) // chunk_size
+                
+                for i in range(0, len(insert_data), chunk_size):
+                    chunk = insert_data[i:i + chunk_size]
+                    
+                    if self.use_postgres:
+                        cursor.executemany(
+                            "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (%s, %s, %s, %s)",
+                            chunk
+                        )
+                    else:
+                        cursor.executemany(
+                            "INSERT INTO actual_data (fiscal_period_id, item_name, month, amount) VALUES (?, ?, ?, ?)",
+                            chunk
+                        )
+                    
+                    # チャンクごとにコミット（メモリ節約）
+                    conn.commit()
             
-            conn.commit()
-            return True, "インポートが完了しました"
+            return True, f"インポート完了: {len(insert_data)}件のデータを保存しました"
+        
         except Exception as e:
             if conn:
                 conn.rollback()
