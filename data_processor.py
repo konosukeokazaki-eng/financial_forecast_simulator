@@ -1035,7 +1035,7 @@ class DataProcessor:
             return False, str(e)
 
     def import_yayoi_excel(self, file_path, fiscal_period_id, preview_only=True):
-        """弥生会計のExcelからデータを抽出"""
+        """弥生会計のExcelからデータを抽出（最適化版）"""
         try:
             # IDの型変換
             if isinstance(fiscal_period_id, bytes):
@@ -1062,25 +1062,35 @@ class DataProcessor:
             fiscal_start_month = start_date.month
             fiscal_start_year = start_date.year
             
-            xls = pd.ExcelFile(file_path)
+            # Excelファイルを開く（openpyxlを使用して高速化）
+            xls = pd.ExcelFile(file_path, engine='openpyxl')
             imported_data = {item: {} for item in self.all_items}
             
-            for sheet_name in xls.sheet_names:
-                df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+            # エイリアスの逆引きマップを事前に作成（高速化）
+            alias_to_item = {}
+            for std_name, aliases in self.item_mapping.items():
+                for alias in aliases:
+                    alias_to_item[alias] = std_name
+            
+            # シート数の制限（最初の3シートのみ処理）
+            sheet_names = xls.sheet_names[:3] if len(xls.sheet_names) > 3 else xls.sheet_names
+            
+            for sheet_name in sheet_names:
+                # ヘッダー行のみ先に読み込んで月列を特定（高速化）
+                df_header = pd.read_excel(xls, sheet_name=sheet_name, header=None, nrows=20)
                 
                 month_cols = {}
                 
-                # 月の列を特定
-                for r in range(min(20, len(df))):
-                    for c in range(len(df.columns)):
-                        val = str(df.iloc[r, c])
-                        # 月のパターンを検出 (例: "8月度", "9月度")
+                # 月の列を特定（最適化）
+                for r in range(len(df_header)):
+                    for c in range(min(50, len(df_header.columns))):  # 列数を制限
+                        val = str(df_header.iloc[r, c])
+                        # 月のパターンを検出
                         match = re.search(r'(\d{1,2})月', val)
                         if match:
                             month_num = int(match.group(1))
                             
-                            # 会計年度に基づいて年を決定
-                            # 開始月以降は当年、開始月より前は翌年
+                            # 年を決定
                             if month_num >= fiscal_start_month:
                                 year = fiscal_start_year
                             else:
@@ -1088,7 +1098,7 @@ class DataProcessor:
                             
                             month_str = f"{year}-{month_num:02d}"
                             
-                            # 会計期間内の月のみを対象とする
+                            # 会計期間内の月のみ
                             month_dt = datetime.strptime(month_str + "-01", '%Y-%m-%d')
                             if start_date <= month_dt <= end_date:
                                 month_cols[month_str] = c
@@ -1096,8 +1106,15 @@ class DataProcessor:
                 if not month_cols:
                     continue
                 
-                # 項目の行を特定して数値を抽出
+                # 全データ読み込み（一度だけ）
+                df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+                
+                # 項目名列を特定（最初の3列のみ）
+                item_col = df.iloc[:, :3]
+                
+                # 行ごとに処理
                 for r in range(len(df)):
+                    # 項目名を取得
                     item_val = ""
                     for c in range(min(3, len(df.columns))):
                         v = str(df.iloc[r, c]).strip()
@@ -1108,51 +1125,64 @@ class DataProcessor:
                     if not item_val:
                         continue
                     
+                    # 標準項目名を特定（最適化）
                     target_item = None
-                    for std_name, aliases in self.item_mapping.items():
-                        if any(alias in item_val for alias in aliases):
-                            target_item = std_name
-                            break
                     
-                    if not target_item and item_val in self.all_items:
+                    # 直接一致チェック
+                    if item_val in self.all_items:
                         target_item = item_val
+                    else:
+                        # エイリアスチェック（高速化）
+                        for alias, std_name in alias_to_item.items():
+                            if alias in item_val:
+                                target_item = std_name
+                                break
                     
                     if target_item:
+                        # 月別データを取得（ベクトル演算で高速化）
                         for m, col_idx in month_cols.items():
-                            raw_val = df.iloc[r, col_idx]
-                            try:
-                                if isinstance(raw_val, str):
-                                    clean_val = raw_val.replace(',', '').replace('¥', '').replace('円', '').strip()
-                                    if clean_val.startswith('△') or clean_val.startswith('▲'):
-                                        val = -float(clean_val[1:])
-                                    elif clean_val.startswith('(') and clean_val.endswith(')'):
-                                        val = -float(clean_val[1:-1])
+                            if col_idx < len(df.columns):
+                                raw_val = df.iloc[r, col_idx]
+                                try:
+                                    if pd.isna(raw_val):
+                                        continue
+                                    
+                                    if isinstance(raw_val, (int, float)):
+                                        val = float(raw_val)
                                     else:
-                                        val = float(clean_val)
-                                else:
-                                    val = float(raw_val)
-                                
-                                if not np.isnan(val):
-                                    imported_data[target_item][m] = val
-                            except:
-                                pass
+                                        clean_val = str(raw_val).replace(',', '').replace('¥', '').replace('円', '').strip()
+                                        if clean_val.startswith('△') or clean_val.startswith('▲'):
+                                            val = -float(clean_val[1:])
+                                        elif clean_val.startswith('(') and clean_val.endswith(')'):
+                                            val = -float(clean_val[1:-1])
+                                        else:
+                                            val = float(clean_val)
+                                    
+                                    if not np.isnan(val) and val != 0:
+                                        imported_data[target_item][m] = val
+                                except:
+                                    pass
             
-            # DataFrameに変換
-            imported_df = pd.DataFrame.from_dict(imported_data, orient='index').reset_index().rename(columns={'index': '項目名'})
+            # DataFrameに変換（高速化）
+            result_data = []
+            for item in self.all_items:
+                row = {'項目名': item}
+                row.update(imported_data[item])
+                result_data.append(row)
+            
+            imported_df = pd.DataFrame(result_data)
             
             # 月列を取得してソート
             month_cols = [c for c in imported_df.columns if c != '項目名']
             if month_cols:
-                # YYYY-MM形式の月をソート
                 try:
                     month_cols_sorted = sorted(month_cols, key=lambda x: pd.to_datetime(x + '-01'))
                     imported_df = imported_df[['項目名'] + month_cols_sorted]
                 except:
-                    pass  # ソート失敗時はそのまま
+                    pass
             
-            # 項目名でソート
-            imported_df['項目名'] = pd.Categorical(imported_df['項目名'], categories=self.all_items, ordered=True)
-            imported_df = imported_df.sort_values('項目名').reset_index(drop=True)
+            # 欠損値を0で埋める
+            imported_df = imported_df.fillna(0)
             
             return imported_df, "データ抽出に成功しました"
 
