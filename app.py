@@ -1126,21 +1126,148 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             st.markdown("---")
             
-            # 主要指標（Manageboard風）
-            st.markdown("### 主要指標")
+            # ワンクリック着地予測ボタン
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                show_forecast = st.button("▶ 着地予測を表示", type="primary", use_container_width=True)
+            
+            if show_forecast or st.session_state.get('show_forecast_detail', False):
+                st.session_state.show_forecast_detail = True
+                
+                with st.container():
+                    st.markdown("### 📊 通期着地予測")
+                    
+                    # 達成率の計算（仮の目標値）
+                    # TODO: 実際の目標値をデータベースから取得
+                    target_sales = sales_forecast * 0.98  # 仮の目標（予測の98%）
+                    achievement_rate = (sales_forecast / target_sales * 100) if target_sales != 0 else 0
+                    
+                    # 予測 vs 計画
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        plan_diff = 2.0  # 仮の計画比（％）
+                        st.metric(
+                            "売上高（通期）",
+                            f"¥{safe_int(sales_forecast):,}",
+                            delta=f"{plan_diff:+.1f}% vs 計画"
+                        )
+                    
+                    with col2:
+                        plan_diff_op = 5.0  # 仮の計画比
+                        st.metric(
+                            "営業利益（通期）",
+                            f"¥{safe_int(op_forecast):,}",
+                            delta=f"{plan_diff_op:+.1f}% vs 計画"
+                        )
+                    
+                    with col3:
+                        plan_diff_ord = 3.0  # 仮の計画比
+                        st.metric(
+                            "経常利益（通期）",
+                            f"¥{safe_int(ord_forecast):,}",
+                            delta=f"{plan_diff_ord:+.1f}% vs 計画"
+                        )
+                    
+                    # 達成率
+                    st.markdown("---")
+                    st.markdown("#### 🎯 目標達成状況")
+                    
+                    col1, col2 = st.columns([2, 1])
+                    with col1:
+                        st.progress(min(achievement_rate / 100, 1.0))
+                    with col2:
+                        achievement_color = "🟢" if achievement_rate >= 100 else "🟡" if achievement_rate >= 90 else "🔴"
+                        st.markdown(f"### {achievement_color} {achievement_rate:.1f}%")
+                    
+                    st.caption(f"目標売上: ¥{safe_int(target_sales):,}")
+            
+            st.markdown("---")
+            
+            # 主要指標（ドリルダウン対応）
+            st.markdown("### 主要指標（クリックで詳細表示）")
             
             col1, col2, col3 = st.columns(3)
             
-            gp_rate = ((sales_forecast - pl_display[pl_display['項目名'] == '売上原価']['合計'].iloc[0]) / sales_forecast * 100) if sales_forecast != 0 else 0
+            gp_total = pl_display[pl_display['項目名'] == '売上総損益金額']['合計'].iloc[0] if not pl_display.empty else 0
+            cogs_total = pl_display[pl_display['項目名'] == '売上原価']['合計'].iloc[0] if not pl_display.empty else 0
+            
+            gp_rate = ((sales_forecast - cogs_total) / sales_forecast * 100) if sales_forecast != 0 else 0
             op_rate = (op_forecast / sales_forecast * 100) if sales_forecast != 0 else 0
             ord_rate = (ord_forecast / sales_forecast * 100) if sales_forecast != 0 else 0
             
             with col1:
-                st.metric("粗利率", f"{gp_rate:.1f}%")
+                if st.button(f"粗利率: {gp_rate:.1f}%", use_container_width=True, key="drill_gp"):
+                    st.session_state.drill_item = "粗利率"
             with col2:
-                st.metric("営業利益率", f"{op_rate:.1f}%")
+                if st.button(f"営業利益率: {op_rate:.1f}%", use_container_width=True, key="drill_op"):
+                    st.session_state.drill_item = "営業利益率"
             with col3:
-                st.metric("経常利益率", f"{ord_rate:.1f}%")
+                if st.button(f"経常利益率: {ord_rate:.1f}%", use_container_width=True, key="drill_ord"):
+                    st.session_state.drill_item = "経常利益率"
+            
+            # ドリルダウン表示
+            if 'drill_item' in st.session_state and st.session_state.drill_item:
+                with st.expander(f"📊 {st.session_state.drill_item}の詳細", expanded=True):
+                    if st.session_state.drill_item == "粗利率":
+                        st.markdown(f"""
+                        **計算式:**  
+                        粗利率 = (売上高 - 売上原価) ÷ 売上高  
+                        = (¥{safe_int(sales_forecast):,} - ¥{safe_int(cogs_total):,}) ÷ ¥{safe_int(sales_forecast):,}  
+                        = **{gp_rate:.1f}%**
+                        
+                        **内訳:**
+                        - 売上高: ¥{safe_int(sales_forecast):,}
+                        - 売上原価: ¥{safe_int(cogs_total):,}
+                        - 売上総利益: ¥{safe_int(gp_total):,}
+                        """)
+                        
+                        # 補助科目があれば表示
+                        if not sub_accounts_df.empty:
+                            sales_subs = sub_accounts_df[sub_accounts_df['parent_item'] == '売上高']
+                            if not sales_subs.empty:
+                                st.markdown("**売上高の内訳:**")
+                                sub_summary = sales_subs.groupby('sub_account_name')['amount'].sum().reset_index()
+                                sub_summary['構成比'] = (sub_summary['amount'] / sub_summary['amount'].sum() * 100).round(1)
+                                
+                                for _, row in sub_summary.iterrows():
+                                    st.markdown(f"- {row['sub_account_name']}: ¥{safe_int(row['amount']):,} ({row['構成比']}%)")
+                    
+                    elif st.session_state.drill_item == "営業利益率":
+                        ga_total = pl_display[pl_display['項目名'] == '販売管理費計']['合計'].iloc[0] if not pl_display.empty else 0
+                        
+                        st.markdown(f"""
+                        **計算式:**  
+                        営業利益率 = 営業利益 ÷ 売上高  
+                        = ¥{safe_int(op_forecast):,} ÷ ¥{safe_int(sales_forecast):,}  
+                        = **{op_rate:.1f}%**
+                        
+                        **内訳:**
+                        - 売上総利益: ¥{safe_int(gp_total):,} ({gp_rate:.1f}%)
+                        - 販売管理費: ¥{safe_int(ga_total):,} ({ga_total/sales_forecast*100:.1f}%)
+                        - 営業利益: ¥{safe_int(op_forecast):,} ({op_rate:.1f}%)
+                        """)
+                    
+                    elif st.session_state.drill_item == "経常利益率":
+                        non_op_inc = pl_display[pl_display['項目名'] == '営業外収益合計']['合計'].iloc[0] if not pl_display.empty else 0
+                        non_op_exp = pl_display[pl_display['項目名'] == '営業外費用合計']['合計'].iloc[0] if not pl_display.empty else 0
+                        
+                        st.markdown(f"""
+                        **計算式:**  
+                        経常利益率 = 経常利益 ÷ 売上高  
+                        = ¥{safe_int(ord_forecast):,} ÷ ¥{safe_int(sales_forecast):,}  
+                        = **{ord_rate:.1f}%**
+                        
+                        **内訳:**
+                        - 営業利益: ¥{safe_int(op_forecast):,}
+                        - 営業外収益: ¥{safe_int(non_op_inc):,}
+                        - 営業外費用: ¥{safe_int(non_op_exp):,}
+                        - 経常利益: ¥{safe_int(ord_forecast):,}
+                        """)
+                    
+                    if st.button("閉じる", key="close_drill"):
+                        st.session_state.drill_item = None
+                        st.rerun()
 
         elif st.session_state.page == "損益計算書 (PL)":
             st.title("損益計算書 (PL)")
