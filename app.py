@@ -1368,14 +1368,19 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 values
                             )
                             if success:
-                                st.success(f"✅ {selected_item}に全月¥{bulk_amount:,}を設定しました")
-                                # キャッシュクリア
-                                for key in ['forecasts_df', 'forecast_data_cache', 'pl_df']:
+                                st.success(f"✅ {selected_item}に全月{bulk_amount:,}千円を設定しました")
+                                # キャッシュを完全にクリア
+                                st.cache_data.clear()
+                                for key in ['forecasts_df', 'forecast_data_cache', 'pl_df', 'sub_accounts_df', 
+                                           'actuals_df', 'sub_account_aggregation_cache', 'forecast_input_cache_key',
+                                           'forecast_input_data']:
                                     if key in st.session_state:
                                         del st.session_state[key]
                                 st.rerun()
                             else:
                                 st.error(f"❌ {msg}")
+                        else:
+                            st.warning("⚠️ 金額を入力してください")
                 
                 st.markdown("---")
                 
@@ -1397,8 +1402,21 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             st.markdown("---")
             
-            # 予測データと補助科目データを取得
-            forecast_data = forecasts_df.copy()
+            # 予測データと補助科目データを取得（現在のシナリオ）
+            # キャッシュをチェックして、なければ再読み込み
+            cache_key = (st.session_state.selected_period_id, st.session_state.scenario)
+            if 'forecast_input_cache_key' not in st.session_state or st.session_state.forecast_input_cache_key != cache_key:
+                # 最新データを読み込み
+                forecast_data = load_forecast_data_cached(
+                    st.session_state.selected_period_id,
+                    st.session_state.scenario,
+                    processor
+                )
+                st.session_state.forecast_input_cache_key = cache_key
+                st.session_state.forecast_input_data = forecast_data
+            else:
+                forecast_data = st.session_state.forecast_input_data.copy()
+            
             sub_accounts_data = load_sub_accounts_cached(
                 st.session_state.selected_period_id,
                 st.session_state.scenario,
@@ -1589,12 +1607,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.success(f"✅ {success_count}件のデータを保存しました")
                             # キャッシュクリア
                             st.cache_data.clear()
-                            if 'forecasts_df' in st.session_state:
-                                del st.session_state.forecasts_df
-                            if 'sub_accounts_df' in st.session_state:
-                                del st.session_state.sub_accounts_df
-                            if 'pl_df' in st.session_state:
-                                del st.session_state.pl_df
+                            for key in ['forecasts_df', 'sub_accounts_df', 'pl_df', 'forecast_input_cache_key', 'forecast_input_data']:
+                                if key in st.session_state:
+                                    del st.session_state[key]
                             st.rerun()
                         else:
                             st.warning(f"⚠️ {success_count}件成功、{error_count}件失敗")
