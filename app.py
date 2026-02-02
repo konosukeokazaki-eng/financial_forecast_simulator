@@ -2030,9 +2030,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         ],
                         "評価": [
                             "良好" if contribution_margin_ratio > 40 else "要改善",
-                            "良好" if (breakeven_sales / total_sales * 100) < 80 else "要改善",
+                            "良好" if (total_sales > 0 and (breakeven_sales / total_sales * 100) < 80) else ("要改善" if total_sales > 0 else "-"),
                             "良好" if safety_margin_ratio > 20 else "要注意",
-                            "良好" if (contribution_margin / total_fc * 100) > 120 else "要改善"
+                            "良好" if (total_fc > 0 and (contribution_margin / total_fc * 100) > 120) else ("要改善" if total_fc > 0 else "-")
                         ]
                     }
                     
