@@ -2724,12 +2724,23 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 if forecast_file:
                     if 'forecast_imported_df' not in st.session_state:
                         try:
-                            # Excelファイルを読み込み
-                            forecast_df = pd.read_excel(forecast_file)
+                            # Excelファイルを読み込み（シート名を指定）
+                            try:
+                                # まず「予測データ」シートを試す
+                                forecast_df = pd.read_excel(forecast_file, sheet_name='予測データ')
+                            except:
+                                # 失敗したら最初のシートを読み込む
+                                forecast_df = pd.read_excel(forecast_file, sheet_name=0)
                             
                             # 基本的なバリデーション
                             if '項目名' not in forecast_df.columns:
                                 st.error("❌ テンプレート形式が正しくありません。「項目名」列が見つかりません。")
+                                st.info("""
+                                💡 **確認事項:**
+                                - テンプレートファイルを使用していますか？
+                                - 「項目名」列を削除していませんか？
+                                - シート名は「予測データ」ですか？
+                                """)
                             else:
                                 st.success(f"✅ ファイル **{forecast_file.name}** を読み込みました")
                                 st.session_state.forecast_imported_df = forecast_df
@@ -2737,6 +2748,12 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         
                         except Exception as e:
                             st.error(f"❌ ファイルの読み込みに失敗しました: {str(e)}")
+                            st.info("""
+                            💡 **よくある原因:**
+                            - ファイルが破損している
+                            - Excel形式ではない
+                            - テンプレート形式と異なる
+                            """)
                     
                     if st.session_state.get('show_forecast_import_button'):
                         st.subheader("📋 インポートデータ プレビュー（直接編集可能）")
