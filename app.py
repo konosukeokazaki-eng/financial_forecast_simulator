@@ -1479,18 +1479,18 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             month_cols = [m for m in months if m in edit_df.columns]
             edit_df['合計'] = edit_df[month_cols].sum(axis=1)
             
-            # カラム設定
+            # カラム設定（カンマ区切り）
             column_config = {
                 "項目名": st.column_config.TextColumn("項目名", width="large", disabled=True),
                 "タイプ": st.column_config.TextColumn("タイプ", width="small", disabled=True),
                 "親項目": None,  # 非表示
-                "合計": st.column_config.NumberColumn("合計", format="¥%.0f", disabled=True, width="medium")
+                "合計": st.column_config.NumberColumn("合計", format="¥%,.0f", disabled=True, width="medium")
             }
             
             for month in month_cols:
                 column_config[month] = st.column_config.NumberColumn(
                     month,
-                    format="¥%.0f",
+                    format="¥%,.0f",  # カンマ区切り追加
                     width="small",
                     help=f"{month}の予測値"
                 )
@@ -2558,7 +2558,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 disabled=["項目名"],
                                 column_config={
                                     col: st.column_config.NumberColumn(
-                                        format="¥%d",
+                                        format="¥%,.0f",  # カンマ区切り追加
                                         min_value=-999999999,
                                         max_value=999999999
                                     ) for col in st.session_state.imported_df.columns if col != '項目名'
