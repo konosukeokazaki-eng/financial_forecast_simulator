@@ -294,24 +294,28 @@ st.markdown("""
         background-color: transparent !important;
     }
     
-    /* サイドバーのボタン */
+    /* サイドバーのボタン - 見やすく改善 */
     [data-testid="stSidebar"] .stButton > button {
         width: 100%;
         text-align: left;
-        padding: 0.625rem 1rem;
-        margin-bottom: 0.25rem;
-        background-color: transparent !important;
-        border: none;
-        color: #334155 !important;
-        font-weight: 500;
-        font-size: 0.875rem;
-        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        background-color: #ffffff !important;  /* 白背景で目立たせる */
+        border: 1px solid #cbd5e1 !important;  /* 枠線を追加 */
+        color: #1e293b !important;
+        font-weight: 600;  /* 太字に */
+        font-size: 0.9rem;  /* 少し大きく */
+        border-radius: 8px;  /* 角丸を大きく */
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);  /* 軽い影 */
+        transition: all 0.2s ease;
     }
     
     [data-testid="stSidebar"] .stButton > button:hover {
-        background-color: #e2e8f0 !important;
-        transform: none;
-        box-shadow: none;
+        background-color: #3b82f6 !important;  /* ホバー時は青 */
+        color: #ffffff !important;  /* ホバー時は白文字 */
+        border-color: #3b82f6 !important;
+        transform: translateX(4px);  /* 右に少し移動 */
+        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);  /* 青い影 */
     }
     
     /* セレクトボックスの文字色 */
