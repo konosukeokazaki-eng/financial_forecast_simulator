@@ -1407,36 +1407,65 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             table_rows = []
             
             for item in editable_items:
-                # 基本項目の行
-                item_row = {"項目名": item, "タイプ": "基本", "親項目": item}
-                item_data = forecast_data[forecast_data['項目名'] == item]
-                
-                for month in months:
-                    if not item_data.empty and month in item_data.columns:
-                        val = item_data[month].iloc[0]
-                        item_row[month] = float(val) if pd.notna(val) else 0.0
-                    else:
-                        item_row[month] = 0.0
-                
-                table_rows.append(item_row)
-                
-                # 補助科目の行（あれば）
+                # 補助科目がある場合、親項目の値を補助科目の合計に置き換える
                 if item in processor.parent_items_with_sub_accounts:
                     item_subs = sub_accounts_data[sub_accounts_data['parent_item'] == item]
                     
-                    for sub_name in item_subs['sub_account_name'].unique():
-                        sub_row = {"項目名": f"  └ {sub_name}", "タイプ": "補助", "親項目": item}
-                        sub_data = item_subs[item_subs['sub_account_name'] == sub_name]
+                    if not item_subs.empty:
+                        # 親項目の行（補助科目の合計を表示）
+                        item_row = {"項目名": item, "タイプ": "基本", "親項目": item}
                         
                         for month in months:
-                            month_data = sub_data[sub_data['month'] == month]
-                            if not month_data.empty:
-                                val = month_data['amount'].iloc[0]
-                                sub_row[month] = float(val) if pd.notna(val) else 0.0
+                            # 補助科目の合計を計算
+                            month_subs = item_subs[item_subs['month'] == month]
+                            if not month_subs.empty:
+                                total = month_subs['amount'].sum()
+                                item_row[month] = float(total)
                             else:
-                                sub_row[month] = 0.0
+                                item_row[month] = 0.0
                         
-                        table_rows.append(sub_row)
+                        table_rows.append(item_row)
+                        
+                        # 補助科目の行
+                        for sub_name in item_subs['sub_account_name'].unique():
+                            sub_row = {"項目名": f"  └ {sub_name}", "タイプ": "補助", "親項目": item}
+                            sub_data = item_subs[item_subs['sub_account_name'] == sub_name]
+                            
+                            for month in months:
+                                month_data = sub_data[sub_data['month'] == month]
+                                if not month_data.empty:
+                                    val = month_data['amount'].iloc[0]
+                                    sub_row[month] = float(val) if pd.notna(val) else 0.0
+                                else:
+                                    sub_row[month] = 0.0
+                            
+                            table_rows.append(sub_row)
+                    else:
+                        # 補助科目がない場合は通常通り
+                        item_row = {"項目名": item, "タイプ": "基本", "親項目": item}
+                        item_data = forecast_data[forecast_data['項目名'] == item]
+                        
+                        for month in months:
+                            if not item_data.empty and month in item_data.columns:
+                                val = item_data[month].iloc[0]
+                                item_row[month] = float(val) if pd.notna(val) else 0.0
+                            else:
+                                item_row[month] = 0.0
+                        
+                        table_rows.append(item_row)
+                else:
+                    # 補助科目を持たない項目は通常通り
+                    item_row = {"項目名": item, "タイプ": "基本", "親項目": item}
+                    item_data = forecast_data[forecast_data['項目名'] == item]
+                    
+                    for month in months:
+                        if not item_data.empty and month in item_data.columns:
+                            val = item_data[month].iloc[0]
+                            item_row[month] = float(val) if pd.notna(val) else 0.0
+                        else:
+                            item_row[month] = 0.0
+                    
+                    table_rows.append(item_row)
             
             # DataFrameに変換
             edit_df = pd.DataFrame(table_rows)
@@ -1463,7 +1492,21 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             # データエディタで全体を表示・編集
             st.markdown("### 予測損益計算書（スプレッドシート）")
-            st.markdown("💡 表内の数値を直接編集できます。編集後は必ず下部の保存ボタンをクリックしてください。")
+            st.markdown("💡 補助科目がある項目は自動計算されます。補助科目の数値を編集してください。")
+            
+            # 補助科目がある親項目のリストを作成
+            items_with_subs = []
+            for item in editable_items:
+                if item in processor.parent_items_with_sub_accounts:
+                    item_subs = sub_accounts_data[sub_accounts_data['parent_item'] == item]
+                    if not item_subs.empty:
+                        items_with_subs.append(item)
+            
+            # 編集不可の行を設定（補助科目がある親項目）
+            disabled_rows = []
+            for idx, row in edit_df.iterrows():
+                if row['タイプ'] == '基本' and row['項目名'] in items_with_subs:
+                    disabled_rows.append(idx)
             
             edited_df = st.data_editor(
                 edit_df,
@@ -1471,7 +1514,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 use_container_width=True,
                 height=600,
                 key="forecast_pl_editor",
-                hide_index=True
+                hide_index=True,
+                disabled=disabled_rows  # 補助科目がある親項目は編集不可
             )
             
             # 保存ボタン
@@ -1483,9 +1527,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         success_count = 0
                         error_count = 0
                         
-                        # 基本項目を保存
+                        # 基本項目を保存（補助科目がない項目のみ）
                         for _, row in edited_df[edited_df['タイプ'] == '基本'].iterrows():
                             item_name = row['項目名']
+                            
+                            # 補助科目がある項目はスキップ（自動計算されるため）
+                            if item_name in items_with_subs:
+                                continue
+                            
                             values = {month: row[month] for month in month_cols}
                             
                             success, msg = processor.save_forecast_item(
@@ -1499,6 +1548,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 success_count += 1
                             else:
                                 error_count += 1
+                                st.error(f"❌ {item_name}: {msg}")
                                 st.error(f"❌ {item_name}: {msg}")
                         
                         # 補助科目を保存
