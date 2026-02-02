@@ -1042,8 +1042,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         x=actual_months_list,
                         y=sales_actual_data,
                         name="売上高（実績）",
-                        marker_color='#2563eb',  # より濃いブルー
-                        opacity=1.0
+                        marker_color='#2563eb',
+                        opacity=1.0,
+                        hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
                     ),
                     secondary_y=False
                 )
@@ -1054,8 +1055,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         x=forecast_months_list,
                         y=sales_forecast_data,
                         name="売上高（予測）",
-                        marker_color='#60a5fa',  # 明るいブルー
-                        opacity=0.8
+                        marker_color='#60a5fa',
+                        opacity=0.8,
+                        hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
                     ),
                     secondary_y=False
                 )
@@ -1066,14 +1068,15 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         x=months,
                         y=op_data,
                         name="営業利益",
-                        line=dict(color='#ea580c', width=4),  # より鮮やかなオレンジ
+                        line=dict(color='#ea580c', width=4),
                         mode='lines+markers',
-                        marker=dict(size=8, color='#ea580c')
+                        marker=dict(size=8, color='#ea580c'),
+                        hovertemplate='%{x}<br>¥%{y:,.0f}<extra></extra>'
                     ),
                     secondary_y=True
                 )
                 
-                # レイアウト - テキストを濃く
+                # レイアウト - テキストを濃く、軸にカンマ区切り
                 fig.update_layout(
                     template='plotly_white',
                     paper_bgcolor='#fafbfc',
@@ -1081,7 +1084,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     font=dict(
                         family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                         size=13,
-                        color='#1e293b'  # より濃い色
+                        color='#1e293b'
                     ),
                     xaxis=dict(
                         title="月",
@@ -1095,7 +1098,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         title_font=dict(size=14, color='#0f172a'),
                         gridcolor='#e2e8f0',
                         linecolor='#cbd5e1',
-                        tickfont=dict(color='#334155', size=12)
+                        tickfont=dict(color='#334155', size=12),
+                        tickformat=',.0f'  # カンマ区切り
                     ),
                     yaxis2=dict(
                         title="営業利益（円）",
@@ -1104,7 +1108,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         side='right',
                         gridcolor='#e2e8f0',
                         linecolor='#cbd5e1',
-                        tickfont=dict(color='#334155', size=12)
+                        tickfont=dict(color='#334155', size=12),
+                        tickformat=',.0f'  # カンマ区切り
                     ),
                     legend=dict(
                         bgcolor='rgba(255,255,255,0.95)',
