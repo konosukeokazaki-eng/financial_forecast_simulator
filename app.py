@@ -1507,11 +1507,15 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     if not item_subs.empty:
                         items_with_subs.append(item)
             
-            # 編集不可の行を設定（補助科目がある親項目）
-            disabled_rows = []
-            for idx, row in edit_df.iterrows():
+            # 補助科目がある親項目の行には背景色を付ける（編集不可の視覚的表示）
+            def highlight_readonly(row):
                 if row['タイプ'] == '基本' and row['項目名'] in items_with_subs:
-                    disabled_rows.append(idx)
+                    return ['background-color: #f0f0f0'] * len(row)
+                else:
+                    return [''] * len(row)
+            
+            # 項目名列と合計列は常に編集不可
+            disabled_columns = ["項目名", "タイプ", "合計"]
             
             edited_df = st.data_editor(
                 edit_df,
@@ -1520,7 +1524,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 height=600,
                 key="forecast_pl_editor",
                 hide_index=True,
-                disabled=disabled_rows  # 補助科目がある親項目は編集不可
+                disabled=disabled_columns  # 項目名と合計列のみ編集不可
             )
             
             # 保存ボタン
@@ -1531,6 +1535,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     with st.spinner("保存中..."):
                         success_count = 0
                         error_count = 0
+                        
+                        # 警告メッセージ
+                        if items_with_subs:
+                            st.info(f"ℹ️ 補助科目がある項目（{', '.join(items_with_subs)}）は自動計算されるため、保存時にスキップされます。")
                         
                         # 基本項目を保存（補助科目がない項目のみ）
                         for _, row in edited_df[edited_df['タイプ'] == '基本'].iterrows():
@@ -1553,7 +1561,6 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 success_count += 1
                             else:
                                 error_count += 1
-                                st.error(f"❌ {item_name}: {msg}")
                                 st.error(f"❌ {item_name}: {msg}")
                         
                         # 補助科目を保存
