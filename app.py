@@ -1519,7 +1519,6 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             # データエディタで全体を表示・編集
             st.markdown("### 予測損益計算書（スプレッドシート）")
-            st.markdown("💡 補助科目がある項目は自動計算されます。補助科目の数値を編集してください。")
             
             # 補助科目がある親項目のリストを作成
             items_with_subs = []
@@ -1529,14 +1528,18 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     if not item_subs.empty:
                         items_with_subs.append(item)
             
-            # 補助科目がある親項目の行には背景色を付ける（編集不可の視覚的表示）
-            def highlight_readonly(row):
-                if row['タイプ'] == '基本' and row['項目名'] in items_with_subs:
-                    return ['background-color: #f0f0f0'] * len(row)
-                else:
-                    return [''] * len(row)
+            # デバッグ情報（開発時のみ）
+            if st.checkbox("🔧 デバッグ情報を表示", value=False, key="debug_forecast_input"):
+                st.write("データ件数:", len(forecast_data))
+                st.write("補助科目データ件数:", len(sub_accounts_data))
+                st.write("表示行数:", len(edit_df))
+                st.write("編集可能項目数:", len(editable_items))
+                st.write("補助科目がある項目:", items_with_subs)
+                st.write("月列:", month_cols)
             
-            # 項目名列と合計列は常に編集不可
+            st.markdown("💡 数値をクリックして直接編集できます。補助科目がある項目は自動計算されます。")
+            
+            # 項目名列と合計列、タイプ列は常に編集不可
             disabled_columns = ["項目名", "タイプ", "合計"]
             
             edited_df = st.data_editor(
@@ -1546,7 +1549,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 height=600,
                 key="forecast_pl_editor",
                 hide_index=True,
-                disabled=disabled_columns  # 項目名と合計列のみ編集不可
+                disabled=disabled_columns,  # 項目名、タイプ、合計列のみ編集不可
+                num_rows="fixed"  # 行の追加・削除を禁止
             )
             
             # 保存ボタン
