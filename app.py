@@ -1484,15 +1484,15 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 "項目名": st.column_config.TextColumn("項目名", width="large", disabled=True),
                 "タイプ": st.column_config.TextColumn("タイプ", width="small", disabled=True),
                 "親項目": None,  # 非表示
-                "合計": st.column_config.NumberColumn("合計", format="¥%,.0f", disabled=True, width="medium")
+                "合計": st.column_config.NumberColumn("合計", format="%,.0f", disabled=True, width="medium")
             }
             
             for month in month_cols:
                 column_config[month] = st.column_config.NumberColumn(
                     month,
-                    format="¥%,.0f",  # カンマ区切り追加
+                    format="%,.0f",  # カンマ区切り（通貨記号なし）
                     width="small",
-                    help=f"{month}の予測値"
+                    help=f"{month}の予測値（千円）"
                 )
             
             # データエディタで全体を表示・編集
@@ -2565,7 +2565,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 disabled=["項目名"],
                                 column_config={
                                     col: st.column_config.NumberColumn(
-                                        format="¥%,.0f",  # カンマ区切り追加
+                                        format="%,.0f",  # カンマ区切り（通貨記号なし）
                                         min_value=-999999999,
                                         max_value=999999999
                                     ) for col in st.session_state.imported_df.columns if col != '項目名'
@@ -2737,7 +2737,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             disabled=["項目名"],
                             column_config={
                                 col: st.column_config.NumberColumn(
-                                    format="¥%d",
+                                    format="%,.0f",
                                     min_value=-999999999,
                                     max_value=999999999
                                 ) for col in st.session_state.forecast_imported_df.columns if col != '項目名'
