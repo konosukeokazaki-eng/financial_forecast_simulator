@@ -2483,8 +2483,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 "成長率(%)": "{:.1f}%"
                             })\
                             .applymap(
-                                lambda x: 'background-color: #d4edda' if isinstance(x, (int, float)) and x > 0 else 
-                                          ('background-color: #f8d7da' if isinstance(x, (int, float)) and x < 0 else ''),
+                                lambda x: 'background-color: #7efc9d' if isinstance(x, (int, float)) and x > 0 else 
+                                          ('background-color: #ff96a0' if isinstance(x, (int, float)) and x < 0 else ''),
                                 subset=['増減額', '成長率(%)']
                             )
                         
