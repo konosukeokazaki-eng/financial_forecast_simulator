@@ -800,6 +800,8 @@ else:
         st.session_state.page = "貸借対照表 (BS)"
     if st.sidebar.button("CF計算書", use_container_width=True, key="nav_cf"):
         st.session_state.page = "キャッシュフロー計算書 (CF)"
+    if st.sidebar.button("CF詳細分析", use_container_width=True, key="nav_cf_detail"):
+        st.session_state.page = "CF詳細分析"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 分析レポート")
@@ -813,6 +815,8 @@ else:
         st.session_state.page = "経営指標ダッシュボード"
     if st.sidebar.button("損益分岐点", use_container_width=True, key="nav_breakeven"):
         st.session_state.page = "損益分岐点分析"
+    if st.sidebar.button("運転資本分析", use_container_width=True, key="nav_working_capital"):
+        st.session_state.page = "運転資本分析"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 設定")
@@ -2364,6 +2368,327 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             else:
                 st.warning("キャッシュフローデータがありません。")
         
+        elif st.session_state.page == "CF詳細分析":
+            st.title("💰 キャッシュフロー詳細分析")
+            
+            # データチェック
+            if 'cf_data' not in st.session_state or not st.session_state.cf_data:
+                st.warning("⚠️ CFデータが読み込まれていません")
+                st.info("「データ取込」→「BS・CFインポート」からデータをアップロードしてください")
+            else:
+                cf_data = st.session_state.cf_data
+                
+                st.success(f"✅ {len(cf_data)}ヶ月分のCFデータを読み込み済み")
+                
+                # 月次CF計算書詳細
+                st.markdown("### 📊 月次キャッシュフロー計算書")
+                
+                # 月選択
+                available_months = list(cf_data.keys())
+                selected_month = st.selectbox(
+                    "月を選択",
+                    available_months,
+                    index=len(available_months)-1 if available_months else 0
+                )
+                
+                if selected_month:
+                    cf_month = cf_data[selected_month]
+                    
+                    # 3カラムで表示
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+                        st.markdown("#### 🔄 営業活動によるCF")
+                        
+                        operating_cf = cf_month.get('営業CF', {})
+                        st.markdown(f"""
+                        | 項目 | 金額 |
+                        |------|------|
+                        | 税引前利益 | ¥{safe_int(operating_cf.get('税引前利益', 0)):,} |
+                        | + 減価償却費 | ¥{safe_int(operating_cf.get('減価償却費', 0)):,} |
+                        | - 売上債権増加 | ¥{safe_int(operating_cf.get('売上債権の増減', 0)):,} |
+                        | - 棚卸資産増加 | ¥{safe_int(operating_cf.get('棚卸資産の増減', 0)):,} |
+                        | + 買入債務増加 | ¥{safe_int(operating_cf.get('買入債務の増減', 0)):,} |
+                        | - 法人税支払 | ¥{safe_int(operating_cf.get('法人税の支払', 0)):,} |
+                        | **= 営業CF** | **¥{safe_int(operating_cf.get('合計', 0)):,}** |
+                        """)
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+                        st.markdown("#### 📈 投資活動によるCF")
+                        
+                        investing_cf = cf_month.get('投資CF', {})
+                        st.markdown(f"""
+                        | 項目 | 金額 |
+                        |------|------|
+                        | - 固定資産取得 | ¥{safe_int(investing_cf.get('固定資産の取得', 0)):,} |
+                        | **= 投資CF** | **¥{safe_int(investing_cf.get('合計', 0)):,}** |
+                        """)
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    with col3:
+                        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+                        st.markdown("#### 💼 財務活動によるCF")
+                        
+                        financing_cf = cf_month.get('財務CF', {})
+                        st.markdown(f"""
+                        | 項目 | 金額 |
+                        |------|------|
+                        | - 借入金返済 | ¥{safe_int(financing_cf.get('借入金の返済', 0)):,} |
+                        | - 配当金支払 | ¥{safe_int(financing_cf.get('配当金の支払', 0)):,} |
+                        | **= 財務CF** | **¥{safe_int(financing_cf.get('合計', 0)):,}** |
+                        """)
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # 現金増減サマリー
+                    st.markdown("---")
+                    st.markdown("### 💵 現金増減サマリー")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.metric(
+                            "営業CF + 投資CF + 財務CF",
+                            f"¥{safe_int(cf_month.get('現金増減', 0)):,}",
+                            delta=None
+                        )
+                    
+                    with col2:
+                        st.metric(
+                            "期末現金残高",
+                            f"¥{safe_int(cf_month.get('期末現金', 0)):,}",
+                            delta=f"¥{safe_int(cf_month.get('現金増減', 0)):,}"
+                        )
+                    
+                    # 累積CF推移グラフ
+                    st.markdown("---")
+                    st.markdown("### 📊 累積キャッシュフロー推移")
+                    
+                    # データ準備
+                    months_list = []
+                    cumulative_operating = []
+                    cumulative_investing = []
+                    cumulative_financing = []
+                    cumulative_total = []
+                    
+                    running_operating = 0
+                    running_investing = 0
+                    running_financing = 0
+                    running_total = 0
+                    
+                    for month_key in cf_data.keys():
+                        cf_m = cf_data[month_key]
+                        months_list.append(month_key.replace('月度', '月'))
+                        
+                        running_operating += cf_m.get('営業CF', {}).get('合計', 0)
+                        running_investing += cf_m.get('投資CF', {}).get('合計', 0)
+                        running_financing += cf_m.get('財務CF', {}).get('合計', 0)
+                        running_total += cf_m.get('現金増減', 0)
+                        
+                        cumulative_operating.append(running_operating)
+                        cumulative_investing.append(running_investing)
+                        cumulative_financing.append(running_financing)
+                        cumulative_total.append(running_total)
+                    
+                    fig = go.Figure()
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list, y=cumulative_operating,
+                        name='営業CF（累積）',
+                        line=dict(color='#10B981', width=3)
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list, y=cumulative_investing,
+                        name='投資CF（累積）',
+                        line=dict(color='#EF4444', width=3)
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list, y=cumulative_financing,
+                        name='財務CF（累積）',
+                        line=dict(color='#F59E0B', width=3)
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list, y=cumulative_total,
+                        name='現金増減（累積）',
+                        line=dict(color='#3B82F6', width=4)
+                    ))
+                    
+                    fig.update_layout(
+                        template='plotly_white',
+                        hovermode='x unified',
+                        height=400,
+                        yaxis=dict(tickformat=',.0f')
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+        
+        elif st.session_state.page == "運転資本分析":
+            st.title("🔄 運転資本分析")
+            
+            # データチェック
+            if 'bs_data' not in st.session_state or st.session_state.bs_data.empty:
+                st.warning("⚠️ BSデータが読み込まれていません")
+                st.info("「データ取込」→「BS・CFインポート」からデータをアップロードしてください")
+            else:
+                bs_data = st.session_state.bs_data
+                
+                st.success(f"✅ BSデータを読み込み済み")
+                
+                # 運転資本指標を計算
+                with st.spinner("💰 運転資本指標を計算しています..."):
+                    wc_metrics = cf_analyzer.calculate_working_capital_metrics(
+                        bs_data,
+                        None  # PLデータ
+                    )
+                
+                if wc_metrics:
+                    # 最新月の指標を表示
+                    latest_month = list(wc_metrics.keys())[-1]
+                    latest_metrics = wc_metrics[latest_month]
+                    
+                    st.markdown("### 📊 運転資本KPI（最新月）")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric(
+                            "運転資本",
+                            f"¥{safe_int(latest_metrics['運転資本']):,}",
+                            help="(売上債権 + 棚卸資産) - 買入債務"
+                        )
+                    
+                    with col2:
+                        st.metric(
+                            "売上債権回転日数",
+                            f"{latest_metrics['売上債権回転日数']:.1f}日",
+                            help="売上債権 ÷ 月間売上 × 30"
+                        )
+                    
+                    with col3:
+                        st.metric(
+                            "在庫回転日数",
+                            f"{latest_metrics['棚卸資産回転日数']:.1f}日",
+                            help="棚卸資産 ÷ 月間売上原価 × 30"
+                        )
+                    
+                    with col4:
+                        st.metric(
+                            "CCC",
+                            f"{latest_metrics['CCC']:.1f}日",
+                            help="キャッシュコンバージョンサイクル"
+                        )
+                    
+                    st.markdown("---")
+                    
+                    # 運転資本の内訳
+                    st.markdown("### 🔍 運転資本の内訳")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+                        st.markdown("#### 売上債権")
+                        st.metric("", f"¥{safe_int(latest_metrics['売上債権']):,}")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+                        st.markdown("#### 棚卸資産")
+                        st.metric("", f"¥{safe_int(latest_metrics['棚卸資産']):,}")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    with col3:
+                        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+                        st.markdown("#### 買入債務")
+                        st.metric("", f"¥{safe_int(latest_metrics['買入債務']):,}")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    
+                    # 推移グラフ
+                    st.markdown("### 📈 運転資本の推移")
+                    
+                    months_list = []
+                    wc_values = []
+                    ar_values = []
+                    inv_values = []
+                    ap_values = []
+                    
+                    for month, metrics in wc_metrics.items():
+                        months_list.append(month)
+                        wc_values.append(metrics['運転資本'])
+                        ar_values.append(metrics['売上債権'])
+                        inv_values.append(metrics['棚卸資産'])
+                        ap_values.append(metrics['買入債務'])
+                    
+                    fig = go.Figure()
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list, y=wc_values,
+                        name='運転資本',
+                        line=dict(color='#3B82F6', width=4),
+                        fill='tozeroy'
+                    ))
+                    
+                    fig.update_layout(
+                        template='plotly_white',
+                        hovermode='x',
+                        height=400,
+                        yaxis=dict(tickformat=',.0f', title="金額（円）")
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # CCC推移
+                    st.markdown("### ⏱️ CCC（キャッシュコンバージョンサイクル）推移")
+                    
+                    ccc_values = [m['CCC'] for m in wc_metrics.values()]
+                    
+                    fig = go.Figure()
+                    
+                    fig.add_trace(go.Scatter(
+                        x=months_list, y=ccc_values,
+                        name='CCC',
+                        line=dict(color='#F59E0B', width=3),
+                        mode='lines+markers'
+                    ))
+                    
+                    fig.update_layout(
+                        template='plotly_white',
+                        hovermode='x',
+                        height=350,
+                        yaxis=dict(title="日数")
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # 分析コメント
+                    st.markdown("---")
+                    st.markdown("### 💡 分析結果")
+                    
+                    ccc = latest_metrics['CCC']
+                    
+                    if ccc < 30:
+                        st.success(f"✅ CCCは{ccc:.1f}日と短く、効率的な資金運用ができています")
+                    elif ccc < 60:
+                        st.info(f"💡 CCCは{ccc:.1f}日です。改善の余地があります")
+                    else:
+                        st.warning(f"⚠️ CCCが{ccc:.1f}日と長期化しています。運転資本の改善が必要です")
+                    
+                    st.markdown("""
+                    **改善施策:**
+                    - 売上債権回転日数の短縮 → 請求サイトの見直し
+                    - 在庫回転日数の短縮 → 在庫管理の最適化
+                    - 買入債務回転日数の延長 → 支払条件の交渉
+                    """)
+                else:
+                    st.error("運転資本指標の計算に失敗しました")
+        
         elif st.session_state.page == "経営指標ダッシュボード":
             st.title("経営指標")
             
@@ -3485,6 +3810,25 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                         if cf_data:
                                             st.session_state.cf_data = cf_data
                                             st.success("✅ キャッシュフロー計算完了")
+                                            
+                                            # データベースに保存
+                                            with st.spinner("💾 データベースに保存しています..."):
+                                                # BSを保存
+                                                bs_saved = cf_analyzer.save_bs_to_db(
+                                                    st.session_state.selected_period_id,
+                                                    bs_data
+                                                )
+                                                
+                                                # CFを保存
+                                                cf_saved = cf_analyzer.save_cf_to_db(
+                                                    st.session_state.selected_period_id,
+                                                    cf_data
+                                                )
+                                                
+                                                if bs_saved and cf_saved:
+                                                    st.success("✅ データベースに保存完了")
+                                                else:
+                                                    st.warning("⚠️ データベース保存に一部失敗しました")
                                 else:
                                     st.error("❌ BS・PLシートが見つかりません")
                             
