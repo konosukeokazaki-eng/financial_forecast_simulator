@@ -623,7 +623,7 @@ class CashFlowAnalyzer:
         try:
             import sqlite3
             
-            conn = self.processor.get_connection()
+            conn = self.processor._get_connection()
             cursor = conn.cursor()
             
             # 月度列を取得
@@ -705,7 +705,7 @@ class CashFlowAnalyzer:
         try:
             import sqlite3
             
-            conn = self.processor.get_connection()
+            conn = self.processor._get_connection()
             cursor = conn.cursor()
             
             for month_key, cf_month in cf_data.items():
@@ -797,7 +797,7 @@ class CashFlowAnalyzer:
             import sqlite3
             import pandas as pd
             
-            conn = self.processor.get_connection()
+            conn = self.processor._get_connection()
             
             # CFデータを読み込み
             query = """
