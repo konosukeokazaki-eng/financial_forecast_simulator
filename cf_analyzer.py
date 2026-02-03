@@ -654,24 +654,31 @@ class CashFlowAnalyzer:
                     'long_term_debt': get_value('長期借入金'),
                 }
                 
+                # データベースの種類を判定してプレースホルダーを選択
+                is_postgres = hasattr(self.processor, 'use_postgres') and self.processor.use_postgres
+                placeholder = '%s' if is_postgres else '?'
+                
                 # UPSERTクエリ
-                cursor.execute("""
+                query = f"""
                     INSERT INTO balance_sheet 
                     (fiscal_period_id, month, cash_and_deposits, accounts_receivable, 
                      inventory, other_current_assets, fixed_assets, accounts_payable,
                      short_term_debt, long_term_debt)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, 
+                            {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
                     ON CONFLICT(fiscal_period_id, month) 
                     DO UPDATE SET
-                        cash_and_deposits = excluded.cash_and_deposits,
-                        accounts_receivable = excluded.accounts_receivable,
-                        inventory = excluded.inventory,
-                        other_current_assets = excluded.other_current_assets,
-                        fixed_assets = excluded.fixed_assets,
-                        accounts_payable = excluded.accounts_payable,
-                        short_term_debt = excluded.short_term_debt,
-                        long_term_debt = excluded.long_term_debt
-                """, (
+                        cash_and_deposits = EXCLUDED.cash_and_deposits,
+                        accounts_receivable = EXCLUDED.accounts_receivable,
+                        inventory = EXCLUDED.inventory,
+                        other_current_assets = EXCLUDED.other_current_assets,
+                        fixed_assets = EXCLUDED.fixed_assets,
+                        accounts_payable = EXCLUDED.accounts_payable,
+                        short_term_debt = EXCLUDED.short_term_debt,
+                        long_term_debt = EXCLUDED.long_term_debt
+                """
+                
+                cursor.execute(query, (
                     data['fiscal_period_id'], data['month'], 
                     data['cash_and_deposits'], data['accounts_receivable'],
                     data['inventory'], data['other_current_assets'], 
@@ -736,32 +743,41 @@ class CashFlowAnalyzer:
                     'ending_cash': cf_month.get('期末現金', 0)
                 }
                 
+                # データベースの種類を判定してプレースホルダーを選択
+                is_postgres = hasattr(self.processor, 'use_postgres') and self.processor.use_postgres
+                placeholder = '%s' if is_postgres else '?'
+                
+                # プレースホルダーのリスト生成（17個）
+                placeholders = ', '.join([placeholder] * 17)
+                
                 # UPSERTクエリ
-                cursor.execute("""
+                query = f"""
                     INSERT INTO cash_flow_statement 
                     (fiscal_period_id, month, operating_cf, profit_before_tax, 
                      depreciation, ar_change, inventory_change, ap_change, tax_paid,
                      investing_cf, capex, financing_cf, debt_repayment, dividend_paid,
                      net_cash_change, beginning_cash, ending_cash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES ({placeholders})
                     ON CONFLICT(fiscal_period_id, month) 
                     DO UPDATE SET
-                        operating_cf = excluded.operating_cf,
-                        profit_before_tax = excluded.profit_before_tax,
-                        depreciation = excluded.depreciation,
-                        ar_change = excluded.ar_change,
-                        inventory_change = excluded.inventory_change,
-                        ap_change = excluded.ap_change,
-                        tax_paid = excluded.tax_paid,
-                        investing_cf = excluded.investing_cf,
-                        capex = excluded.capex,
-                        financing_cf = excluded.financing_cf,
-                        debt_repayment = excluded.debt_repayment,
-                        dividend_paid = excluded.dividend_paid,
-                        net_cash_change = excluded.net_cash_change,
-                        beginning_cash = excluded.beginning_cash,
-                        ending_cash = excluded.ending_cash
-                """, (
+                        operating_cf = EXCLUDED.operating_cf,
+                        profit_before_tax = EXCLUDED.profit_before_tax,
+                        depreciation = EXCLUDED.depreciation,
+                        ar_change = EXCLUDED.ar_change,
+                        inventory_change = EXCLUDED.inventory_change,
+                        ap_change = EXCLUDED.ap_change,
+                        tax_paid = EXCLUDED.tax_paid,
+                        investing_cf = EXCLUDED.investing_cf,
+                        capex = EXCLUDED.capex,
+                        financing_cf = EXCLUDED.financing_cf,
+                        debt_repayment = EXCLUDED.debt_repayment,
+                        dividend_paid = EXCLUDED.dividend_paid,
+                        net_cash_change = EXCLUDED.net_cash_change,
+                        beginning_cash = EXCLUDED.beginning_cash,
+                        ending_cash = EXCLUDED.ending_cash
+                """
+                
+                cursor.execute(query, (
                     data['fiscal_period_id'], data['month'],
                     data['operating_cf'], data['profit_before_tax'],
                     data['depreciation'], data['ar_change'],
