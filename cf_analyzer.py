@@ -43,19 +43,21 @@ class CashFlowAnalyzer:
                 sys.stderr.write(f"   読み込み完了: {len(df_raw)}行 × {len(df_raw.columns)}列\n")
                 sys.stderr.flush()
                 
-                if len(df_raw) < 8:
-                    sys.stderr.write(f"❌ データ行数が不足: {len(df_raw)}行（最低8行必要）\n")
+                if len(df_raw) < 9:
+                    sys.stderr.write(f"❌ データ行数が不足: {len(df_raw)}行（最低9行必要）\n")
                     sys.stderr.flush()
                     return pd.DataFrame()
                 
-                # 6行目をヘッダーとして取得
-                header_row = df_raw.iloc[6]
-                sys.stderr.write(f"   ヘッダー行（6行目）: {header_row.tolist()[:5]}...\n")
+                # 7行目をヘッダーとして取得（インデックス7）
+                header_row = df_raw.iloc[7]
+                # 先頭・末尾の空白を削除
+                header_list = [str(x).strip() if pd.notna(x) else f"Col_{i}" for i, x in enumerate(header_row)]
+                sys.stderr.write(f"   ヘッダー行（7行目）: {header_list[:5]}...\n")
                 sys.stderr.flush()
                 
-                # 7行目以降をデータとして取得
-                df_data = df_raw.iloc[7:].copy()
-                df_data.columns = header_row.tolist()
+                # 8行目以降をデータとして取得（インデックス8以降）
+                df_data = df_raw.iloc[8:].copy()
+                df_data.columns = header_list
                 df_data = df_data.reset_index(drop=True)
                 
                 sys.stderr.write(f"   データ行数: {len(df_data)}\n")
