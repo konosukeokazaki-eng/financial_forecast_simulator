@@ -44,13 +44,27 @@ class ProfitabilityAnalyzer:
                 'is_profitable': sales >= breakeven_sales
             }
         except Exception as e:
+            sys.stderr.write(f"❌ 計算エラー: {e}\n")
+            sys.stderr.flush()
             return self._empty_metrics()
     
     def analyze_monthly_profitability(self, pl_data: pd.DataFrame) -> pd.DataFrame:
         try:
+            sys.stderr.write(f"📊 analyze_monthly_profitability開始\n")
+            sys.stderr.write(f"   データ形状: {pl_data.shape}\n")
+            sys.stderr.write(f"   カラム: {pl_data.columns.tolist()}\n")
+            sys.stderr.flush()
+            
             month_cols = [col for col in pl_data.columns if col not in ['項目名', 'item_name', '項目タイプ']]
             
+            sys.stderr.write(f"   月度列数: {len(month_cols)}\n")
+            if month_cols:
+                sys.stderr.write(f"   月度列例: {month_cols[:3]}\n")
+            sys.stderr.flush()
+            
             if not month_cols:
+                sys.stderr.write("❌ 月度列が見つかりません\n")
+                sys.stderr.flush()
                 return pd.DataFrame()
             
             results = []
@@ -64,6 +78,9 @@ class ProfitabilityAnalyzer:
                 if opex == 0:
                     opex = self._get_pl_value(pl_data, '販売費及び一般管理費', month_col)
                 
+                sys.stderr.write(f"   {month_col}: 売上={sales:,.0f}, 原価={cogs:,.0f}, 販管費={opex:,.0f}\n")
+                sys.stderr.flush()
+                
                 if sales == 0:
                     continue
                 
@@ -71,8 +88,15 @@ class ProfitabilityAnalyzer:
                 metrics['month'] = month_col
                 results.append(metrics)
             
+            sys.stderr.write(f"✅ 分析完了: {len(results)}ヶ月\n")
+            sys.stderr.flush()
+            
             return pd.DataFrame(results)
         except Exception as e:
+            sys.stderr.write(f"❌ analyze_monthly_profitabilityエラー: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
             return pd.DataFrame()
     
     def _get_pl_value(self, pl_data: pd.DataFrame, item_name: str, month_col: str) -> float:
@@ -101,23 +125,54 @@ class ProfitabilityAnalyzer:
 
 def analyze_profitability_from_db(period_id: int, processor) -> Dict:
     try:
+        sys.stderr.write(f"\n{'='*80}\n")
+        sys.stderr.write(f"🚀 analyze_profitability_from_db開始\n")
+        sys.stderr.write(f"   期間ID: {period_id}\n")
+        sys.stderr.flush()
+        
         conn = processor._get_connection()
         placeholder = '%s' if hasattr(processor, 'use_postgres') and processor.use_postgres else '?'
+        
+        sys.stderr.write(f"   プレースホルダー: {placeholder}\n")
+        sys.stderr.flush()
+        
         query = f"SELECT item_name, month, value FROM actual_data WHERE fiscal_period_id = {placeholder} ORDER BY month, item_name"
+        
+        sys.stderr.write(f"   SQL実行中...\n")
+        sys.stderr.flush()
+        
         df = pd.read_sql_query(query, conn, params=(period_id,))
         conn.close()
         
+        sys.stderr.write(f"   取得レコード数: {len(df)}\n")
+        sys.stderr.flush()
+        
         if df.empty:
+            sys.stderr.write("❌ データなし（actual_dataテーブルが空）\n")
+            sys.stderr.write(f"{'='*80}\n\n")
+            sys.stderr.flush()
             return {}
+        
+        sys.stderr.write(f"   項目数: {df['item_name'].nunique()}\n")
+        sys.stderr.write(f"   項目例: {df['item_name'].unique()[:5].tolist()}\n")
+        sys.stderr.write(f"   月数: {df['month'].nunique()}\n")
+        sys.stderr.write(f"   月例: {df['month'].unique()[:3].tolist()}\n")
+        sys.stderr.flush()
         
         pl_data = df.pivot(index='item_name', columns='month', values='value').reset_index()
         pl_data.columns.name = None
         pl_data = pl_data.rename(columns={'item_name': '項目名'})
         
+        sys.stderr.write(f"   ピボット後の形状: {pl_data.shape}\n")
+        sys.stderr.flush()
+        
         analyzer = ProfitabilityAnalyzer(processor)
         monthly_df = analyzer.analyze_monthly_profitability(pl_data)
         
         if monthly_df.empty:
+            sys.stderr.write("❌ 月次分析結果が空\n")
+            sys.stderr.write(f"{'='*80}\n\n")
+            sys.stderr.flush()
             return {}
         
         avg_marginal_profit_rate = monthly_df['marginal_profit_rate'].mean()
@@ -131,6 +186,12 @@ def analyze_profitability_from_db(period_id: int, processor) -> Dict:
             elif recent_3[2] < recent_3[0] * 0.98:
                 trend = 'deteriorating'
         
+        sys.stderr.write(f"✅ 分析完了\n")
+        sys.stderr.write(f"   平均限界利益率: {avg_marginal_profit_rate*100:.1f}%\n")
+        sys.stderr.write(f"   トレンド: {trend}\n")
+        sys.stderr.write(f"{'='*80}\n\n")
+        sys.stderr.flush()
+        
         return {
             'monthly_data': monthly_df,
             'average_marginal_profit_rate': avg_marginal_profit_rate,
@@ -138,7 +199,9 @@ def analyze_profitability_from_db(period_id: int, processor) -> Dict:
             'trend': trend
         }
     except Exception as e:
-        sys.stderr.write(f"❌ エラー: {e}\n")
+        sys.stderr.write(f"❌ analyze_profitability_from_dbエラー: {e}\n")
         import traceback
         traceback.print_exc(file=sys.stderr)
+        sys.stderr.write(f"{'='*80}\n\n")
+        sys.stderr.flush()
         return {}
