@@ -35,56 +35,61 @@ class CashFlowAnalyzer:
             sys.stderr.write(f"📊 BS読み込み開始: {file_path}\n")
             sys.stderr.flush()
             
-            # Excelファイルをopenpyxlで読み込み
-            import openpyxl
-            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
-            
-            if sheet_name not in wb.sheetnames:
-                sys.stderr.write(f"❌ シート '{sheet_name}' が見つかりません\n")
-                sys.stderr.write(f"   利用可能なシート: {wb.sheetnames}\n")
+            # pandasで直接読み込み（シンプルな方法）
+            try:
+                # header=Noneで全データを取得
+                df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
+                
+                sys.stderr.write(f"   読み込み完了: {len(df_raw)}行 × {len(df_raw.columns)}列\n")
                 sys.stderr.flush()
-                wb.close()
-                return pd.DataFrame()
-            
-            sheet = wb[sheet_name]
-            
-            # シート全体をデータフレームに変換
-            data = []
-            for row in sheet.iter_rows(values_only=True):
-                data.append(row)
-            
-            wb.close()
-            
-            # DataFrameに変換
-            df = pd.DataFrame(data)
-            
-            # 6行目（インデックス6）をヘッダーとして使用
-            if len(df) < 8:
-                sys.stderr.write(f"❌ データ行数が不足: {len(df)}行\n")
+                
+                if len(df_raw) < 8:
+                    sys.stderr.write(f"❌ データ行数が不足: {len(df_raw)}行（最低8行必要）\n")
+                    sys.stderr.flush()
+                    return pd.DataFrame()
+                
+                # 6行目をヘッダーとして取得
+                header_row = df_raw.iloc[6]
+                sys.stderr.write(f"   ヘッダー行（6行目）: {header_row.tolist()[:5]}...\n")
+                sys.stderr.flush()
+                
+                # 7行目以降をデータとして取得
+                df_data = df_raw.iloc[7:].copy()
+                df_data.columns = header_row.tolist()
+                df_data = df_data.reset_index(drop=True)
+                
+                sys.stderr.write(f"   データ行数: {len(df_data)}\n")
+                sys.stderr.flush()
+                
+            except Exception as e:
+                sys.stderr.write(f"❌ Excel読み込みエラー: {e}\n")
+                import traceback
+                traceback.print_exc(file=sys.stderr)
                 sys.stderr.flush()
                 return pd.DataFrame()
-            
-            # ヘッダー行を取得
-            headers = df.iloc[6].tolist()
-            
-            # データ行を抽出（7行目以降）
-            df_data = df.iloc[7:].reset_index(drop=True)
-            df_data.columns = headers
             
             # 最初の列名を取得
+            if len(df_data.columns) == 0:
+                sys.stderr.write(f"❌ 列が存在しません\n")
+                sys.stderr.flush()
+                return pd.DataFrame()
+            
             first_col = df_data.columns[0]
             
             # 月度列を特定
-            month_cols = [col for col in df_data.columns if col is not None and '月度' in str(col)]
+            month_cols = []
+            for col in df_data.columns:
+                if col is not None and pd.notna(col) and '月度' in str(col):
+                    month_cols.append(col)
             
             sys.stderr.write(f"   勘定科目列: {first_col}\n")
             sys.stderr.write(f"   月度列数: {len(month_cols)}\n")
-            sys.stderr.write(f"   月度列: {month_cols}\n")
+            sys.stderr.write(f"   月度列: {month_cols[:3] if len(month_cols) > 3 else month_cols}...\n")
             sys.stderr.flush()
             
             if len(month_cols) == 0:
                 sys.stderr.write(f"❌ 月度列が見つかりません\n")
-                sys.stderr.write(f"   列名: {df_data.columns.tolist()}\n")
+                sys.stderr.write(f"   全列名: {df_data.columns.tolist()}\n")
                 sys.stderr.flush()
                 return pd.DataFrame()
             
@@ -99,40 +104,53 @@ class CashFlowAnalyzer:
                 bs_data[month_col] = []
             
             current_type = None
+            item_count = 0
             
-            for idx, row in df_data.iterrows():
-                # 最初の列の値を取得
-                account_value = row.iloc[0]
-                
-                # NaNチェック
-                if pd.isna(account_value):
+            for idx in range(len(df_data)):
+                try:
+                    # 行を取得
+                    row = df_data.iloc[idx]
+                    
+                    # 最初の列の値を取得
+                    account_value = row.iloc[0]
+                    
+                    # NaNチェック
+                    if pd.isna(account_value):
+                        continue
+                    
+                    account_str = str(account_value).strip()
+                    
+                    # 空文字チェック
+                    if not account_str or account_str == 'nan' or account_str == 'None':
+                        continue
+                    
+                    # 項目タイプを判定
+                    if '[' in account_str and ']' in account_str:
+                        # 大分類（例: [現金･預金]）
+                        current_type = account_str.replace('[', '').replace(']', '')
+                        continue
+                    
+                    # データを記録（合計行も個別項目も全て記録）
+                    bs_data['勘定科目'].append(account_str)
+                    bs_data['項目タイプ'].append(current_type if current_type else '不明')
+                    
+                    for month_col in month_cols:
+                        val = row[month_col]
+                        bs_data[month_col].append(float(val) if pd.notna(val) and val != '' else 0)
+                    
+                    item_count += 1
+                    
+                except Exception as e:
+                    sys.stderr.write(f"⚠️ 行{idx}の処理エラー（スキップ）: {e}\n")
+                    sys.stderr.flush()
                     continue
-                
-                account_str = str(account_value).strip()
-                
-                # 空文字チェック
-                if not account_str or account_str == 'nan' or account_str == 'None':
-                    continue
-                
-                # 項目タイプを判定
-                if '[' in account_str and ']' in account_str:
-                    # 大分類（例: [現金･預金]）
-                    current_type = account_str.replace('[', '').replace(']', '')
-                    continue
-                
-                # データを記録（合計行も個別項目も全て記録）
-                bs_data['勘定科目'].append(account_str)
-                bs_data['項目タイプ'].append(current_type if current_type else '不明')
-                
-                for month_col in month_cols:
-                    val = row[month_col]
-                    bs_data[month_col].append(float(val) if pd.notna(val) and val != '' else 0)
             
             result_df = pd.DataFrame(bs_data)
             
             sys.stderr.write(f"✅ BS読み込み完了: {len(result_df)}項目\n")
             if not result_df.empty:
-                sys.stderr.write(f"   項目タイプ: {result_df['項目タイプ'].unique().tolist()}\n")
+                unique_types = result_df['項目タイプ'].unique().tolist()
+                sys.stderr.write(f"   項目タイプ: {unique_types[:5] if len(unique_types) > 5 else unique_types}\n")
             sys.stderr.flush()
             
             return result_df
