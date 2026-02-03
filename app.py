@@ -805,8 +805,6 @@ else:
         st.session_state.page = "キャッシュフロー計算書 (CF)"
     if st.sidebar.button("CF詳細分析", width="stretch", key="nav_cf_detail"):
         st.session_state.page = "CF詳細分析"
-    if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
-        st.session_state.page = "収益構造分析"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 分析レポート")
@@ -822,6 +820,8 @@ else:
         st.session_state.page = "損益分岐点分析"
     if st.sidebar.button("運転資本分析", width="stretch", key="nav_working_capital"):
         st.session_state.page = "運転資本分析"
+    if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
+        st.session_state.page = "収益構造分析"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 設定")
@@ -2533,7 +2533,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     st.plotly_chart(fig, width="stretch")
         
         elif st.session_state.page == "運転資本分析":
-            show_profitability_analysis_page(processor)
+            st.title("🔄 運転資本分析")
             
             # データチェック
             if 'bs_data' not in st.session_state or st.session_state.bs_data.empty:
@@ -3915,6 +3915,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             else:
                                 st.error(f"❌ インポートに失敗しました: {info}")
             
+            
+        
+        elif st.session_state.page == "収益構造分析":
+            show_profitability_analysis_page(processor)
         
         elif st.session_state.page == "シナリオ一括設定":
             st.title("シナリオ一括設定")
