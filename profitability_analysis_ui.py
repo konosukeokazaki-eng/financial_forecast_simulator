@@ -6,29 +6,70 @@ import streamlit as st
 import plotly.graph_objects as go
 from profitability_analyzer import analyze_profitability_from_db
 from cfo_advisor import CFOAdvisor
+import sys
 
 
 def show_profitability_analysis_page(processor):
     st.title("📊 収益構造分析")
     
+    sys.stderr.write("\n" + "="*80 + "\n")
+    sys.stderr.write("🖥️ show_profitability_analysis_page開始\n")
+    sys.stderr.flush()
+    
+    # デバッグ: session_stateの内容を確認
+    sys.stderr.write(f"   session_state keys: {list(st.session_state.keys())}\n")
+    sys.stderr.flush()
+    
     if 'selected_period_id' not in st.session_state:
+        sys.stderr.write("❌ selected_period_id が session_state にありません\n")
+        sys.stderr.flush()
         st.warning("⚠️ 会計期間を選択してください")
+        st.info("サイドバーから会計期間を選択してください。")
         return
     
     period_id = st.session_state.selected_period_id
+    sys.stderr.write(f"   選択された期間ID: {period_id}\n")
+    sys.stderr.flush()
     
     with st.spinner("分析中..."):
         cost_structure = analyze_profitability_from_db(period_id, processor)
     
-    if not cost_structure or 'monthly_data' not in cost_structure:
-        st.info("📊 データがありません。実績データをインポートしてください。")
+    sys.stderr.write(f"   cost_structure keys: {list(cost_structure.keys()) if cost_structure else 'None'}\n")
+    sys.stderr.flush()
+    
+    if not cost_structure:
+        sys.stderr.write("❌ cost_structureが空\n")
+        sys.stderr.flush()
+        st.error("❌ データ取得に失敗しました")
+        st.info("📊 実績データをインポートしてください。")
+        st.markdown("**手順:**")
+        st.markdown("1. サイドバーから「データ取込」を選択")
+        st.markdown("2. BS・PLファイルをアップロード")
+        st.markdown("3. インポートを実行")
+        return
+    
+    if 'monthly_data' not in cost_structure:
+        sys.stderr.write("❌ monthly_dataが cost_structure にありません\n")
+        sys.stderr.flush()
+        st.error("❌ データ構造エラー")
+        st.info("📊 実績データをインポートしてください。")
         return
     
     df = cost_structure['monthly_data']
     
+    sys.stderr.write(f"   monthly_data shape: {df.shape if not df.empty else 'empty'}\n")
+    sys.stderr.flush()
+    
     if df.empty:
-        st.info("📊 分析可能なデータがありません。")
+        sys.stderr.write("❌ monthly_dataが空\n")
+        sys.stderr.flush()
+        st.warning("⚠️ 分析可能なデータがありません")
+        st.info("売上、売上原価、販管費のデータが必要です。")
         return
+    
+    sys.stderr.write("✅ データ取得成功 - 画面表示開始\n")
+    sys.stderr.write("="*80 + "\n\n")
+    sys.stderr.flush()
     
     latest = df.iloc[-1]
     
