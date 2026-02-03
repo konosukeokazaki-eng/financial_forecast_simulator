@@ -10,6 +10,9 @@ import tempfile
 from data_processor import DataProcessor
 from cf_analyzer import CashFlowAnalyzer
 from datetime import datetime
+from profitability_analyzer import ProfitabilityAnalyzer, analyze_profitability_from_db
+from cfo_advisor import CFOAdvisor
+from profitability_analysis_ui import show_profitability_analysis_page
 
 # ページ設定 - 完全ライトモード
 st.set_page_config(
@@ -802,6 +805,8 @@ else:
         st.session_state.page = "キャッシュフロー計算書 (CF)"
     if st.sidebar.button("CF詳細分析", width="stretch", key="nav_cf_detail"):
         st.session_state.page = "CF詳細分析"
+    if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
+        st.session_state.page = "収益構造分析"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 分析レポート")
@@ -2528,7 +2533,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     st.plotly_chart(fig, width="stretch")
         
         elif st.session_state.page == "運転資本分析":
-            st.title("🔄 運転資本分析")
+            show_profitability_analysis_page(processor)
             
             # データチェック
             if 'bs_data' not in st.session_state or st.session_state.bs_data.empty:
