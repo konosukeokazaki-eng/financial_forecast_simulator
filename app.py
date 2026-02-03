@@ -771,56 +771,56 @@ else:
     
     # 階層型ナビゲーション（アイコンなし）
     st.sidebar.markdown("### ダッシュボード")
-    if st.sidebar.button("📊 CFO意思決定支援", use_container_width=True, key="nav_cfo_dashboard"):
+    if st.sidebar.button("📊 CFO意思決定支援", width="stretch", key="nav_cfo_dashboard"):
         st.session_state.page = "CFO意思決定支援ダッシュボード"
-    if st.sidebar.button("着地予測（PL）", use_container_width=True, key="nav_dashboard"):
+    if st.sidebar.button("着地予測（PL）", width="stretch", key="nav_dashboard"):
         st.session_state.page = "着地予測ダッシュボード"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### データ入力")
     col1, col2 = st.sidebar.columns(2)
     with col1:
-        if st.button("実績", use_container_width=True, key="nav_actual"):
+        if st.button("実績", width="stretch", key="nav_actual"):
             st.session_state.page = "実績データ入力"
     with col2:
-        if st.button("予測", use_container_width=True, key="nav_forecast"):
+        if st.button("予測", width="stretch", key="nav_forecast"):
             st.session_state.page = "予測データ入力"
     
-    if st.sidebar.button("データ取込", use_container_width=True, key="nav_import"):
+    if st.sidebar.button("データ取込", width="stretch", key="nav_import"):
         st.session_state.page = "データインポート"
     
-    if st.sidebar.button("シナリオ一括設定", use_container_width=True, key="nav_scenario"):
+    if st.sidebar.button("シナリオ一括設定", width="stretch", key="nav_scenario"):
         st.session_state.page = "シナリオ一括設定"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 財務諸表")
-    if st.sidebar.button("損益計算書 (PL)", use_container_width=True, key="nav_pl"):
+    if st.sidebar.button("損益計算書 (PL)", width="stretch", key="nav_pl"):
         st.session_state.page = "損益計算書 (PL)"
-    if st.sidebar.button("貸借対照表 (BS)", use_container_width=True, key="nav_bs"):
+    if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
         st.session_state.page = "貸借対照表 (BS)"
-    if st.sidebar.button("CF計算書", use_container_width=True, key="nav_cf"):
+    if st.sidebar.button("CF計算書", width="stretch", key="nav_cf"):
         st.session_state.page = "キャッシュフロー計算書 (CF)"
-    if st.sidebar.button("CF詳細分析", use_container_width=True, key="nav_cf_detail"):
+    if st.sidebar.button("CF詳細分析", width="stretch", key="nav_cf_detail"):
         st.session_state.page = "CF詳細分析"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 分析レポート")
-    if st.sidebar.button("予実比較", use_container_width=True, key="nav_comparison"):
+    if st.sidebar.button("予実比較", width="stretch", key="nav_comparison"):
         st.session_state.page = "予測 VS 実績比較"
-    if st.sidebar.button("シナリオ比較", use_container_width=True, key="nav_scenario_comp"):
+    if st.sidebar.button("シナリオ比較", width="stretch", key="nav_scenario_comp"):
         st.session_state.page = "シナリオ比較"
-    if st.sidebar.button("期間比較", use_container_width=True, key="nav_period"):
+    if st.sidebar.button("期間比較", width="stretch", key="nav_period"):
         st.session_state.page = "期間比較分析"
-    if st.sidebar.button("経営指標", use_container_width=True, key="nav_metrics"):
+    if st.sidebar.button("経営指標", width="stretch", key="nav_metrics"):
         st.session_state.page = "経営指標ダッシュボード"
-    if st.sidebar.button("損益分岐点", use_container_width=True, key="nav_breakeven"):
+    if st.sidebar.button("損益分岐点", width="stretch", key="nav_breakeven"):
         st.session_state.page = "損益分岐点分析"
-    if st.sidebar.button("運転資本分析", use_container_width=True, key="nav_working_capital"):
+    if st.sidebar.button("運転資本分析", width="stretch", key="nav_working_capital"):
         st.session_state.page = "運転資本分析"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 設定")
-    if st.sidebar.button("システム設定", use_container_width=True, key="nav_settings"):
+    if st.sidebar.button("システム設定", width="stretch", key="nav_settings"):
         st.session_state.page = "システム設定"
     
     # ページ情報を保持（後方互換性のため）
@@ -1358,7 +1358,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     margin=dict(l=20, r=20, t=40, b=20)
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
             
             st.markdown('</div>', unsafe_allow_html=True)  # section-card終了
             
@@ -1368,7 +1368,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # ワンクリック着地予測ボタン
             col1, col2 = st.columns([1, 3])
             with col1:
-                show_forecast = st.button("▶ 着地予測を表示", type="primary", use_container_width=True)
+                show_forecast = st.button("▶ 着地予測を表示", type="primary", width="stretch")
             
             if show_forecast or st.session_state.get('show_forecast_detail', False):
                 st.session_state.show_forecast_detail = True
@@ -1436,13 +1436,13 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             ord_rate = (ord_forecast / sales_forecast * 100) if sales_forecast != 0 else 0
             
             with col1:
-                if st.button(f"粗利率: {gp_rate:.1f}%", use_container_width=True, key="drill_gp"):
+                if st.button(f"粗利率: {gp_rate:.1f}%", width="stretch", key="drill_gp"):
                     st.session_state.drill_item = "粗利率"
             with col2:
-                if st.button(f"営業利益率: {op_rate:.1f}%", use_container_width=True, key="drill_op"):
+                if st.button(f"営業利益率: {op_rate:.1f}%", width="stretch", key="drill_op"):
                     st.session_state.drill_item = "営業利益率"
             with col3:
-                if st.button(f"経常利益率: {ord_rate:.1f}%", use_container_width=True, key="drill_ord"):
+                if st.button(f"経常利益率: {ord_rate:.1f}%", width="stretch", key="drill_ord"):
                     st.session_state.drill_item = "経常利益率"
             
             # ドリルダウン表示
@@ -1770,7 +1770,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 margin=dict(l=20, r=20, t=40, b=20)
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
@@ -1952,7 +1952,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 
                 with col1:
                     st.markdown("**1. 前期実績をコピー**")
-                    if st.button("📋 前期実績をコピー", use_container_width=True):
+                    if st.button("📋 前期実績をコピー", width="stretch"):
                         # 前期のデータを現在のシナリオにコピー
                         st.info("前期実績コピー機能は今後実装予定です")
                 
@@ -1975,7 +1975,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         key="bulk_amount"
                     )
                     
-                    if st.button("✏️ 全月に適用", use_container_width=True, key="apply_bulk"):
+                    if st.button("✏️ 全月に適用", width="stretch", key="apply_bulk"):
                         if bulk_amount != 0:
                             # 全月に同じ金額を設定
                             values = {month: bulk_amount for month in months}
@@ -2015,7 +2015,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         key="ratio_input"
                     )
                     
-                    if st.button("🔢 前年×係数で計算", use_container_width=True):
+                    if st.button("🔢 前年×係数で計算", width="stretch"):
                         st.info("前年比率計算機能は今後実装予定です")
             
             st.markdown("---")
@@ -2159,7 +2159,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             edited_df = st.data_editor(
                 edit_df,
                 column_config=column_config,
-                use_container_width=True,
+                width="stretch",
                 height=600,
                 key="forecast_pl_editor",
                 hide_index=True,
@@ -2364,7 +2364,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         template="plotly_white"
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
             else:
                 st.warning("キャッシュフローデータがありません。")
         
@@ -2525,7 +2525,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         yaxis=dict(tickformat=',.0f')
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
         
         elif st.session_state.page == "運転資本分析":
             st.title("🔄 運転資本分析")
@@ -2642,7 +2642,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         yaxis=dict(tickformat=',.0f', title="金額（円）")
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                     
                     # CCC推移
                     st.markdown("### ⏱️ CCC（キャッシュコンバージョンサイクル）推移")
@@ -2665,7 +2665,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         yaxis=dict(title="日数")
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                     
                     # 分析コメント
                     st.markdown("---")
@@ -2804,7 +2804,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         template="plotly_white"
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                     
                     # 推奨改善アクション
                     st.markdown("### 💡 推奨改善アクション")
@@ -3042,7 +3042,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     template="plotly_white"
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
                 
                 # 改善提案
                 st.markdown("### 💡 改善提案")
@@ -3298,7 +3298,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 
                 st.dataframe(
                     display_df,
-                    use_container_width=True,
+                    width="stretch",
                     height=500,
                     hide_index=True
                 )
@@ -3328,7 +3328,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     template="plotly_white"
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
                 
                 # CSVダウンロード
                 st.markdown("---")
@@ -3619,7 +3619,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.markdown("#### PLデータ プレビュー")
                             st.dataframe(
                                 st.session_state.pl_data.head(20),
-                                use_container_width=True,
+                                width="stretch",
                                 height=400
                             )
                         
@@ -3627,7 +3627,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.markdown("#### BSデータ プレビュー")
                             st.dataframe(
                                 st.session_state.bs_data.head(20),
-                                use_container_width=True,
+                                width="stretch",
                                 height=400
                             )
                         
@@ -3655,7 +3655,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                         '現金増減': '¥{:,.0f}',
                                         '期末現金': '¥{:,.0f}'
                                     })
-                                    st.dataframe(formatted_cf, use_container_width=True, height=400)
+                                    st.dataframe(formatted_cf, width="stretch", height=400)
                             else:
                                 st.info("CF計算データがありません")
                         
@@ -3671,7 +3671,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         
                         col1, col2 = st.columns([1, 3])
                         with col1:
-                            if st.button("✅ インポート実行", type="primary", use_container_width=True):
+                            if st.button("✅ インポート実行", type="primary", width="stretch"):
                                 progress_bar = st.progress(0)
                                 status_text = st.empty()
                                 
@@ -3745,7 +3745,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                     st.code(traceback.format_exc())
                         
                         with col2:
-                            if st.button("🔄 キャンセル", use_container_width=True):
+                            if st.button("🔄 キャンセル", width="stretch"):
                                 # キャッシュクリア
                                 for key in ['bs_data', 'pl_data', 'cf_data', 'file_metadata', 'show_actual_import']:
                                     if key in st.session_state:
