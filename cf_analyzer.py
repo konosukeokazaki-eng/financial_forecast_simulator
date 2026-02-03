@@ -35,23 +35,25 @@ class CashFlowAnalyzer:
             sys.stderr.write(f"📊 BS読み込み開始: {file_path}\n")
             sys.stderr.flush()
             
-            # Excelファイルを読み込み（ヘッダーは行0）
-            df = pd.read_excel(file_path, sheet_name=sheet_name)
+            # Excelファイルを読み込み（header=Noneで生データとして読み込む）
+            df = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
             
-            # 0行目をヘッダーとして使用
-            headers = df.iloc[0].values
-            df = df.iloc[1:].reset_index(drop=True)
-            df.columns = headers
+            # 6行目（インデックス6）をヘッダーとして使用
+            # 0-5行目はメタデータ
+            headers = df.iloc[6].values
+            df_data = df.iloc[7:].reset_index(drop=True)
+            df_data.columns = headers
             
-            # 勘定科目列を取得
-            account_col = df.columns[0]
+            # 最初の列を勘定科目列として取得
+            account_col = df_data.columns[0]
             
             # 月度列を特定
-            month_cols = [col for col in df.columns if '月度' in str(col)]
+            month_cols = [col for col in df_data.columns if '月度' in str(col)]
             
             sys.stderr.write(f"   勘定科目列: {account_col}\n")
             sys.stderr.write(f"   月度列数: {len(month_cols)}\n")
             sys.stderr.write(f"   月度列: {month_cols}\n")
+            sys.stderr.flush()
             
             # BSの主要項目を抽出
             bs_data = {
@@ -65,13 +67,18 @@ class CashFlowAnalyzer:
             
             current_type = None
             
-            for idx, row in df.iterrows():
+            for idx, row in df_data.iterrows():
                 account = row[account_col]
                 
+                # NaNチェック（スカラー値として）
                 if pd.isna(account):
                     continue
                 
                 account_str = str(account).strip()
+                
+                # 空文字チェック
+                if not account_str or account_str == 'nan':
+                    continue
                 
                 # 項目タイプを判定
                 if '[' in account_str and ']' in account_str:
