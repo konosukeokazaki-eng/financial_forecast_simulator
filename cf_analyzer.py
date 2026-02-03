@@ -35,30 +35,63 @@ class CashFlowAnalyzer:
             sys.stderr.write(f"📊 BS読み込み開始: {file_path}\n")
             sys.stderr.flush()
             
-            # Excelファイルを読み込み（header=Noneで生データとして読み込む）
-            df = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
+            # Excelファイルをopenpyxlで読み込み
+            import openpyxl
+            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            
+            if sheet_name not in wb.sheetnames:
+                sys.stderr.write(f"❌ シート '{sheet_name}' が見つかりません\n")
+                sys.stderr.write(f"   利用可能なシート: {wb.sheetnames}\n")
+                sys.stderr.flush()
+                wb.close()
+                return pd.DataFrame()
+            
+            sheet = wb[sheet_name]
+            
+            # シート全体をデータフレームに変換
+            data = []
+            for row in sheet.iter_rows(values_only=True):
+                data.append(row)
+            
+            wb.close()
+            
+            # DataFrameに変換
+            df = pd.DataFrame(data)
             
             # 6行目（インデックス6）をヘッダーとして使用
-            # 0-5行目はメタデータ
-            headers = df.iloc[6].values
+            if len(df) < 8:
+                sys.stderr.write(f"❌ データ行数が不足: {len(df)}行\n")
+                sys.stderr.flush()
+                return pd.DataFrame()
+            
+            # ヘッダー行を取得
+            headers = df.iloc[6].tolist()
+            
+            # データ行を抽出（7行目以降）
             df_data = df.iloc[7:].reset_index(drop=True)
             df_data.columns = headers
             
-            # 最初の列を勘定科目列として取得
-            account_col = df_data.columns[0]
+            # 最初の列名を取得
+            first_col = df_data.columns[0]
             
             # 月度列を特定
-            month_cols = [col for col in df_data.columns if '月度' in str(col)]
+            month_cols = [col for col in df_data.columns if col is not None and '月度' in str(col)]
             
-            sys.stderr.write(f"   勘定科目列: {account_col}\n")
+            sys.stderr.write(f"   勘定科目列: {first_col}\n")
             sys.stderr.write(f"   月度列数: {len(month_cols)}\n")
             sys.stderr.write(f"   月度列: {month_cols}\n")
             sys.stderr.flush()
             
+            if len(month_cols) == 0:
+                sys.stderr.write(f"❌ 月度列が見つかりません\n")
+                sys.stderr.write(f"   列名: {df_data.columns.tolist()}\n")
+                sys.stderr.flush()
+                return pd.DataFrame()
+            
             # BSの主要項目を抽出
             bs_data = {
                 '勘定科目': [],
-                '項目タイプ': []  # 資産・負債・純資産
+                '項目タイプ': []
             }
             
             # 月度データを初期化
@@ -68,16 +101,17 @@ class CashFlowAnalyzer:
             current_type = None
             
             for idx, row in df_data.iterrows():
-                account = row[account_col]
+                # 最初の列の値を取得
+                account_value = row.iloc[0]
                 
-                # NaNチェック（スカラー値として）
-                if pd.isna(account):
+                # NaNチェック
+                if pd.isna(account_value):
                     continue
                 
-                account_str = str(account).strip()
+                account_str = str(account_value).strip()
                 
                 # 空文字チェック
-                if not account_str or account_str == 'nan':
+                if not account_str or account_str == 'nan' or account_str == 'None':
                     continue
                 
                 # 項目タイプを判定
@@ -85,27 +119,20 @@ class CashFlowAnalyzer:
                     # 大分類（例: [現金･預金]）
                     current_type = account_str.replace('[', '').replace(']', '')
                     continue
-                elif '合計' in account_str:
-                    # 合計行は記録
-                    bs_data['勘定科目'].append(account_str)
-                    bs_data['項目タイプ'].append(current_type if current_type else '不明')
-                    
-                    for month_col in month_cols:
-                        val = row[month_col]
-                        bs_data[month_col].append(float(val) if pd.notna(val) and val != '' else 0)
-                else:
-                    # 個別項目
-                    bs_data['勘定科目'].append(account_str)
-                    bs_data['項目タイプ'].append(current_type if current_type else '不明')
-                    
-                    for month_col in month_cols:
-                        val = row[month_col]
-                        bs_data[month_col].append(float(val) if pd.notna(val) and val != '' else 0)
+                
+                # データを記録（合計行も個別項目も全て記録）
+                bs_data['勘定科目'].append(account_str)
+                bs_data['項目タイプ'].append(current_type if current_type else '不明')
+                
+                for month_col in month_cols:
+                    val = row[month_col]
+                    bs_data[month_col].append(float(val) if pd.notna(val) and val != '' else 0)
             
             result_df = pd.DataFrame(bs_data)
             
             sys.stderr.write(f"✅ BS読み込み完了: {len(result_df)}項目\n")
-            sys.stderr.write(f"   項目タイプ: {result_df['項目タイプ'].unique()}\n")
+            if not result_df.empty:
+                sys.stderr.write(f"   項目タイプ: {result_df['項目タイプ'].unique().tolist()}\n")
             sys.stderr.flush()
             
             return result_df
