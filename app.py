@@ -3504,22 +3504,26 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                     """)
                                 else:
                                     # メタデータを読み込み（BSシートから）
-                                    df_meta = pd.read_excel(temp_path, sheet_name='貸･事業所(合計)', header=None)
+                                    import openpyxl
+                                    wb_meta = openpyxl.load_workbook(temp_path, read_only=True, data_only=True)
+                                    sheet_meta = wb_meta['貸･事業所(合計)']
                                     
                                     # A3: 会社名
-                                    company_name_raw = str(df_meta.iloc[2, 0]) if len(df_meta) > 2 else ""
+                                    company_name_raw = str(sheet_meta['A3'].value) if sheet_meta['A3'].value else ""
                                     company_name = company_name_raw.replace('事業所名：', '').strip()
                                     
                                     # A4: 処理日時
-                                    process_time_raw = str(df_meta.iloc[3, 0]) if len(df_meta) > 3 else ""
+                                    process_time_raw = str(sheet_meta['A4'].value) if sheet_meta['A4'].value else ""
                                     process_time = process_time_raw.replace('処理日時：', '').strip()
                                     
                                     # A5: 会計期間
-                                    period_raw = str(df_meta.iloc[4, 0]) if len(df_meta) > 4 else ""
+                                    period_raw = str(sheet_meta['A5'].value) if sheet_meta['A5'].value else ""
                                     period_parts = period_raw.replace('集計期間：', '').strip().split(',')
                                     
                                     period_start = period_parts[0] if len(period_parts) > 0 else ""
                                     period_end = period_parts[1] if len(period_parts) > 1 else ""
+                                    
+                                    wb_meta.close()
                                     
                                     # メタデータを保存
                                     metadata = {
