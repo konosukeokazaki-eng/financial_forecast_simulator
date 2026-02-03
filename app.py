@@ -3444,150 +3444,306 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         elif st.session_state.page == "データインポート":
             st.title("データ取込")
             
-            # タブで実績データ、予測データ、BS・CFを分ける
-            tab1, tab2, tab3 = st.tabs(["💰 実績データインポート", "📊 予測データインポート", "🏦 BS・CFインポート"])
+            # タブで実績データと予測データを分ける
+            tab1, tab2 = st.tabs(["💰 実績データインポート（BS・PL統合）", "📊 予測データインポート"])
             
-            # ===== タブ1: 実績データインポート =====
+            # ===== タブ1: 実績データインポート（BS・PL統合） =====
             with tab1:
-                st.markdown("### Excelファイルから実績データを取り込む")
+                st.markdown("### 📊 BS・PLを含むExcelファイルから実績データを一括取り込み")
                 st.caption("弥生会計からエクスポートしたExcelファイルをアップロード")
                 
+                st.info("""
+                💡 **対応ファイル形式:**
+                - シート「貸･事業所(合計)」（BS: 貸借対照表）
+                - シート「損･事業所(合計)」（PL: 損益計算書）
+                
+                ファイルから自動で以下を認識します:
+                - 会社名（A3セル）
+                - 処理日時（A4セル）※最新データかチェック
+                - 会計期間（A5セル）
+                """)
+                
                 uploaded_file = st.file_uploader(
-                    "Excelファイルを選択",
+                    "Excelファイルを選択（BS・PL両シート含む）",
                     type=['xlsx', 'xls'],
-                    help="弥生会計の月次推移表をアップロードしてください",
-                    key="actual_upload"
+                    help="弥生会計からエクスポートしたBS・PLファイルをアップロード",
+                    key="actual_bs_pl_upload"
                 )
                 
                 # ファイルが削除された場合のキャッシュクリア
                 if uploaded_file is None:
-                    if 'imported_df' in st.session_state:
-                        del st.session_state.imported_df
-                    if 'show_import_button' in st.session_state:
-                        del st.session_state.show_import_button
+                    for key in ['bs_data', 'pl_data', 'cf_data', 'file_metadata', 'show_actual_import']:
+                        if key in st.session_state:
+                            del st.session_state[key]
                 
                 if uploaded_file:
-                    # ファイル読み込み（キャッシュ）
-                    if 'imported_df' not in st.session_state:
-                        with st.spinner("📂 ファイルを読み込んでいます..."):
+                    if 'bs_data' not in st.session_state:
+                        with st.spinner("📂 BS・PLファイルを読み込んでいます..."):
                             try:
+                                # 一時ファイルに保存
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
                                     tmp_file.write(uploaded_file.read())
                                     temp_path = tmp_file.name
                                 
-                                # プレビュー読み込み（軽量処理）
-                                imported_df, info = processor.import_yayoi_excel(
-                                    temp_path, 
-                                    st.session_state.selected_period_id,
-                                    preview_only=True
-                                )
+                                # Excelファイルを開く
+                                import openpyxl
+                                wb = openpyxl.load_workbook(temp_path, read_only=True, data_only=True)
                                 
-                                # 一時ファイル削除
-                                if os.path.exists(temp_path):
-                                    os.unlink(temp_path)
+                                # シート名を確認
+                                has_bs = '貸･事業所(合計)' in wb.sheetnames
+                                has_pl = '損･事業所(合計)' in wb.sheetnames
                                 
-                                if imported_df is not None and not imported_df.empty:
-                                    st.session_state.imported_df = imported_df
-                                    st.session_state.show_import_button = True
-                                    st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
+                                if not has_bs or not has_pl:
+                                    st.error("❌ 必要なシートが見つかりません")
+                                    st.markdown(f"""
+                                    **検出されたシート:** {', '.join(wb.sheetnames)}
+                                    
+                                    **必要なシート:**
+                                    - 貸･事業所(合計) {'✅' if has_bs else '❌'}
+                                    - 損･事業所(合計) {'✅' if has_pl else '❌'}
+                                    """)
                                 else:
-                                    st.error("❌ ファイルの読み込みに失敗しました")
+                                    # メタデータを読み込み（BSシートから）
+                                    df_meta = pd.read_excel(temp_path, sheet_name='貸･事業所(合計)', header=None)
+                                    
+                                    # A3: 会社名
+                                    company_name_raw = str(df_meta.iloc[2, 0]) if len(df_meta) > 2 else ""
+                                    company_name = company_name_raw.replace('事業所名：', '').strip()
+                                    
+                                    # A4: 処理日時
+                                    process_time_raw = str(df_meta.iloc[3, 0]) if len(df_meta) > 3 else ""
+                                    process_time = process_time_raw.replace('処理日時：', '').strip()
+                                    
+                                    # A5: 会計期間
+                                    period_raw = str(df_meta.iloc[4, 0]) if len(df_meta) > 4 else ""
+                                    period_parts = period_raw.replace('集計期間：', '').strip().split(',')
+                                    
+                                    period_start = period_parts[0] if len(period_parts) > 0 else ""
+                                    period_end = period_parts[1] if len(period_parts) > 1 else ""
+                                    
+                                    # メタデータを保存
+                                    metadata = {
+                                        'company_name': company_name,
+                                        'process_time': process_time,
+                                        'period_start': period_start,
+                                        'period_end': period_end
+                                    }
+                                    st.session_state.file_metadata = metadata
+                                    
+                                    # BSを読み込み
+                                    bs_data = cf_analyzer.load_bs_from_yayoi(temp_path, sheet_name='貸･事業所(合計)')
+                                    
+                                    # PLを読み込み（既存のimport_yayoi_excelを使用）
+                                    pl_df, info = processor.import_yayoi_excel(
+                                        temp_path,
+                                        st.session_state.selected_period_id,
+                                        preview_only=True
+                                    )
+                                    
+                                    # 一時ファイル削除
+                                    if os.path.exists(temp_path):
+                                        os.unlink(temp_path)
+                                    
+                                    if not bs_data.empty and pl_df is not None and not pl_df.empty:
+                                        st.session_state.bs_data = bs_data
+                                        st.session_state.pl_data = pl_df
+                                        st.session_state.show_actual_import = True
+                                        
+                                        # CFを自動計算
+                                        with st.spinner("💰 キャッシュフローを計算しています..."):
+                                            cf_data = cf_analyzer.calculate_cash_flow(
+                                                pl_df,
+                                                bs_data
+                                            )
+                                            
+                                            if cf_data:
+                                                st.session_state.cf_data = cf_data
+                                        
+                                        st.success(f"✅ ファイル **{uploaded_file.name}** を読み込みました")
+                                    else:
+                                        st.error("❌ BS・PLの読み込みに失敗しました")
                             
                             except Exception as e:
                                 st.error(f"❌ エラー: {str(e)}")
-                                if 'imported_df' in st.session_state:
-                                    del st.session_state.imported_df
+                                import traceback
+                                st.code(traceback.format_exc())
+                    
+                    # データが読み込まれている場合
+                    if st.session_state.get('show_actual_import'):
+                        metadata = st.session_state.file_metadata
                         
-                    if st.session_state.get('show_import_button'):
                         st.markdown("---")
-                        st.markdown("### 📋 データプレビュー")
+                        st.markdown("### 📋 ファイル情報")
                         
-                        # データサマリー
-                        col1, col2, col3 = st.columns(3)
+                        # ファイルメタデータを表示
+                        col1, col2 = st.columns(2)
                         with col1:
-                            st.metric("項目数", len(st.session_state.imported_df))
+                            st.markdown(f"""
+                            **🏢 会社名:** {metadata['company_name']}  
+                            **📅 会計期間:** {metadata['period_start']} 〜 {metadata['period_end']}
+                            """)
                         with col2:
-                            months = [c for c in st.session_state.imported_df.columns if c != '項目名']
-                            st.metric("月数", len(months))
-                        with col3:
-                            non_zero = (st.session_state.imported_df[months] != 0).sum().sum()
-                            st.metric("データ数", non_zero)
+                            st.markdown(f"""
+                            **⏰ 処理日時:** {metadata['process_time']}
+                            """)
                         
-                        # プレビュー表示（編集可能）
-                        with st.expander("📊 データを確認・編集", expanded=True):
-                            edited_df = st.data_editor(
-                                st.session_state.imported_df,
-                                use_container_width=True,
-                                height=400,
-                                num_rows="fixed",
-                                disabled=["項目名"],
-                                column_config={
-                                    col: st.column_config.NumberColumn(
-                                        format="%,.0f",  # カンマ区切り（通貨記号なし）
-                                        min_value=-999999999,
-                                        max_value=999999999
-                                    ) for col in st.session_state.imported_df.columns if col != '項目名'
-                                },
-                                key="actual_editor"
-                            )
-                            
-                            # 編集を保存
-                            st.session_state.imported_df = edited_df
+                        # 会社名チェック
+                        if metadata['company_name'] != st.session_state.selected_comp_name:
+                            st.warning(f"⚠️ ファイルの会社名（{metadata['company_name']}）と選択中の会社名（{st.session_state.selected_comp_name}）が異なります")
                         
                         st.markdown("---")
+                        st.markdown("### 📊 データサマリー")
                         
-                        # 警告
-                        st.warning("⚠️ インポートを実行すると、現在の実績データは上書きされます。")
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("BS項目数", len(st.session_state.bs_data))
+                        with col2:
+                            st.metric("PL項目数", len(st.session_state.pl_data))
+                        with col3:
+                            month_cols = [c for c in st.session_state.bs_data.columns if '月度' in str(c)]
+                            st.metric("月数", len(month_cols))
+                        with col4:
+                            if 'cf_data' in st.session_state:
+                                st.metric("CF計算", "✅ 完了")
+                            else:
+                                st.metric("CF計算", "❌ 未完了")
+                        
+                        # タブでBS・PL・CFを表示
+                        data_tab1, data_tab2, data_tab3 = st.tabs(["📈 PL（損益計算書）", "📊 BS（貸借対照表）", "💰 CF（キャッシュフロー）"])
+                        
+                        with data_tab1:
+                            st.markdown("#### PLデータ プレビュー")
+                            st.dataframe(
+                                st.session_state.pl_data.head(20),
+                                use_container_width=True,
+                                height=400
+                            )
+                        
+                        with data_tab2:
+                            st.markdown("#### BSデータ プレビュー")
+                            st.dataframe(
+                                st.session_state.bs_data.head(20),
+                                use_container_width=True,
+                                height=400
+                            )
+                        
+                        with data_tab3:
+                            if 'cf_data' in st.session_state and st.session_state.cf_data:
+                                st.markdown("#### CFデータ プレビュー")
+                                cf_rows = []
+                                for month, cf_month_data in st.session_state.cf_data.items():
+                                    if '営業CF' in cf_month_data and '合計' in cf_month_data['営業CF']:
+                                        cf_rows.append({
+                                            '月': month,
+                                            '営業CF': cf_month_data['営業CF']['合計'],
+                                            '投資CF': cf_month_data['投資CF'].get('合計', 0),
+                                            '財務CF': cf_month_data['財務CF'].get('合計', 0),
+                                            '現金増減': cf_month_data.get('現金増減', 0),
+                                            '期末現金': cf_month_data.get('期末現金', 0)
+                                        })
+                                
+                                if cf_rows:
+                                    cf_df = pd.DataFrame(cf_rows)
+                                    formatted_cf = cf_df.style.format({
+                                        '営業CF': '¥{:,.0f}',
+                                        '投資CF': '¥{:,.0f}',
+                                        '財務CF': '¥{:,.0f}',
+                                        '現金増減': '¥{:,.0f}',
+                                        '期末現金': '¥{:,.0f}'
+                                    })
+                                    st.dataframe(formatted_cf, use_container_width=True, height=400)
+                            else:
+                                st.info("CF計算データがありません")
+                        
+                        st.markdown("---")
                         
                         # インポートボタン
+                        st.warning("⚠️ インポートを実行すると、以下のデータがデータベースに保存されます")
+                        st.markdown("""
+                        - ✅ PL（損益計算書）実績データ
+                        - ✅ BS（貸借対照表）データ
+                        - ✅ CF（キャッシュフロー）データ
+                        """)
+                        
                         col1, col2 = st.columns([1, 3])
                         with col1:
                             if st.button("✅ インポート実行", type="primary", use_container_width=True):
-                                # プログレスバー付きで保存
                                 progress_bar = st.progress(0)
                                 status_text = st.empty()
                                 
                                 try:
-                                    status_text.text("💾 データベースに保存中...")
-                                    progress_bar.progress(30)
+                                    # PL実績データ保存
+                                    status_text.text("💾 PLデータを保存中...")
+                                    progress_bar.progress(20)
                                     
-                                    # 保存処理
-                                    success, info = processor.save_extracted_data(
+                                    success_pl, info_pl = processor.save_extracted_data(
                                         st.session_state.selected_period_id,
-                                        st.session_state.imported_df
+                                        st.session_state.pl_data
                                     )
+                                    
+                                    # BSデータ保存
+                                    status_text.text("💾 BSデータを保存中...")
+                                    progress_bar.progress(40)
+                                    
+                                    success_bs = cf_analyzer.save_bs_to_db(
+                                        st.session_state.selected_period_id,
+                                        st.session_state.bs_data
+                                    )
+                                    
+                                    # CFデータ保存
+                                    status_text.text("💾 CFデータを保存中...")
+                                    progress_bar.progress(60)
+                                    
+                                    success_cf = False
+                                    if 'cf_data' in st.session_state and st.session_state.cf_data:
+                                        success_cf = cf_analyzer.save_cf_to_db(
+                                            st.session_state.selected_period_id,
+                                            st.session_state.cf_data
+                                        )
                                     
                                     progress_bar.progress(80)
                                     
-                                    if success:
+                                    # 結果確認
+                                    if success_pl and success_bs:
                                         progress_bar.progress(100)
                                         status_text.text("✅ 完了")
                                         st.success("✅ インポートが完了しました！")
                                         
+                                        if success_cf:
+                                            st.success("✅ CFデータも保存されました")
+                                        
                                         # キャッシュクリア
-                                        for key in ['actuals_df', 'imported_df', 'show_import_button', 'pl_df', 'forecast_data_cache']:
+                                        for key in ['bs_data', 'pl_data', 'cf_data', 'file_metadata', 'show_actual_import', 
+                                                   'actuals_df', 'imported_df', 'pl_df', 'forecast_data_cache']:
                                             if key in st.session_state:
                                                 del st.session_state[key]
                                         
                                         st.cache_data.clear()
                                         
-                                        # 3秒後にリロード
+                                        # リロード
                                         import time
                                         time.sleep(1)
                                         st.rerun()
                                     else:
                                         progress_bar.empty()
                                         status_text.empty()
-                                        st.error(f"❌ インポートに失敗しました: {info}")
+                                        st.error(f"❌ インポートに失敗しました")
+                                        if not success_pl:
+                                            st.error(f"PL保存エラー: {info_pl}")
+                                        if not success_bs:
+                                            st.error("BS保存エラー")
                                 
                                 except Exception as e:
                                     progress_bar.empty()
                                     status_text.empty()
                                     st.error(f"❌ エラーが発生しました: {str(e)}")
+                                    import traceback
+                                    st.code(traceback.format_exc())
                         
                         with col2:
                             if st.button("🔄 キャンセル", use_container_width=True):
-                                for key in ['imported_df', 'show_import_button']:
+                                # キャッシュクリア
+                                for key in ['bs_data', 'pl_data', 'cf_data', 'file_metadata', 'show_actual_import']:
                                     if key in st.session_state:
                                         del st.session_state[key]
                                 st.rerun()
@@ -3750,161 +3906,6 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             else:
                                 st.error(f"❌ インポートに失敗しました: {info}")
             
-            # ===== タブ3: BS・CFインポート =====
-            with tab3:
-                st.markdown("### BS（貸借対照表）とPL（損益計算書）から自動CF計算")
-                st.caption("弥生会計からエクスポートしたBS・PLを含むExcelファイルをアップロード")
-                
-                uploaded_bs_pl_file = st.file_uploader(
-                    "Excelファイルを選択（BS・PLシート含む）",
-                    type=['xlsx', 'xls'],
-                    help="「貸･事業所(合計)」「損･事業所(合計)」の両シートを含むファイル",
-                    key="bs_pl_upload"
-                )
-                
-                if uploaded_bs_pl_file is None:
-                    if 'bs_data' in st.session_state:
-                        del st.session_state.bs_data
-                    if 'pl_from_bs_file' in st.session_state:
-                        del st.session_state.pl_from_bs_file
-                    if 'cf_data' in st.session_state:
-                        del st.session_state.cf_data
-                
-                if uploaded_bs_pl_file:
-                    if 'bs_data' not in st.session_state:
-                        with st.spinner("📂 BS・PLファイルを読み込んでいます..."):
-                            try:
-                                # 一時ファイルに保存
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
-                                    tmp_file.write(uploaded_bs_pl_file.read())
-                                    temp_path = tmp_file.name
-                                
-                                # BSを読み込み
-                                bs_data = cf_analyzer.load_bs_from_yayoi(temp_path, sheet_name='貸･事業所(合計)')
-                                
-                                # PLも同じファイルから読み込み（簡易版）
-                                import pandas as pd
-                                df_pl_raw = pd.read_excel(temp_path, sheet_name='損･事業所(合計)')
-                                
-                                # 一時ファイル削除
-                                if os.path.exists(temp_path):
-                                    os.unlink(temp_path)
-                                
-                                if not bs_data.empty and not df_pl_raw.empty:
-                                    st.session_state.bs_data = bs_data
-                                    st.session_state.pl_from_bs_file = df_pl_raw
-                                    st.success(f"✅ ファイル **{uploaded_bs_pl_file.name}** を読み込みました")
-                                    
-                                    # CFを自動計算
-                                    with st.spinner("💰 キャッシュフローを計算しています..."):
-                                        # PLデータを整形（簡易版）
-                                        pl_data_dict = {}
-                                        # TODO: PLデータの整形処理
-                                        
-                                        # CFを計算
-                                        cf_data = cf_analyzer.calculate_cash_flow(
-                                            st.session_state.pl_from_bs_file, 
-                                            bs_data
-                                        )
-                                        
-                                        if cf_data:
-                                            st.session_state.cf_data = cf_data
-                                            st.success("✅ キャッシュフロー計算完了")
-                                            
-                                            # データベースに保存
-                                            with st.spinner("💾 データベースに保存しています..."):
-                                                # BSを保存
-                                                bs_saved = cf_analyzer.save_bs_to_db(
-                                                    st.session_state.selected_period_id,
-                                                    bs_data
-                                                )
-                                                
-                                                # CFを保存
-                                                cf_saved = cf_analyzer.save_cf_to_db(
-                                                    st.session_state.selected_period_id,
-                                                    cf_data
-                                                )
-                                                
-                                                if bs_saved and cf_saved:
-                                                    st.success("✅ データベースに保存完了")
-                                                else:
-                                                    st.warning("⚠️ データベース保存に一部失敗しました")
-                                else:
-                                    st.error("❌ BS・PLシートが見つかりません")
-                            
-                            except Exception as e:
-                                st.error(f"❌ エラー: {str(e)}")
-                                import traceback
-                                st.code(traceback.format_exc())
-                    
-                    # データが読み込まれている場合
-                    if 'bs_data' in st.session_state and 'cf_data' in st.session_state:
-                        st.markdown("---")
-                        st.markdown("### 📊 データサマリー")
-                        
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("BS項目数", len(st.session_state.bs_data))
-                        with col2:
-                            month_cols = [col for col in st.session_state.bs_data.columns if '月度' in str(col)]
-                            st.metric("月数", len(month_cols))
-                        with col3:
-                            st.metric("CF計算月数", len(st.session_state.cf_data))
-                        
-                        st.markdown("---")
-                        st.markdown("### 📋 BSプレビュー")
-                        
-                        bs_preview = st.session_state.bs_data.head(20)
-                        st.dataframe(bs_preview, use_container_width=True, height=400)
-                        
-                        st.markdown("---")
-                        st.markdown("### 💰 CF計算結果プレビュー")
-                        
-                        # CF計算結果を表形式で表示
-                        if st.session_state.cf_data:
-                            cf_rows = []
-                            for month, cf_month_data in st.session_state.cf_data.items():
-                                if '営業CF' in cf_month_data and '合計' in cf_month_data['営業CF']:
-                                    cf_rows.append({
-                                        '月': month,
-                                        '営業CF': cf_month_data['営業CF']['合計'],
-                                        '投資CF': cf_month_data['投資CF'].get('合計', 0),
-                                        '財務CF': cf_month_data['財務CF'].get('合計', 0),
-                                        '現金増減': cf_month_data.get('現金増減', 0),
-                                        '期末現金': cf_month_data.get('期末現金', 0)
-                                    })
-                            
-                            if cf_rows:
-                                cf_df = pd.DataFrame(cf_rows)
-                                
-                                # フォーマット
-                                formatted_cf = cf_df.style.format({
-                                    '営業CF': '¥{:,.0f}',
-                                    '投資CF': '¥{:,.0f}',
-                                    '財務CF': '¥{:,.0f}',
-                                    '現金増減': '¥{:,.0f}',
-                                    '期末現金': '¥{:,.0f}'
-                                })
-                                
-                                st.dataframe(formatted_cf, use_container_width=True, height=400)
-                                
-                                st.markdown("---")
-                                
-                                # CFOダッシュボードに反映ボタン
-                                if st.button("📊 CFOダッシュボードで詳細を確認", type="primary", use_container_width=True):
-                                    st.session_state.page = "CFO意思決定支援ダッシュボード"
-                                    st.rerun()
-                                
-                                st.info("""
-                                💡 **次のステップ:**
-                                - CFOダッシュボードで詳細なCF分析を確認
-                                - 将来予測を実行
-                                - アラートとアクション提案を確認
-                                """)
-                            else:
-                                st.warning("CF計算結果が空です")
-                        else:
-                            st.warning("CF計算データがありません")
         
         elif st.session_state.page == "シナリオ一括設定":
             st.title("シナリオ一括設定")
