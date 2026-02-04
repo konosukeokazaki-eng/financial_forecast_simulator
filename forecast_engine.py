@@ -343,9 +343,9 @@ def auto_forecast_from_actuals(
         sys.stderr.flush()
         
         # 実績データを取得
-        conn = processor._get_connection()
+        conn = processor.get_connection()
         query = """
-            SELECT item_name, value, month
+            SELECT item_name, amount, month
             FROM actual_data
             WHERE fiscal_period_id = ?
             ORDER BY month
@@ -356,6 +356,9 @@ def auto_forecast_from_actuals(
             query = query.replace('?', '%s')
         
         df_actuals = pd.read_sql_query(query, conn, params=(period_id,))
+        
+        # カラム名を'value'にリネーム（後続処理との互換性）
+        df_actuals = df_actuals.rename(columns={'amount': 'value'})
         
         if df_actuals.empty:
             sys.stderr.write("⚠️ 実績データなし\n")
