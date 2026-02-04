@@ -1,340 +1,439 @@
 """
-収益性分析モジュール
-損益分岐点分析、限界利益率分析を実施
+運転資本分析モジュール
+CCC（Cash Conversion Cycle）、運転資本回転期間等を詳細計算
 """
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import sys
 
 
-class ProfitabilityAnalyzer:
-    """収益性分析クラス"""
+class WorkingCapitalAnalyzer:
+    """運転資本分析クラス"""
     
-    def __init__(self, processor=None):
+    def __init__(self):
+        pass
+    
+    def calculate_working_capital_metrics(self, pl_data: Dict, bs_data: Dict,
+                                         bs_previous: Optional[Dict] = None,
+                                         period_months: int = 12,
+                                         actual_period_manager=None,
+                                         period_id: int = None) -> Dict:
         """
-        初期化
+        運転資本関連指標を計算（実績締月まで）
         
         Args:
-            processor: DataProcessorインスタンス
-        """
-        self.processor = processor
-    
-    def analyze_from_db(self, period_id: int) -> Optional[Dict]:
-        """
-        データベースから実績データを取得して収益性分析を実行
-        
-        Args:
+            pl_data: PL データ
+            bs_data: BS データ
+            bs_previous: 前期BSデータ
+            period_months: 期間（月数）
+            actual_period_manager: 実績締月管理インスタンス
             period_id: 会計期間ID
             
         Returns:
-            Dict: 分析結果
+            Dict: 運転資本指標（実績締月までのデータで計算）
         """
-        if not self.processor:
-            return None
-        
-        conn = self.processor._get_connection()
-        return analyze_profitability_from_db(conn, period_id)
-    
-    def analyze_from_dataframe(self, df: pd.DataFrame) -> Optional[Dict]:
-        """
-        DataFrameから収益性分析を実行
-        
-        Args:
-            df: 月次PL/BSデータ
+        try:
+            metrics = {}
             
-        Returns:
-            Dict: 分析結果
-        """
-        return self._calculate_profitability_metrics(df)
-    
-    def _calculate_profitability_metrics(self, df: pd.DataFrame) -> Dict:
-        """
-        収益性指標を計算
-        
-        Args:
-            df: 月次財務データ
+            # 実績締月を確認
+            actual_months = period_months
+            if actual_period_manager and period_id:
+                latest_actual = actual_period_manager.get_latest_actual_month(period_id)
+                actual_months = latest_actual
+                cumulative_data = actual_period_manager.get_cumulative_actual_data(period_id, latest_actual)
+                
+                # 累計実績データでPL/BSを上書き
+                if cumulative_data:
+                    pl_data = {**pl_data, **cumulative_data}
+                    
+                    sys.stderr.write(f"📊 運転資本分析を実績締月({latest_actual}月)までのデータで計算\n")
+                    sys.stderr.flush()
             
-        Returns:
-            Dict: 各種指標
-        """
-        monthly_data = []
-        
-        for _, row in df.iterrows():
-            sales = row.get('売上高', 0)
-            cogs = row.get('売上原価', 0)
-            sg_expenses = row.get('販売費及び一般管理費', 0)
+            # ============ 基本データ取得 ============
             
-            marginal_profit = sales - cogs
-            marginal_profit_rate = marginal_profit / sales if sales > 0 else 0
-            fixed_costs = sg_expenses
-            operating_profit = marginal_profit - fixed_costs
-            breakeven_sales = fixed_costs / marginal_profit_rate if marginal_profit_rate > 0 else 0
-            safety_rate = (sales - breakeven_sales) / sales if sales > 0 else 0
+            # PLデータ
+            sales = pl_data.get('売上高', 0)
+            cogs = pl_data.get('売上原価', 0)
             
-            monthly_data.append({
-                'month': row.get('month', 0),
-                'sales': float(sales),
-                'cogs': float(cogs),
-                'marginal_profit': float(marginal_profit),
-                'marginal_profit_rate': float(marginal_profit_rate),
-                'fixed_costs': float(fixed_costs),
-                'operating_profit': float(operating_profit),
-                'breakeven_sales': float(breakeven_sales),
-                'safety_rate': float(safety_rate)
-            })
-        
-        df_monthly = pd.DataFrame(monthly_data)
-        
-        return {
-            'monthly_data': df_monthly,
-            'average_marginal_profit_rate': df_monthly['marginal_profit_rate'].mean() if not df_monthly.empty else 0
-        }
-
-
-def analyze_profitability_from_db(conn, period_id: int) -> Optional[Dict]:
-    """
-    データベースから実績データを取得して収益性分析を実行
-    
-    Args:
-        conn: データベース接続
-        period_id: 会計期間ID
-        
-    Returns:
-        Dict: 分析結果
-    """
-    try:
-        print(f"🚀 analyze_profitability_from_db開始")
-        print(f"   期間ID: {period_id}")
-        
-        # プレースホルダーの判定
-        placeholder = '%s'  # PostgreSQL用
-        print(f"   プレースホルダー: {placeholder}")
-        
-        # actual_dataテーブルから実績データを取得（amountカラムを使用）
-        query = """
-            SELECT item_name, month, amount
-            FROM actual_data
-            WHERE fiscal_period_id = %s
-            ORDER BY month, item_name
-        """
-        
-        print(f"   SQL実行中...")
-        df = pd.read_sql_query(query, conn, params=(period_id,))
-        
-        # 後続処理との互換性のため、カラム名を'value'にリネーム
-        df = df.rename(columns={'amount': 'value'})
-        
-        if df.empty:
-            print(f"⚠️  実績データが見つかりません")
-            return None
-        
-        print(f"✅ データ取得成功: {len(df)}行")
-        print(f"   monthカラムのサンプル: {df['month'].head(3).tolist()}")
-        print(f"   monthカラムの型: {df['month'].dtype}")
-        
-        # month列が文字列（YYYY-MM形式）の場合、月の部分のみを抽出
-        if df['month'].dtype == 'object' or isinstance(df['month'].iloc[0], str):
-            # 'YYYY-MM' 形式から月番号を抽出
-            df['month_num'] = df['month'].apply(lambda x: int(str(x).split('-')[1]) if '-' in str(x) else int(x))
-            print(f"   月番号変換: {df[['month', 'month_num']].head(3).to_dict('records')}")
-        else:
-            df['month_num'] = df['month']
-        
-        # ピボットして月次×科目の形式に変換
-        df_pivot = df.pivot(index='month_num', columns='item_name', values='value').fillna(0)
-        
-        print(f"   ピボット後の形状: {df_pivot.shape}")
-        print(f"   科目: {list(df_pivot.columns)}")
-        print(f"   月: {df_pivot.index.tolist()}")
-        
-        # 必要な科目が存在するか確認
-        required_items = ['売上高', '売上原価', '販売費及び一般管理費']
-        missing_items = [item for item in required_items if item not in df_pivot.columns]
-        
-        if missing_items:
-            print(f"⚠️  必須科目が不足: {missing_items}")
-            # 不足している科目は0で補完
-            for item in missing_items:
-                df_pivot[item] = 0
-        
-        # 月次分析データを作成
-        monthly_data = []
-        
-        for month_num in df_pivot.index:
-            sales = df_pivot.loc[month_num, '売上高'] if '売上高' in df_pivot.columns else 0
-            cogs = df_pivot.loc[month_num, '売上原価'] if '売上原価' in df_pivot.columns else 0
-            sg_expenses = df_pivot.loc[month_num, '販売費及び一般管理費'] if '販売費及び一般管理費' in df_pivot.columns else 0
+            # 月平均に換算
+            monthly_sales = sales / actual_months if actual_months > 0 else sales
+            monthly_cogs = cogs / actual_months if actual_months > 0 else cogs
             
-            # 限界利益 = 売上 - 変動費（ここでは売上原価を変動費と仮定）
-            marginal_profit = sales - cogs
-            marginal_profit_rate = marginal_profit / sales if sales > 0 else 0
+            # BSデータ（流動資産）
+            cash = bs_data.get('現金･預金合計', 0)
+            receivables = bs_data.get('売掛金', 0)
+            notes_receivable = bs_data.get('受取手形', 0)
+            inventory = bs_data.get('棚卸資産', 0)
+            other_current_assets = bs_data.get('その他流動資産', 0)
             
-            # 固定費（販管費を固定費と仮定）
-            fixed_costs = sg_expenses
+            # BSデータ（流動負債）
+            payables = bs_data.get('買掛金', 0)
+            notes_payable = bs_data.get('支払手形', 0)
+            short_term_debt = bs_data.get('短期借入金', 0)
+            other_current_liabilities = bs_data.get('その他流動負債', 0)
             
-            # 営業利益
-            operating_profit = marginal_profit - fixed_costs
-            
-            # 損益分岐点売上高 = 固定費 / 限界利益率
-            breakeven_sales = fixed_costs / marginal_profit_rate if marginal_profit_rate > 0 else 0
-            
-            # 安全余裕率 = (実際の売上 - 損益分岐点売上高) / 実際の売上
-            safety_rate = (sales - breakeven_sales) / sales if sales > 0 else 0
-            
-            monthly_data.append({
-                'month': int(month_num),
-                'sales': float(sales),
-                'cogs': float(cogs),
-                'marginal_profit': float(marginal_profit),
-                'marginal_profit_rate': float(marginal_profit_rate),
-                'fixed_costs': float(fixed_costs),
-                'operating_profit': float(operating_profit),
-                'breakeven_sales': float(breakeven_sales),
-                'safety_rate': float(safety_rate)
-            })
-        
-        df_monthly = pd.DataFrame(monthly_data)
-        
-        if df_monthly.empty:
-            print(f"⚠️  月次データの生成に失敗")
-            return None
-        
-        print(f"   月次データサンプル:\n{df_monthly.head()}")
-        
-        # トレンド分析
-        if len(df_monthly) >= 3:
-            # 最近3ヶ月の平均と最初3ヶ月の平均を比較
-            recent_avg = df_monthly.tail(3)['marginal_profit_rate'].mean()
-            initial_avg = df_monthly.head(3)['marginal_profit_rate'].mean()
-            
-            if recent_avg > initial_avg * 1.05:
-                trend = 'improving'
-            elif recent_avg < initial_avg * 0.95:
-                trend = 'deteriorating'
+            # 平均値計算（前期データがあれば）
+            if bs_previous:
+                receivables_prev = bs_previous.get('売掛金', receivables)
+                inventory_prev = bs_previous.get('棚卸資産', inventory)
+                payables_prev = bs_previous.get('買掛金', payables)
+                
+                avg_receivables = (receivables + receivables_prev) / 2
+                avg_inventory = (inventory + inventory_prev) / 2
+                avg_payables = (payables + payables_prev) / 2
             else:
-                trend = 'stable'
-        else:
-            trend = 'insufficient_data'
-        
-        # 全体の平均限界利益率
-        avg_marginal_rate = df_monthly['marginal_profit_rate'].mean()
-        
-        result = {
-            'monthly_data': df_monthly,
-            'trend': trend,
-            'average_marginal_profit_rate': float(avg_marginal_rate),
-            'latest_month': int(df_monthly.iloc[-1]['month']),
-            'total_months': len(df_monthly)
-        }
-        
-        print(f"✅ 分析完了")
-        print(f"   トレンド: {trend}")
-        print(f"   平均限界利益率: {avg_marginal_rate*100:.2f}%")
-        print(f"   対象月数: {len(df_monthly)}ヶ月")
-        
-        return result
-        
-    except Exception as e:
-        print(f"❌ analyze_profitability_from_dbエラー: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-
-def calculate_cost_structure(df: pd.DataFrame) -> Dict:
-    """
-    費用構造を分析
+                avg_receivables = receivables
+                avg_inventory = inventory
+                avg_payables = payables
+            
+            # ============ 運転資本 ============
+            
+            current_assets = cash + receivables + notes_receivable + inventory + other_current_assets
+            current_liabilities = payables + notes_payable + short_term_debt + other_current_liabilities
+            
+            working_capital = current_assets - current_liabilities
+            metrics['運転資本'] = working_capital
+            
+            # 純運転資本（有利子負債を除く）
+            net_working_capital = (receivables + inventory) - (payables + notes_payable)
+            metrics['純運転資本'] = net_working_capital
+            
+            # ============ 回転期間分析 ============
+            
+            # 売上債権回転期間（日）= 売掛金 / (売上高 / 365)
+            if sales > 0:
+                receivables_days = (avg_receivables / (sales / 365))
+                metrics['売上債権回転期間'] = receivables_days
+            else:
+                metrics['売上債権回転期間'] = 0
+            
+            # 棚卸資産回転期間（日）= 棚卸資産 / (売上原価 / 365)
+            if cogs > 0:
+                inventory_days = (avg_inventory / (cogs / 365))
+                metrics['棚卸資産回転期間'] = inventory_days
+            else:
+                metrics['棚卸資産回転期間'] = 0
+            
+            # 仕入債務回転期間（日）= 買掛金 / (売上原価 / 365)
+            # 注: 仕入高が理想だが、データがないため売上原価で代用
+            if cogs > 0:
+                payables_days = (avg_payables / (cogs / 365))
+                metrics['仕入債務回転期間'] = payables_days
+            else:
+                metrics['仕入債務回転期間'] = 0
+            
+            # ============ CCC（Cash Conversion Cycle）============
+            
+            ccc = (metrics['売上債権回転期間'] + 
+                   metrics['棚卸資産回転期間'] - 
+                   metrics['仕入債務回転期間'])
+            metrics['CCC'] = ccc
+            
+            # ============ 運転資本比率 ============
+            
+            # 運転資本比率 = 運転資本 / 売上高 × 100
+            if sales > 0:
+                metrics['運転資本比率'] = (working_capital / sales) * 100
+            else:
+                metrics['運転資本比率'] = 0
+            
+            # 運転資本回転率 = 売上高 / 運転資本
+            if working_capital > 0:
+                metrics['運転資本回転率'] = sales / working_capital
+            else:
+                metrics['運転資本回転率'] = 0
+            
+            # ============ 各項目の売上高比率 ============
+            
+            if sales > 0:
+                metrics['売掛金_売上高比率'] = (receivables / sales) * 100
+                metrics['棚卸資産_売上高比率'] = (inventory / sales) * 100
+                metrics['買掛金_売上高比率'] = (payables / sales) * 100
+            else:
+                metrics['売掛金_売上高比率'] = 0
+                metrics['棚卸資産_売上高比率'] = 0
+                metrics['買掛金_売上高比率'] = 0
+            
+            # ============ キャッシュギャップ分析 ============
+            
+            # 現金ベースの運転資本
+            cash_working_capital = cash + receivables + inventory - payables - notes_payable
+            metrics['現金ベース運転資本'] = cash_working_capital
+            
+            # 現金化日数 = 売上債権回転期間 + 棚卸資産回転期間
+            metrics['現金化日数'] = metrics['売上債権回転期間'] + metrics['棚卸資産回転期間']
+            
+            # 支払猶予日数 = 仕入債務回転期間
+            metrics['支払猶予日数'] = metrics['仕入債務回転期間']
+            
+            return metrics
+            
+        except Exception as e:
+            sys.stderr.write(f"❌ 運転資本分析エラー: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
+            return {}
     
-    Args:
-        df: 月次PL/BSデータ
+    def analyze_working_capital_trend(self, historical_data: List[Dict]) -> Dict:
+        """
+        運転資本の推移分析
         
-    Returns:
-        Dict: 変動費率、固定費などの分析結果
-    """
-    try:
-        # 売上と原価の関係から変動費率を推定
-        if 'sales' not in df.columns or 'cogs' not in df.columns:
+        Args:
+            historical_data: 過去データのリスト
+            
+        Returns:
+            Dict: トレンド分析結果
+        """
+        if not historical_data or len(historical_data) < 2:
             return {}
         
-        # 線形回帰で変動費率を推定
-        from sklearn.linear_model import LinearRegression
+        try:
+            analysis = {}
+            
+            # CCCの推移
+            ccc_values = [d.get('CCC', 0) for d in historical_data]
+            
+            # トレンド判定
+            if len(ccc_values) >= 3:
+                recent_avg = np.mean(ccc_values[-3:])
+                initial_avg = np.mean(ccc_values[:3])
+                
+                ccc_change = recent_avg - initial_avg
+                ccc_change_pct = (ccc_change / initial_avg * 100) if initial_avg != 0 else 0
+                
+                analysis['CCC推移'] = {
+                    '初期平均': initial_avg,
+                    '最近平均': recent_avg,
+                    '変化': ccc_change,
+                    '変化率': ccc_change_pct,
+                    'トレンド': 'improving' if ccc_change < 0 else ('deteriorating' if ccc_change > 0 else 'stable')
+                }
+            
+            # 運転資本の推移
+            wc_values = [d.get('運転資本', 0) for d in historical_data]
+            
+            if len(wc_values) >= 2:
+                wc_change = wc_values[-1] - wc_values[0]
+                wc_change_pct = (wc_change / wc_values[0] * 100) if wc_values[0] != 0 else 0
+                
+                analysis['運転資本推移'] = {
+                    '期首': wc_values[0],
+                    '期末': wc_values[-1],
+                    '変化': wc_change,
+                    '変化率': wc_change_pct
+                }
+            
+            return analysis
+            
+        except Exception as e:
+            sys.stderr.write(f"❌ 運転資本トレンド分析エラー: {e}\n")
+            return {}
+    
+    def get_working_capital_recommendations(self, metrics: Dict) -> List[Dict]:
+        """
+        運転資本改善の提案を生成
         
-        X = df[['sales']].values
-        y = df['cogs'].values
+        Args:
+            metrics: 計算済み運転資本指標
+            
+        Returns:
+            List[Dict]: 改善提案のリスト
+        """
+        recommendations = []
         
-        model = LinearRegression()
-        model.fit(X, y)
+        ccc = metrics.get('CCC', 0)
+        receivables_days = metrics.get('売上債権回転期間', 0)
+        inventory_days = metrics.get('棚卸資産回転期間', 0)
+        payables_days = metrics.get('仕入債務回転期間', 0)
         
-        variable_cost_rate = model.coef_[0]
-        fixed_cost_intercept = model.intercept_
+        # CCCが長い（資金繰り悪化）
+        if ccc > 90:
+            recommendations.append({
+                'カテゴリ': '資金繰り',
+                'レベル': 'critical',
+                'アイコン': '🔴',
+                'タイトル': 'CCCが90日超過',
+                'メッセージ': f'現在のCCC: {ccc:.0f}日。資金繰りが圧迫されています。',
+                'アクション': [
+                    '売掛金回収の早期化（回収サイト短縮交渉）',
+                    '在庫回転率の向上（適正在庫の維持）',
+                    '仕入支払条件の延長交渉'
+                ]
+            })
+        elif ccc > 60:
+            recommendations.append({
+                'カテゴリ': '資金繰り',
+                'レベル': 'warning',
+                'アイコン': '🟡',
+                'タイトル': 'CCC改善余地あり',
+                'メッセージ': f'現在のCCC: {ccc:.0f}日。標準的ですが改善の余地があります。',
+                'アクション': [
+                    '売掛金管理の強化',
+                    '在庫管理の効率化'
+                ]
+            })
         
-        return {
-            'variable_cost_rate': float(variable_cost_rate),
-            'estimated_fixed_costs': float(fixed_cost_intercept),
-            'r_squared': float(model.score(X, y))
+        # 売上債権回転期間が長い
+        if receivables_days > 60:
+            recommendations.append({
+                'カテゴリ': '売掛金管理',
+                'レベル': 'warning',
+                'アイコン': '🟡',
+                'タイトル': '売掛金回収期間が長い',
+                'メッセージ': f'現在の回収期間: {receivables_days:.0f}日',
+                'アクション': [
+                    '回収サイトの短縮交渉（60日→45日など）',
+                    '早期入金割引制度の導入',
+                    '与信管理の厳格化',
+                    '請求書発行の迅速化'
+                ]
+            })
+        
+        # 棚卸資産回転期間が長い
+        if inventory_days > 60:
+            recommendations.append({
+                'カテゴリ': '在庫管理',
+                'レベル': 'warning',
+                'アイコン': '🟡',
+                'タイトル': '在庫回転期間が長い',
+                'メッセージ': f'現在の在庫回転期間: {inventory_days:.0f}日',
+                'アクション': [
+                    'ABC分析による適正在庫の設定',
+                    '死蔵在庫の処分',
+                    'ジャストインタイム発注の導入',
+                    '需要予測精度の向上'
+                ]
+            })
+        
+        # 仕入債務回転期間が短い（支払いが早すぎる）
+        if payables_days < 30:
+            recommendations.append({
+                'カテゴリ': '買掛金管理',
+                'レベル': 'info',
+                'アイコン': '💡',
+                'タイトル': '支払条件の改善余地',
+                'メッセージ': f'現在の支払期間: {payables_days:.0f}日',
+                'アクション': [
+                    '仕入先との支払サイト延長交渉',
+                    '手形・月末締め翌月払いの活用',
+                    '取引条件の見直し'
+                ]
+            })
+        
+        # CCCが短い（良好）
+        if ccc < 30:
+            recommendations.append({
+                'カテゴリ': '資金繰り',
+                'レベル': 'success',
+                'アイコン': '🟢',
+                'タイトル': 'CCCが良好',
+                'メッセージ': f'現在のCCC: {ccc:.0f}日。資金効率が高い状態です。',
+                'アクション': [
+                    '現状の運転資本管理体制を維持',
+                    '余剰資金の戦略的活用を検討'
+                ]
+            })
+        
+        return recommendations
+    
+    def create_working_capital_dashboard_data(self, metrics: Dict) -> Dict:
+        """
+        ダッシュボード表示用データを作成
+        
+        Args:
+            metrics: 計算済み指標
+            
+        Returns:
+            Dict: ダッシュボード用データ
+        """
+        dashboard = {
+            'summary': {
+                'CCC': {
+                    '値': metrics.get('CCC', 0),
+                    '単位': '日',
+                    'ベンチマーク': 60,
+                    '説明': '現金化サイクル'
+                },
+                '売上債権回転期間': {
+                    '値': metrics.get('売上債権回転期間', 0),
+                    '単位': '日',
+                    'ベンチマーク': 45,
+                    '説明': '売掛金回収期間'
+                },
+                '棚卸資産回転期間': {
+                    '値': metrics.get('棚卸資産回転期間', 0),
+                    '単位': '日',
+                    'ベンチマーク': 30,
+                    '説明': '在庫保有期間'
+                },
+                '仕入債務回転期間': {
+                    '値': metrics.get('仕入債務回転期間', 0),
+                    '単位': '日',
+                    'ベンチマーク': 45,
+                    '説明': '買掛金支払期間'
+                }
+            },
+            'working_capital': {
+                '運転資本': metrics.get('運転資本', 0),
+                '純運転資本': metrics.get('純運転資本', 0),
+                '運転資本比率': metrics.get('運転資本比率', 0),
+                '運転資本回転率': metrics.get('運転資本回転率', 0)
+            },
+            'components': {
+                '売掛金比率': metrics.get('売掛金_売上高比率', 0),
+                '棚卸資産比率': metrics.get('棚卸資産_売上高比率', 0),
+                '買掛金比率': metrics.get('買掛金_売上高比率', 0)
+            }
         }
         
-    except Exception as e:
-        print(f"❌ 費用構造分析エラー: {e}")
-        return {}
-
-
-def identify_improvement_opportunities(monthly_data: pd.DataFrame) -> list:
-    """
-    改善機会を特定
+        return dashboard
     
-    Args:
-        monthly_data: 月次分析データ
+    def format_for_display(self, metrics: Dict) -> pd.DataFrame:
+        """
+        表示用DataFrameに変換
         
-    Returns:
-        list: 改善提案のリスト
-    """
-    opportunities = []
-    
-    if monthly_data.empty:
-        return opportunities
-    
-    latest = monthly_data.iloc[-1]
-    
-    # 限界利益率が低い
-    if latest['marginal_profit_rate'] < 0.30:
-        opportunities.append({
-            'category': 'profitability',
-            'severity': 'high',
-            'message': '限界利益率が30%を下回っています',
-            'suggestions': [
-                '値上げの検討',
-                '仕入先との価格交渉',
-                '高粗利商品へのシフト'
-            ]
-        })
-    
-    # 安全余裕率が低い
-    if latest['safety_rate'] < 0.20:
-        opportunities.append({
-            'category': 'risk',
-            'severity': 'high',
-            'message': '安全余裕率が20%を下回っています',
-            'suggestions': [
-                '固定費の削減',
-                '売上の増加施策',
-                '損益分岐点の引き下げ'
-            ]
-        })
-    
-    # 赤字
-    if latest['operating_profit'] < 0:
-        opportunities.append({
-            'category': 'urgent',
-            'severity': 'critical',
-            'message': '営業赤字です',
-            'suggestions': [
-                '緊急の固定費削減',
-                '不採算事業の見直し',
-                '価格改定の即時実行'
-            ]
-        })
-    
-    return opportunities
+        Args:
+            metrics: 計算済み指標
+            
+        Returns:
+            DataFrame: 表示用
+        """
+        data = []
+        
+        display_metrics = {
+            'CCC': ('CCC（キャッシュ変換サイクル）', '日', '短いほど良好'),
+            '売上債権回転期間': ('売上債権回転期間', '日', '短いほど良好'),
+            '棚卸資産回転期間': ('棚卸資産回転期間', '日', '短いほど良好'),
+            '仕入債務回転期間': ('仕入債務回転期間', '日', '長いほど良好'),
+            '運転資本': ('運転資本', '円', 'プラスが健全'),
+            '純運転資本': ('純運転資本', '円', 'プラスが健全'),
+            '運転資本比率': ('運転資本比率', '%', '適正水準10-20%'),
+            '運転資本回転率': ('運転資本回転率', '回', '高いほど良好')
+        }
+        
+        for key, (name, unit, note) in display_metrics.items():
+            if key in metrics:
+                value = metrics[key]
+                
+                if unit == '円':
+                    formatted_value = f"¥{value:,.0f}"
+                elif unit == '日':
+                    formatted_value = f"{value:.1f}"
+                elif unit == '%':
+                    formatted_value = f"{value:.1f}"
+                elif unit == '回':
+                    formatted_value = f"{value:.2f}"
+                else:
+                    formatted_value = f"{value:.2f}"
+                
+                data.append({
+                    '指標名': name,
+                    '値': formatted_value,
+                    '単位': unit,
+                    '備考': note
+                })
+        
+        return pd.DataFrame(data)
