@@ -299,27 +299,74 @@ class CashFlowAnalyzer:
         capex = -(fa_current - fa_previous) if fa_current > fa_previous else 0
         cf['投資CF']['固定資産の取得'] = capex
         
+        # 有価証券の取得・売却
+        securities_current = get_bs_value(bs_data, '有価証券', month_col)
+        securities_previous = 0
+        if bs_previous is not None:
+            securities_previous = get_bs_value(bs_previous, '有価証券', month_col)
+        securities_change = -(securities_current - securities_previous)
+        if securities_change < 0:
+            cf['投資CF']['有価証券の取得'] = securities_change
+        else:
+            cf['投資CF']['有価証券の売却'] = securities_change
+        
         # 投資CF合計
-        investing_cf = cf['投資CF']['固定資産の取得']
+        investing_cf = (cf['投資CF']['固定資産の取得'] + 
+                       cf['投資CF'].get('有価証券の取得', 0) +
+                       cf['投資CF'].get('有価証券の売却', 0))
         cf['投資CF']['合計'] = investing_cf
         
         # === 財務活動によるキャッシュフロー ===
         
-        # 借入金の返済（簡易: 借入金の減少分）
+        # 借入金の増減
         debt_current = get_bs_value(bs_data, '借入金', month_col)
         debt_previous = 0
         if bs_previous is not None:
             debt_previous = get_bs_value(bs_previous, '借入金', month_col)
-        debt_repayment = -(debt_current - debt_previous) if debt_current < debt_previous else 0
-        cf['財務CF']['借入金の返済'] = debt_repayment
         
-        # 配当金の支払
-        dividend = 0  # TODO: PLから取得
+        debt_change = debt_current - debt_previous
+        if debt_change > 0:
+            cf['財務CF']['借入金の借入'] = debt_change
+        elif debt_change < 0:
+            cf['財務CF']['借入金の返済'] = debt_change
+        
+        # 資本金の増減
+        capital_current = get_bs_value(bs_data, '資本金', month_col)
+        capital_previous = 0
+        if bs_previous is not None:
+            capital_previous = get_bs_value(bs_previous, '資本金', month_col)
+        
+        capital_change = capital_current - capital_previous
+        if capital_change > 0:
+            cf['財務CF']['増資による収入'] = capital_change
+        
+        # 配当金の支払（PLから取得、なければ利益剰余金の減少から推定）
+        dividend = 0
+        dividend_pl = get_pl_value(pl_data, '配当金', month_col)
+        if dividend_pl > 0:
+            dividend = -dividend_pl
+        else:
+            # 利益剰余金から推定
+            retained_earnings_current = get_bs_value(bs_data, '利益剰余金', month_col)
+            retained_earnings_previous = 0
+            if bs_previous is not None:
+                retained_earnings_previous = get_bs_value(bs_previous, '利益剰余金', month_col)
+            
+            # 当期純利益を取得
+            net_income = get_pl_value(pl_data, '当期純利益', month_col)
+            
+            # 配当 = (前期利益剰余金 + 当期純利益) - 当期利益剰余金
+            expected_retained = retained_earnings_previous + net_income
+            if retained_earnings_current < expected_retained:
+                dividend = -(expected_retained - retained_earnings_current)
+        
         cf['財務CF']['配当金の支払'] = dividend
         
         # 財務CF合計
         financing_cf = (
-            cf['財務CF']['借入金の返済'] +
+            cf['財務CF'].get('借入金の借入', 0) +
+            cf['財務CF'].get('借入金の返済', 0) +
+            cf['財務CF'].get('増資による収入', 0) +
             cf['財務CF']['配当金の支払']
         )
         cf['財務CF']['合計'] = financing_cf
@@ -356,15 +403,23 @@ class CashFlowAnalyzer:
             
             month_cols = [col for col in bs_data.columns if '月度' in str(col)]
             
+            # 固定費項目を定義
+            FIXED_COST_ITEMS = [
+                '役員報酬', '給料手当', '賞与', '法定福利費', '福利厚生費',
+                '地代家賃', '賃借料', '減価償却費', '保険料', '水道光熱費',
+                '通信費', '支払報酬料', '租税公課'
+            ]
+            
             for month_col in month_cols:
                 month_kpi = {}
                 
                 if month_col in cf_data:
                     cf_month = cf_data[month_col]
                     
-                    # 税引後キャッシュ = 営業CF - 法人税
+                    # 税引後キャッシュ = 営業CF - 法人税等の支払額
                     operating_cf = cf_month['営業CF'].get('合計', 0)
-                    month_kpi['税引後キャッシュ'] = operating_cf
+                    tax_paid = abs(cf_month['営業CF'].get('法人税等の支払額', 0))
+                    month_kpi['税引後キャッシュ'] = operating_cf - tax_paid
                     
                     # フリーキャッシュフロー = 営業CF + 投資CF
                     fcf = cf_month['営業CF'].get('合計', 0) + cf_month['投資CF'].get('合計', 0)
@@ -374,9 +429,19 @@ class CashFlowAnalyzer:
                     cash_balance = cf_month.get('期末現金', 0)
                     month_kpi['現金残高'] = cash_balance
                     
-                    # 資金耐久月数（簡易: 固定費を販管費として計算）
-                    # TODO: 固定費を正確に計算
-                    fixed_cost_monthly = 10000000  # 仮の固定費
+                    # 固定費を計算（PLデータから固定費項目を集計）
+                    fixed_cost_monthly = 0
+                    for item in FIXED_COST_ITEMS:
+                        item_value = self._get_pl_value(pl_data, item, month_col)
+                        fixed_cost_monthly += item_value
+                    
+                    # 固定費が0の場合は販管費全体を使用
+                    if fixed_cost_monthly == 0:
+                        fixed_cost_monthly = self._get_pl_value(pl_data, '販売費及び一般管理費', month_col)
+                    
+                    month_kpi['月間固定費'] = fixed_cost_monthly
+                    
+                    # 資金耐久月数 = 現金残高 / 月間固定費
                     if fixed_cost_monthly > 0:
                         months_runway = cash_balance / fixed_cost_monthly
                         month_kpi['資金耐久月数'] = months_runway
@@ -393,6 +458,18 @@ class CashFlowAnalyzer:
             traceback.print_exc(file=sys.stderr)
             sys.stderr.flush()
             return {}
+    
+    def _get_pl_value(self, pl_data, item_name, month_col):
+        """PLデータから特定項目の値を取得"""
+        try:
+            if '勘定科目' in pl_data.columns:
+                row = pl_data[pl_data['勘定科目'] == item_name]
+                if not row.empty and month_col in row.columns:
+                    value = row[month_col].values[0]
+                    return float(value) if pd.notna(value) else 0
+            return 0
+        except:
+            return 0
     
     def forecast_cash_flow(self, historical_cf, months_ahead=12):
         """
