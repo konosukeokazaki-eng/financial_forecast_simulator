@@ -34,7 +34,7 @@ class ProfitabilityAnalyzer:
         if not self.processor:
             return None
         
-        conn = self.processor.get_connection()
+        conn = self.processor._get_connection()
         return analyze_profitability_from_db(conn, period_id)
     
     def analyze_from_dataframe(self, df: pd.DataFrame) -> Optional[Dict]:
@@ -131,12 +131,23 @@ def analyze_profitability_from_db(conn, period_id: int) -> Optional[Dict]:
             return None
         
         print(f"✅ データ取得成功: {len(df)}行")
+        print(f"   monthカラムのサンプル: {df['month'].head(3).tolist()}")
+        print(f"   monthカラムの型: {df['month'].dtype}")
+        
+        # month列が文字列（YYYY-MM形式）の場合、月の部分のみを抽出
+        if df['month'].dtype == 'object' or isinstance(df['month'].iloc[0], str):
+            # 'YYYY-MM' 形式から月番号を抽出
+            df['month_num'] = df['month'].apply(lambda x: int(str(x).split('-')[1]) if '-' in str(x) else int(x))
+            print(f"   月番号変換: {df[['month', 'month_num']].head(3).to_dict('records')}")
+        else:
+            df['month_num'] = df['month']
         
         # ピボットして月次×科目の形式に変換
-        df_pivot = df.pivot(index='month', columns='item_name', values='value').fillna(0)
+        df_pivot = df.pivot(index='month_num', columns='item_name', values='value').fillna(0)
         
         print(f"   ピボット後の形状: {df_pivot.shape}")
         print(f"   科目: {list(df_pivot.columns)}")
+        print(f"   月: {df_pivot.index.tolist()}")
         
         # 必要な科目が存在するか確認
         required_items = ['売上高', '売上原価', '販売費及び一般管理費']
@@ -151,10 +162,10 @@ def analyze_profitability_from_db(conn, period_id: int) -> Optional[Dict]:
         # 月次分析データを作成
         monthly_data = []
         
-        for month in df_pivot.index:
-            sales = df_pivot.loc[month, '売上高'] if '売上高' in df_pivot.columns else 0
-            cogs = df_pivot.loc[month, '売上原価'] if '売上原価' in df_pivot.columns else 0
-            sg_expenses = df_pivot.loc[month, '販売費及び一般管理費'] if '販売費及び一般管理費' in df_pivot.columns else 0
+        for month_num in df_pivot.index:
+            sales = df_pivot.loc[month_num, '売上高'] if '売上高' in df_pivot.columns else 0
+            cogs = df_pivot.loc[month_num, '売上原価'] if '売上原価' in df_pivot.columns else 0
+            sg_expenses = df_pivot.loc[month_num, '販売費及び一般管理費'] if '販売費及び一般管理費' in df_pivot.columns else 0
             
             # 限界利益 = 売上 - 変動費（ここでは売上原価を変動費と仮定）
             marginal_profit = sales - cogs
@@ -173,7 +184,7 @@ def analyze_profitability_from_db(conn, period_id: int) -> Optional[Dict]:
             safety_rate = (sales - breakeven_sales) / sales if sales > 0 else 0
             
             monthly_data.append({
-                'month': int(month),
+                'month': int(month_num),
                 'sales': float(sales),
                 'cogs': float(cogs),
                 'marginal_profit': float(marginal_profit),
@@ -189,6 +200,8 @@ def analyze_profitability_from_db(conn, period_id: int) -> Optional[Dict]:
         if df_monthly.empty:
             print(f"⚠️  月次データの生成に失敗")
             return None
+        
+        print(f"   月次データサンプル:\n{df_monthly.head()}")
         
         # トレンド分析
         if len(df_monthly) >= 3:
