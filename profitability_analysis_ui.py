@@ -32,7 +32,7 @@ def show_profitability_analysis_page(processor):
     sys.stderr.flush()
     
     with st.spinner("分析中..."):
-        cost_structure = analyze_profitability_from_db(period_id, processor)
+        cost_structure = analyze_profitability_from_db(processor.conn, period_id)
     
     sys.stderr.write(f"   cost_structure keys: {list(cost_structure.keys()) if cost_structure else 'None'}\n")
     sys.stderr.flush()
