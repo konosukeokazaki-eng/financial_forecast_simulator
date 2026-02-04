@@ -15,20 +15,36 @@ class MetricsCalculator:
         pass
     
     def calculate_all_metrics(self, pl_data: Dict, bs_data: Dict, 
-                             bs_previous: Optional[Dict] = None) -> Dict:
+                             bs_previous: Optional[Dict] = None,
+                             actual_period_manager=None,
+                             period_id: int = None) -> Dict:
         """
-        すべての経営指標を計算
+        すべての経営指標を計算（実績締月まで）
         
         Args:
             pl_data: PL（損益計算書）データ
             bs_data: BS（貸借対照表）データ
             bs_previous: 前期BSデータ（平均計算用）
+            actual_period_manager: 実績締月管理インスタンス
+            period_id: 会計期間ID
             
         Returns:
-            Dict: 各種経営指標
+            Dict: 各種経営指標（実績締月までのデータで計算）
         """
         try:
             metrics = {}
+            
+            # 実績締月を確認
+            if actual_period_manager and period_id:
+                latest_actual = actual_period_manager.get_latest_actual_month(period_id)
+                cumulative_data = actual_period_manager.get_cumulative_actual_data(period_id, latest_actual)
+                
+                # 累計実績データでPL/BSを上書き
+                if cumulative_data:
+                    pl_data = {**pl_data, **cumulative_data}
+                    
+                    sys.stderr.write(f"📊 経営指標を実績締月({latest_actual}月)までのデータで計算\n")
+                    sys.stderr.flush()
             
             # ============ 収益性指標 ============
             metrics.update(self.calculate_profitability_ratios(pl_data, bs_data, bs_previous))
@@ -43,8 +59,12 @@ class MetricsCalculator:
             if bs_previous:
                 metrics.update(self.calculate_growth_ratios(pl_data, bs_data, bs_previous))
             
-            # ============ キャッシュフロー指標 ============
-            # cf_dataがあれば追加
+            # 実績締月情報を追加
+            if actual_period_manager and period_id:
+                metrics['_meta'] = {
+                    'latest_actual_month': latest_actual,
+                    'calculation_type': 'actual_based'
+                }
             
             return metrics
             
