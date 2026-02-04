@@ -17,21 +17,39 @@ class WorkingCapitalAnalyzer:
     
     def calculate_working_capital_metrics(self, pl_data: Dict, bs_data: Dict,
                                          bs_previous: Optional[Dict] = None,
-                                         period_months: int = 12) -> Dict:
+                                         period_months: int = 12,
+                                         actual_period_manager=None,
+                                         period_id: int = None) -> Dict:
         """
-        運転資本関連指標を計算
+        運転資本関連指標を計算（実績締月まで）
         
         Args:
             pl_data: PL データ
             bs_data: BS データ
             bs_previous: 前期BSデータ
             period_months: 期間（月数）
+            actual_period_manager: 実績締月管理インスタンス
+            period_id: 会計期間ID
             
         Returns:
-            Dict: 運転資本指標
+            Dict: 運転資本指標（実績締月までのデータで計算）
         """
         try:
             metrics = {}
+            
+            # 実績締月を確認
+            actual_months = period_months
+            if actual_period_manager and period_id:
+                latest_actual = actual_period_manager.get_latest_actual_month(period_id)
+                actual_months = latest_actual
+                cumulative_data = actual_period_manager.get_cumulative_actual_data(period_id, latest_actual)
+                
+                # 累計実績データでPL/BSを上書き
+                if cumulative_data:
+                    pl_data = {**pl_data, **cumulative_data}
+                    
+                    sys.stderr.write(f"📊 運転資本分析を実績締月({latest_actual}月)までのデータで計算\n")
+                    sys.stderr.flush()
             
             # ============ 基本データ取得 ============
             
@@ -40,8 +58,8 @@ class WorkingCapitalAnalyzer:
             cogs = pl_data.get('売上原価', 0)
             
             # 月平均に換算
-            monthly_sales = sales / period_months if period_months > 0 else sales
-            monthly_cogs = cogs / period_months if period_months > 0 else cogs
+            monthly_sales = sales / actual_months if actual_months > 0 else sales
+            monthly_cogs = cogs / actual_months if actual_months > 0 else cogs
             
             # BSデータ（流動資産）
             cash = bs_data.get('現金･預金合計', 0)
