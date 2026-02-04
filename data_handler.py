@@ -243,6 +243,195 @@ class DataHandler:
         # 実装は既存と同じ
         return pd.DataFrame()
     
+    # ============ 実績データインポート（永続化） ============
+    
+    def import_actual_data_from_excel(self, file_path: str, period_id: int, 
+                                      sheet_name: str = 'Sheet1') -> Dict:
+        """
+        Excelファイルから実績データをインポート（永続化版）
+        
+        Args:
+            file_path: Excelファイルパス
+            period_id: 会計期間ID
+            sheet_name: シート名
+            
+        Returns:
+            Dict: インポート結果
+        """
+        import sys
+        
+        try:
+            sys.stderr.write(f"📥 実績データインポート開始\n")
+            sys.stderr.write(f"   ファイル: {file_path}\n")
+            sys.stderr.write(f"   期間ID: {period_id}\n")
+            sys.stderr.flush()
+            
+            # ファイル読み込み
+            df = pd.read_excel(file_path, sheet_name=sheet_name)
+            
+            sys.stderr.write(f"   読み込み: {len(df)}行\n")
+            sys.stderr.flush()
+            
+            if df.empty:
+                return {
+                    'success': False,
+                    'message': 'ファイルにデータがありません',
+                    'records_imported': 0
+                }
+            
+            # データベース接続
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # 既存データを削除
+            delete_query = """
+                DELETE FROM actual_data 
+                WHERE fiscal_period_id = %s
+            """
+            
+            cursor.execute(delete_query, (period_id,))
+            deleted_count = cursor.rowcount
+            
+            sys.stderr.write(f"   既存データ削除: {deleted_count}件\n")
+            sys.stderr.flush()
+            
+            # 新しいデータを挿入
+            insert_query = """
+                INSERT INTO actual_data 
+                (fiscal_period_id, item_name, month, amount, created_at)
+                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (fiscal_period_id, item_name, month) 
+                DO UPDATE SET 
+                    amount = EXCLUDED.amount,
+                    created_at = CURRENT_TIMESTAMP
+            """
+            
+            records_imported = 0
+            
+            for _, row in df.iterrows():
+                try:
+                    # データ検証
+                    item_name = str(row.get('item_name', row.get('科目', '')))
+                    month = row.get('month', row.get('月', ''))
+                    amount = float(row.get('amount', row.get('金額', 0)))
+                    
+                    if not item_name or not month:
+                        continue
+                    
+                    # 月を数値に変換
+                    if isinstance(month, str) and '-' in month:
+                        month_num = int(month.split('-')[1])
+                    else:
+                        month_num = int(month)
+                    
+                    cursor.execute(insert_query, (
+                        period_id,
+                        item_name,
+                        month_num,
+                        amount
+                    ))
+                    
+                    records_imported += 1
+                    
+                except Exception as row_error:
+                    sys.stderr.write(f"⚠️ 行スキップ: {row_error}\n")
+                    sys.stderr.flush()
+                    continue
+            
+            # 🔥 重要: コミット！
+            conn.commit()
+            
+            sys.stderr.write(f"✅ コミット完了: {records_imported}件\n")
+            sys.stderr.flush()
+            
+            cursor.close()
+            conn.close()
+            
+            # キャッシュをクリア
+            st.cache_data.clear()
+            
+            sys.stderr.write(f"🎉 インポート成功\n")
+            sys.stderr.flush()
+            
+            return {
+                'success': True,
+                'message': f'{records_imported}件のデータをインポートしました',
+                'records_imported': records_imported
+            }
+            
+        except Exception as e:
+            sys.stderr.write(f"❌ インポートエラー: {e}\n")
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
+            
+            # ロールバック
+            if 'conn' in locals() and conn:
+                try:
+                    conn.rollback()
+                    sys.stderr.write(f"   ロールバック実行\n")
+                    sys.stderr.flush()
+                except:
+                    pass
+            
+            return {
+                'success': False,
+                'message': f'インポート失敗: {str(e)}',
+                'records_imported': 0
+            }
+    
+    def verify_actual_data(self, period_id: int) -> Dict:
+        """
+        実績データが正しく保存されているか検証
+        
+        Args:
+            period_id: 会計期間ID
+            
+        Returns:
+            Dict: 検証結果
+        """
+        try:
+            conn = self._get_connection()
+            
+            query = """
+                SELECT 
+                    COUNT(*) as total_records,
+                    COUNT(DISTINCT item_name) as item_count,
+                    COUNT(DISTINCT month) as month_count,
+                    MIN(month) as first_month,
+                    MAX(month) as last_month,
+                    SUM(amount) as total_amount
+                FROM actual_data
+                WHERE fiscal_period_id = %s
+            """
+            
+            df = pd.read_sql_query(query, conn, params=(period_id,))
+            
+            if df.empty or df.iloc[0]['total_records'] == 0:
+                return {
+                    'exists': False,
+                    'message': '実績データが見つかりません'
+                }
+            
+            row = df.iloc[0]
+            
+            return {
+                'exists': True,
+                'total_records': int(row['total_records']),
+                'item_count': int(row['item_count']),
+                'month_count': int(row['month_count']),
+                'first_month': int(row['first_month']) if row['first_month'] else None,
+                'last_month': int(row['last_month']) if row['last_month'] else None,
+                'total_amount': float(row['total_amount']) if row['total_amount'] else 0,
+                'message': f"{row['total_records']}件の実績データが保存されています"
+            }
+            
+        except Exception as e:
+            return {
+                'exists': False,
+                'message': f'検証エラー: {str(e)}'
+            }
+    
     # ============ デバッグ出力制御 ============
     
     @staticmethod
