@@ -9,6 +9,90 @@ from typing import Dict, Optional
 import sys
 
 
+class ProfitabilityAnalyzer:
+    """収益性分析クラス"""
+    
+    def __init__(self, processor=None):
+        """
+        初期化
+        
+        Args:
+            processor: DataProcessorインスタンス
+        """
+        self.processor = processor
+    
+    def analyze_from_db(self, period_id: int) -> Optional[Dict]:
+        """
+        データベースから実績データを取得して収益性分析を実行
+        
+        Args:
+            period_id: 会計期間ID
+            
+        Returns:
+            Dict: 分析結果
+        """
+        if not self.processor:
+            return None
+        
+        conn = self.processor.get_connection()
+        return analyze_profitability_from_db(conn, period_id)
+    
+    def analyze_from_dataframe(self, df: pd.DataFrame) -> Optional[Dict]:
+        """
+        DataFrameから収益性分析を実行
+        
+        Args:
+            df: 月次PL/BSデータ
+            
+        Returns:
+            Dict: 分析結果
+        """
+        return self._calculate_profitability_metrics(df)
+    
+    def _calculate_profitability_metrics(self, df: pd.DataFrame) -> Dict:
+        """
+        収益性指標を計算
+        
+        Args:
+            df: 月次財務データ
+            
+        Returns:
+            Dict: 各種指標
+        """
+        monthly_data = []
+        
+        for _, row in df.iterrows():
+            sales = row.get('売上高', 0)
+            cogs = row.get('売上原価', 0)
+            sg_expenses = row.get('販売費及び一般管理費', 0)
+            
+            marginal_profit = sales - cogs
+            marginal_profit_rate = marginal_profit / sales if sales > 0 else 0
+            fixed_costs = sg_expenses
+            operating_profit = marginal_profit - fixed_costs
+            breakeven_sales = fixed_costs / marginal_profit_rate if marginal_profit_rate > 0 else 0
+            safety_rate = (sales - breakeven_sales) / sales if sales > 0 else 0
+            
+            monthly_data.append({
+                'month': row.get('month', 0),
+                'sales': float(sales),
+                'cogs': float(cogs),
+                'marginal_profit': float(marginal_profit),
+                'marginal_profit_rate': float(marginal_profit_rate),
+                'fixed_costs': float(fixed_costs),
+                'operating_profit': float(operating_profit),
+                'breakeven_sales': float(breakeven_sales),
+                'safety_rate': float(safety_rate)
+            })
+        
+        df_monthly = pd.DataFrame(monthly_data)
+        
+        return {
+            'monthly_data': df_monthly,
+            'average_marginal_profit_rate': df_monthly['marginal_profit_rate'].mean() if not df_monthly.empty else 0
+        }
+
+
 def analyze_profitability_from_db(conn, period_id: int) -> Optional[Dict]:
     """
     データベースから実績データを取得して収益性分析を実行
