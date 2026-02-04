@@ -13,6 +13,8 @@ from datetime import datetime
 from profitability_analyzer import ProfitabilityAnalyzer, analyze_profitability_from_db
 from cfo_advisor import CFOAdvisor
 from profitability_analysis_ui import show_profitability_analysis_page
+from advanced_forecast_engine import get_advanced_forecast_engine
+from advanced_forecast_ui import show_advanced_forecast_page
 
 # ページ設定 - 完全ライトモード
 st.set_page_config(
@@ -567,6 +569,9 @@ if 'processor' not in st.session_state:
     st.session_state.processor = DataProcessor()
 processor = st.session_state.processor
 
+if 'advanced_engine' not in st.session_state:
+    st.session_state.advanced_engine = get_advanced_forecast_engine(data_handler)
+
 # CFアナライザーの初期化
 if 'cf_analyzer' not in st.session_state:
     st.session_state.cf_analyzer = CashFlowAnalyzer(processor)
@@ -794,6 +799,8 @@ else:
     
     if st.sidebar.button("シナリオ一括設定", width="stretch", key="nav_scenario"):
         st.session_state.page = "シナリオ一括設定"
+    if st.sidebar.button("🔮 AI自動予測"):
+        st.session_state.page = 'advanced_forecast'
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 財務諸表")
