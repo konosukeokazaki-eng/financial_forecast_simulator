@@ -343,7 +343,7 @@ def auto_forecast_from_actuals(
         sys.stderr.flush()
         
         # 実績データを取得
-        conn = processor.get_connection()
+        conn = processor._get_connection()
         query = """
             SELECT item_name, amount, month
             FROM actual_data
