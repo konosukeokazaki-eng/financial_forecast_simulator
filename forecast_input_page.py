@@ -1,6 +1,5 @@
 """
-予測直接入力画面
-ユーザーが予測値を月別・科目別に直接入力できる（フォーマット修正版）
+予測直接入力画面（format指定完全削除版）
 """
 
 import streamlit as st
@@ -10,13 +9,7 @@ import sys
 
 
 def show_forecast_input_page(processor, period_manager):
-    """
-    予測直接入力画面を表示
-    
-    Args:
-        processor: DataProcessorインスタンス
-        period_manager: ActualPeriodManagerインスタンス
-    """
+    """予測直接入力画面を表示"""
     st.title("📝 予測値の直接入力")
     
     if 'selected_period_id' not in st.session_state:
@@ -31,22 +24,19 @@ def show_forecast_input_page(processor, period_manager):
     forecast_months = split_info['forecast_months']
     
     if not forecast_months:
-        st.info("📊 すべての月の実績データが入力済みです。予測入力の必要はありません。")
+        st.info("📊 すべての月の実績データが入力済みです。")
         return
     
     st.info(f"📅 最新実績締月: **{latest_actual}月**  |  予測入力対象: **{min(forecast_months)}月～{max(forecast_months)}月**")
     
     # タブで入力方法を選択
-    tab1, tab2, tab3 = st.tabs(["📊 月別入力", "📋 一括入力", "🔄 自動予測から調整"])
+    tab1, tab2 = st.tabs(["📊 月別入力", "📋 一括入力"])
     
     with tab1:
         show_monthly_input(processor, period_id, forecast_months)
     
     with tab2:
         show_bulk_input(processor, period_id, forecast_months)
-    
-    with tab3:
-        show_auto_forecast_adjustment(processor, period_id, forecast_months, latest_actual)
 
 
 def show_monthly_input(processor, period_id: int, forecast_months: List[int]):
@@ -64,16 +54,9 @@ def show_monthly_input(processor, period_id: int, forecast_months: List[int]):
     main_items = [
         "売上高",
         "売上原価",
-        "売上総損益金額",
         "販売費及び一般管理費",
         "営業損益金額",
-        "営業外収益合計",
-        "営業外費用合計",
         "経常損益金額",
-        "特別利益合計",
-        "特別損失合計",
-        "税引前当期純利益",
-        "法人税等合計",
         "当期純利益"
     ]
     
@@ -86,29 +69,25 @@ def show_monthly_input(processor, period_id: int, forecast_months: List[int]):
     with st.form(f"forecast_form_{selected_month}"):
         input_values = {}
         
-        col1, col2 = st.columns(2)
-        
-        for idx, item in enumerate(main_items):
+        for item in main_items:
             current_value = existing_forecast.get(item, 0)
             
-            with (col1 if idx % 2 == 0 else col2):
-                # ✅ 修正: format引数を削除してデフォルトを使用
-                input_val = st.number_input(
-                    item,
-                    value=float(current_value),
-                    step=10000.0,
-                    key=f"input_{selected_month}_{item}"
-                )
-                input_values[item] = input_val
-                
-                # カンマ区切りで表示
-                if input_val != 0:
-                    st.caption(f"💰 ¥{input_val:,.0f}")
+            # ⚠️ format指定を完全に削除
+            input_val = st.number_input(
+                item,
+                value=float(current_value),
+                step=10000.0,
+                key=f"input_{selected_month}_{item}"
+            )
+            input_values[item] = input_val
+            
+            # 表示用（カンマ区切り）
+            if input_val != 0:
+                st.caption(f"💰 ¥{input_val:,.0f}")
         
         submitted = st.form_submit_button("💾 この月の予測を保存", use_container_width=True)
         
         if submitted:
-            # データベースに保存
             success = save_forecast_data(processor, period_id, selected_month, input_values)
             
             if success:
@@ -122,11 +101,17 @@ def show_bulk_input(processor, period_id: int, forecast_months: List[int]):
     """一括入力タブ"""
     st.subheader("📋 複数月の予測値を一括入力")
     
-    # Excelテンプレートのダウンロード
+    # テンプレート作成
+    items = ["売上高", "売上原価", "販売費及び一般管理費", "営業損益金額", "経常損益金額", "当期純利益"]
+    
+    data = {'科目': items}
+    for month in forecast_months:
+        data[f'{month}月'] = [0] * len(items)
+    
+    template_df = pd.DataFrame(data)
+    
+    # テンプレートダウンロード
     if st.button("📥 入力テンプレートをダウンロード"):
-        template_df = create_forecast_template(forecast_months)
-        
-        # CSVとしてダウンロード
         csv = template_df.to_csv(index=False, encoding='utf-8-sig')
         st.download_button(
             label="💾 テンプレートCSVをダウンロード",
@@ -140,23 +125,31 @@ def show_bulk_input(processor, period_id: int, forecast_months: List[int]):
     # ファイルアップロード
     uploaded_file = st.file_uploader(
         "📂 入力済みファイルをアップロード",
-        type=['csv', 'xlsx'],
-        help="テンプレートに予測値を入力してアップロードしてください"
+        type=['csv', 'xlsx']
     )
     
     if uploaded_file is not None:
         try:
-            # ファイル読み込み
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file, encoding='utf-8-sig')
             else:
                 df = pd.read_excel(uploaded_file)
             
             st.write("📊 アップロードされたデータ:")
-            st.dataframe(df, use_container_width=True)
+            
+            # ⚠️ data_editorでもformat指定を完全に削除
+            edited_df = st.data_editor(
+                df,
+                use_container_width=True,
+                num_rows="fixed",
+                column_config={
+                    "科目": st.column_config.TextColumn("科目", disabled=True)
+                    # 他の列はデフォルト設定を使用（format指定なし）
+                }
+            )
             
             if st.button("💾 一括保存", type="primary", use_container_width=True):
-                success = save_bulk_forecast(processor, period_id, df)
+                success = save_bulk_forecast(processor, period_id, edited_df)
                 
                 if success:
                     st.success("✅ 予測値を一括保存しました")
@@ -166,105 +159,6 @@ def show_bulk_input(processor, period_id: int, forecast_months: List[int]):
         
         except Exception as e:
             st.error(f"❌ ファイル読み込みエラー: {e}")
-
-
-def show_auto_forecast_adjustment(processor, period_id: int, forecast_months: List[int], 
-                                  latest_actual: int):
-    """自動予測から調整タブ"""
-    st.subheader("🔄 自動予測を生成して調整")
-    
-    st.markdown("""
-    実績データから自動的に予測値を生成し、それをベースに調整できます。
-    
-    **予測方法:**
-    - 前年同月比法
-    - 直近3ヶ月平均
-    - トレンド分析
-    """)
-    
-    # 予測方法を選択
-    forecast_method = st.radio(
-        "予測方法を選択",
-        ["前年同月比（成長率考慮）", "直近3ヶ月平均", "トレンド分析（線形回帰）"],
-        horizontal=True
-    )
-    
-    # 成長率の調整（前年同月比の場合）
-    growth_rate = 0
-    if forecast_method == "前年同月比（成長率考慮）":
-        growth_rate = st.slider(
-            "成長率（%）",
-            min_value=-50,
-            max_value=100,
-            value=0,
-            step=5,
-            help="前年同月比に対する成長率を設定します"
-        ) / 100
-    
-    if st.button("🔮 自動予測を生成", type="primary", use_container_width=True):
-        with st.spinner("予測計算中..."):
-            # 自動予測を生成
-            forecast_data = generate_auto_forecast(
-                processor, 
-                period_id, 
-                forecast_months,
-                latest_actual,
-                method=forecast_method,
-                growth_rate=growth_rate
-            )
-            
-            if forecast_data is not None and not forecast_data.empty:
-                st.session_state['auto_forecast'] = forecast_data
-                st.success("✅ 自動予測を生成しました")
-            else:
-                st.error("❌ 予測生成に失敗しました")
-    
-    # 生成された予測を表示・編集
-    if 'auto_forecast' in st.session_state:
-        st.markdown("### 📊 生成された予測値")
-        
-        # ✅ 修正: column_configからformat指定を削除
-        edited_df = st.data_editor(
-            st.session_state['auto_forecast'],
-            use_container_width=True,
-            num_rows="fixed",
-            column_config={
-                "科目": st.column_config.TextColumn("科目", disabled=True),
-                **{f"{m}月": st.column_config.NumberColumn(
-                    f"{m}月",
-                    help=f"{m}月の予測値（円）"
-                ) for m in forecast_months}
-            }
-        )
-        
-        # 合計値をカンマ区切りで表示
-        if not edited_df.empty:
-            st.markdown("#### 💰 月別合計")
-            total_cols = [col for col in edited_df.columns if '月' in col]
-            if total_cols:
-                cols = st.columns(len(total_cols))
-                for idx, month_col in enumerate(total_cols):
-                    with cols[idx]:
-                        total = edited_df[month_col].sum()
-                        st.metric(month_col, f"¥{total:,.0f}")
-        
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            if st.button("💾 この予測を保存", type="primary", use_container_width=True):
-                success = save_forecast_from_dataframe(processor, period_id, edited_df, forecast_months)
-                
-                if success:
-                    st.success("✅ 予測値を保存しました")
-                    del st.session_state['auto_forecast']
-                    st.rerun()
-                else:
-                    st.error("❌ 保存に失敗しました")
-        
-        with col2:
-            if st.button("🔄 予測をクリア"):
-                del st.session_state['auto_forecast']
-                st.rerun()
 
 
 # ==================== ヘルパー関数 ====================
@@ -287,7 +181,8 @@ def get_existing_forecast(processor, period_id: int, month: int) -> Dict:
         
         return dict(zip(df['item_name'], df['forecast_value']))
         
-    except:
+    except Exception as e:
+        sys.stderr.write(f"予測データ取得エラー: {e}\n")
         return {}
 
 
@@ -298,7 +193,6 @@ def save_forecast_data(processor, period_id: int, month: int, values: Dict) -> b
         cursor = conn.cursor()
         
         for item_name, value in values.items():
-            # UPSERT（存在すれば更新、なければ挿入）
             query = """
                 INSERT INTO forecast_data (fiscal_period_id, item_name, month, forecast_value, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -314,31 +208,16 @@ def save_forecast_data(processor, period_id: int, month: int, values: Dict) -> b
         cursor.close()
         conn.close()
         
+        # キャッシュクリア
+        st.cache_data.clear()
+        
         return True
         
     except Exception as e:
         sys.stderr.write(f"❌ 予測データ保存エラー: {e}\n")
         import traceback
         traceback.print_exc(file=sys.stderr)
-        sys.stderr.flush()
         return False
-
-
-def create_forecast_template(forecast_months: List[int]) -> pd.DataFrame:
-    """予測入力テンプレートを作成"""
-    items = [
-        "売上高", "売上原価", "売上総損益金額",
-        "販売費及び一般管理費", "営業損益金額",
-        "営業外収益合計", "営業外費用合計", "経常損益金額",
-        "特別利益合計", "特別損失合計", 
-        "税引前当期純利益", "法人税等合計", "当期純利益"
-    ]
-    
-    data = {'科目': items}
-    for month in forecast_months:
-        data[f'{month}月'] = [0] * len(items)
-    
-    return pd.DataFrame(data)
 
 
 def save_bulk_forecast(processor, period_id: int, df: pd.DataFrame) -> bool:
@@ -347,21 +226,23 @@ def save_bulk_forecast(processor, period_id: int, df: pd.DataFrame) -> bool:
         conn = processor._get_connection()
         cursor = conn.cursor()
         
-        # 科目列を取得
         item_col = df.columns[0]
         items = df[item_col].tolist()
         
-        # 月列（2列目以降）
         month_cols = df.columns[1:]
         
         for month_col in month_cols:
             # "3月" → 3 に変換
-            month = int(month_col.replace('月', ''))
+            month_str = str(month_col).replace('月', '')
+            try:
+                month = int(month_str)
+            except:
+                continue
             
             for idx, item_name in enumerate(items):
                 value = df.loc[idx, month_col]
                 
-                if pd.notna(value):
+                if pd.notna(value) and value != 0:
                     query = """
                         INSERT INTO forecast_data (fiscal_period_id, item_name, month, forecast_value, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -377,110 +258,13 @@ def save_bulk_forecast(processor, period_id: int, df: pd.DataFrame) -> bool:
         cursor.close()
         conn.close()
         
+        # キャッシュクリア
+        st.cache_data.clear()
+        
         return True
         
     except Exception as e:
         sys.stderr.write(f"❌ 一括保存エラー: {e}\n")
         import traceback
         traceback.print_exc(file=sys.stderr)
-        sys.stderr.flush()
-        return False
-
-
-def generate_auto_forecast(processor, period_id: int, forecast_months: List[int],
-                          latest_actual: int, method: str, growth_rate: float = 0) -> pd.DataFrame:
-    """自動予測を生成"""
-    try:
-        # 実績データを取得
-        conn = processor._get_connection()
-        query = """
-            SELECT item_name, month, amount
-            FROM actual_data
-            WHERE fiscal_period_id = %s
-            ORDER BY month, item_name
-        """
-        
-        df_actuals = pd.read_sql_query(query, conn, params=(period_id,))
-        
-        if df_actuals.empty:
-            return None
-        
-        # month列を数値に変換
-        if df_actuals['month'].dtype == 'object':
-            df_actuals['month_num'] = df_actuals['month'].apply(
-                lambda x: int(str(x).split('-')[1]) if '-' in str(x) else int(x)
-            )
-        else:
-            df_actuals['month_num'] = df_actuals['month']
-        
-        # 科目ごとに予測
-        forecast_results = {}
-        
-        for item_name in df_actuals['item_name'].unique():
-            item_data = df_actuals[df_actuals['item_name'] == item_name].sort_values('month_num')
-            actuals_list = item_data['amount'].tolist()
-            
-            # 簡易予測（直近の平均値を使用）
-            if method == "直近3ヶ月平均":
-                avg_value = sum(actuals_list[-3:]) / 3 if len(actuals_list) >= 3 else sum(actuals_list) / len(actuals_list)
-                forecasts = [avg_value * (1 + growth_rate) for _ in forecast_months]
-            else:
-                # その他の方法も直近平均を使用
-                avg_value = sum(actuals_list) / len(actuals_list)
-                forecasts = [avg_value * (1 + growth_rate) for _ in forecast_months]
-            
-            forecast_results[item_name] = forecasts
-        
-        # DataFrameに変換
-        data = {'科目': list(forecast_results.keys())}
-        for idx, month in enumerate(forecast_months):
-            data[f'{month}月'] = [forecast_results[item][idx] for item in forecast_results.keys()]
-        
-        return pd.DataFrame(data)
-        
-    except Exception as e:
-        sys.stderr.write(f"❌ 自動予測生成エラー: {e}\n")
-        import traceback
-        traceback.print_exc(file=sys.stderr)
-        sys.stderr.flush()
-        return None
-
-
-def save_forecast_from_dataframe(processor, period_id: int, df: pd.DataFrame, 
-                                 forecast_months: List[int]) -> bool:
-    """DataFrameから予測データを保存"""
-    try:
-        conn = processor._get_connection()
-        cursor = conn.cursor()
-        
-        item_col = df.columns[0]
-        items = df[item_col].tolist()
-        
-        for month in forecast_months:
-            month_col = f'{month}月'
-            
-            if month_col in df.columns:
-                for idx, item_name in enumerate(items):
-                    value = df.loc[idx, month_col]
-                    
-                    if pd.notna(value):
-                        query = """
-                            INSERT INTO forecast_data (fiscal_period_id, item_name, month, forecast_value, created_at, updated_at)
-                            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                            ON CONFLICT (fiscal_period_id, item_name, month) 
-                            DO UPDATE SET 
-                                forecast_value = EXCLUDED.forecast_value,
-                                updated_at = CURRENT_TIMESTAMP
-                        """
-                        
-                        cursor.execute(query, (period_id, item_name, month, float(value)))
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return True
-        
-    except Exception as e:
-        sys.stderr.write(f"❌ DataFrame保存エラー: {e}\n")
         return False
