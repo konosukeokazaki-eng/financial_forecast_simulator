@@ -15,7 +15,7 @@ from cfo_advisor import CFOAdvisor
 from profitability_analysis_ui import show_profitability_analysis_page
 
 
-# 🆕 AI自動予測機能の追加
+# AI Forecast import
 try:
     from advanced_forecast_engine import get_advanced_forecast_engine
     from advanced_forecast_ui import show_advanced_forecast_page
@@ -832,10 +832,11 @@ else:
     if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
         st.session_state.page = "収益構造分析"
     
-    # 🆕 AI自動予測を追加
+    # AI Forecast menu
     if ADVANCED_FORECAST_AVAILABLE:
-        if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_advanced_forecast"):
-            st.session_state.page = "AI自動予測"
+        if st.sidebar.button("AI Forecast", width="stretch", key="nav_ai_forecast"):
+            st.session_state.page = "AI Forecast"
+
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 設定")
@@ -4018,6 +4019,83 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             st.table(pd.DataFrame(summary_data))
         
 
+# AI Forecast page
+elif st.session_state.page == "AI Forecast":
+    if ADVANCED_FORECAST_AVAILABLE:
+        class DataHandlerAdapter:
+            def __init__(self, processor):
+                self._processor = processor
+                self._connection = None
+            
+            def _get_connection(self):
+                if self._connection is None:
+                    if self._processor.use_postgres:
+                        import psycopg2
+                        self._connection = psycopg2.connect(self._processor.db_url)
+                    else:
+                        import sqlite3
+                        self._connection = sqlite3.connect('financial_simulator.db')
+                return self._connection
+            
+            def get_actual_vs_forecast_split(self, period_id):
+                try:
+                    conn = self._get_connection()
+                    if self._processor.use_postgres:
+                        query = "SELECT MAX(fiscal_month) as latest_actual FROM actuals WHERE fiscal_period_id = %s"
+                        df = pd.read_sql_query(query, conn, params=(period_id,))
+                    else:
+                        query = "SELECT MAX(fiscal_month) as latest_actual FROM actuals WHERE fiscal_period_id = ?"
+                        df = pd.read_sql_query(query, conn, params=(period_id,))
+                    
+                    latest_actual = df['latest_actual'].iloc[0] if not df.empty and not pd.isna(df['latest_actual'].iloc[0]) else 0
+                    
+                    if latest_actual and latest_actual > 0:
+                        latest_actual = int(latest_actual)
+                        actual_months = list(range(1, latest_actual + 1))
+                        forecast_months = list(range(latest_actual + 1, 13))
+                    else:
+                        actual_months = []
+                        forecast_months = list(range(1, 13))
+                    
+                    return {
+                        'has_actual': latest_actual > 0,
+                        'latest_actual_month': latest_actual,
+                        'actual_months': actual_months,
+                        'forecast_months': forecast_months
+                    }
+                except Exception as e:
+                    import sys
+                    sys.stderr.write(f"Error: {e}\n")
+                    return {'has_actual': False, 'latest_actual_month': 0, 'actual_months': [], 'forecast_months': list(range(1, 13))}
+            
+            def get_cumulative_actual_data(self, period_id, up_to_month):
+                try:
+                    actuals_df = self._processor.load_actual_data(period_id)
+                    if actuals_df is None or actuals_df.empty:
+                        return {}
+                    if 'fiscal_month' in actuals_df.columns:
+                        actuals_df = actuals_df[actuals_df['fiscal_month'] <= up_to_month]
+                    result = {}
+                    for _, row in actuals_df.iterrows():
+                        account = row.get('account_name', row.get('account', ''))
+                        amount = row.get('amount', row.get('value', 0))
+                        if account:
+                            result[account] = amount
+                    return result
+                except:
+                    return {}
+        
+        if 'data_handler_adapter' not in st.session_state:
+            st.session_state.data_handler_adapter = DataHandlerAdapter(processor)
+        
+        if 'advanced_engine' not in st.session_state:
+            st.session_state.advanced_engine = get_advanced_forecast_engine(st.session_state.data_handler_adapter)
+        
+        show_advanced_forecast_page(st.session_state.data_handler_adapter, st.session_state.advanced_engine)
+    else:
+        st.error("AI Forecast feature is not available")
+        st.info("Please place advanced_forecast_engine.py and advanced_forecast_ui.py in the app directory")
+
 else:
     # 会社または期が未登録の場合
     if companies.empty:
@@ -4055,138 +4133,4 @@ else:
             左サイドバーの「システム設定」→「会計期間設定」タブから<br>
             会計期間を追加してください。
         </div>
-
-# 🆕 AI自動予測ページ
-elif st.session_state.page == "AI自動予測":
-    if ADVANCED_FORECAST_AVAILABLE:
-        # DataProcessorをDataHandler互換にするアダプター
-        class DataHandlerAdapter:
-            """data_processorをdata_handler互換にする"""
-            
-            def __init__(self, processor):
-                self._processor = processor
-                self._connection = None
-            
-            def _get_connection(self):
-                """データベース接続を取得"""
-                if self._connection is None:
-                    if self._processor.use_postgres:
-                        import psycopg2
-                        self._connection = psycopg2.connect(self._processor.db_url)
-                    else:
-                        import sqlite3
-                        self._connection = sqlite3.connect('financial_simulator.db')
-                return self._connection
-            
-            def get_actual_vs_forecast_split(self, period_id):
-                """実績締月情報を取得"""
-                try:
-                    conn = self._get_connection()
-                    
-                    # 実績データの最新月を取得
-                    if self._processor.use_postgres:
-                        query = """
-                            SELECT MAX(fiscal_month) as latest_actual
-                            FROM actuals
-                            WHERE fiscal_period_id = %s
-                        """
-                        df = pd.read_sql_query(query, conn, params=(period_id,))
-                    else:
-                        query = """
-                            SELECT MAX(fiscal_month) as latest_actual
-                            FROM actuals
-                            WHERE fiscal_period_id = ?
-                        """
-                        df = pd.read_sql_query(query, conn, params=(period_id,))
-                    
-                    latest_actual = df['latest_actual'].iloc[0] if not df.empty and not pd.isna(df['latest_actual'].iloc[0]) else 0
-                    
-                    # 月リストを生成
-                    if latest_actual and latest_actual > 0:
-                        latest_actual = int(latest_actual)
-                        actual_months = list(range(1, latest_actual + 1))
-                        forecast_months = list(range(latest_actual + 1, 13))
-                    else:
-                        actual_months = []
-                        forecast_months = list(range(1, 13))
-                    
-                    return {
-                        'has_actual': latest_actual > 0,
-                        'latest_actual_month': latest_actual,
-                        'actual_months': actual_months,
-                        'forecast_months': forecast_months
-                    }
-                    
-                except Exception as e:
-                    import sys
-                    sys.stderr.write(f"❌ get_actual_vs_forecast_split error: {e}\n")
-                    sys.stderr.flush()
-                    return {
-                        'has_actual': False,
-                        'latest_actual_month': 0,
-                        'actual_months': [],
-                        'forecast_months': list(range(1, 13))
-                    }
-            
-            def get_cumulative_actual_data(self, period_id, up_to_month):
-                """累計実績データを取得"""
-                try:
-                    actuals_df = self._processor.load_actual_data(period_id)
-                    
-                    if actuals_df is None or actuals_df.empty:
-                        return {}
-                    
-                    if 'fiscal_month' in actuals_df.columns:
-                        actuals_df = actuals_df[actuals_df['fiscal_month'] <= up_to_month]
-                    
-                    result = {}
-                    for _, row in actuals_df.iterrows():
-                        account = row.get('account_name', row.get('account', ''))
-                        amount = row.get('amount', row.get('value', 0))
-                        if account:
-                            result[account] = amount
-                    
-                    return result
-                    
-                except Exception as e:
-                    import sys
-                    sys.stderr.write(f"❌ get_cumulative_actual_data error: {e}\n")
-                    sys.stderr.flush()
-                    return {}
-        
-        # アダプターを作成
-        if 'data_handler_adapter' not in st.session_state:
-            st.session_state.data_handler_adapter = DataHandlerAdapter(processor)
-        
-        data_handler_adapter = st.session_state.data_handler_adapter
-        
-        # AI予測エンジンの初期化（遅延初期化）
-        if 'advanced_engine' not in st.session_state:
-            st.session_state.advanced_engine = get_advanced_forecast_engine(data_handler_adapter)
-        
-        # AI予測画面を表示
-        show_advanced_forecast_page(
-            data_handler_adapter,
-            st.session_state.advanced_engine
-        )
-        
-    else:
-        st.error("❌ AI自動予測機能が利用できません")
-        st.info("""
-        AI自動予測機能を使用するには、以下のファイルを配置してください：
-        
-        📁 必要なファイル:
-        - advanced_forecast_engine.py
-        - advanced_forecast_ui.py
-        
-        これらのファイルをアプリと同じディレクトリに配置してください。
-        """)
-        
-        with st.expander("📖 配置方法"):
-            st.markdown("""
-            1. `advanced_forecast_engine.py` をダウンロード
-            2. `advanced_forecast_ui.py` をダウンロード
-            3. アプリの実行ディレクトリに配置
-            4. アプリを再起動
-            """)
         """, unsafe_allow_html=True)
