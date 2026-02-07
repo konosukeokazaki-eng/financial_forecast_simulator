@@ -15,31 +15,16 @@ from cfo_advisor import CFOAdvisor
 from profitability_analysis_ui import show_profitability_analysis_page
 
 
-# AI Forecast import
-try:
-    from advanced_forecast_engine import get_advanced_forecast_engine
-    from advanced_forecast_ui import show_advanced_forecast_page
-    ADVANCED_FORECAST_AVAILABLE = True
-except ImportError:
-    ADVANCED_FORECAST_AVAILABLE = False
-
-
 
 # ==================== 可視化関数 ====================
 
 def create_pl_waterfall(pl_data):
-    """PLウォーターフォールチャート"""
+    """PLウォーターフォール"""
     try:
-        # データから値を抽出
-        sales = 0
-        cogs = 0
-        sg_expense = 0
-        operating_profit = 0
-        
+        sales = cogs = sg_expense = operating_profit = 0
         for _, row in pl_data.iterrows():
-            item = row.get('項目名', '')
+            item = str(row.get('項目名', ''))
             amount = float(row.get('金額', 0))
-            
             if item == '売上高':
                 sales = amount
             elif item == '売上原価':
@@ -49,32 +34,19 @@ def create_pl_waterfall(pl_data):
             elif item == '営業損益金額':
                 operating_profit = amount
         
-        gross_profit = sales - cogs
-        
         x_labels = ['売上高', '売上原価', '売上総利益', '販管費', '営業利益']
-        y_values = [sales, -cogs, gross_profit, -sg_expense, operating_profit]
-        measures = ['absolute', 'relative', 'total', 'relative', 'total']
+        y_values = [sales, -cogs, sales - cogs, -sg_expense, operating_profit]
         
         fig = go.Figure(go.Waterfall(
-            x=x_labels,
-            y=y_values,
-            measure=measures,
+            x=x_labels, y=y_values,
+            measure=['absolute', 'relative', 'total', 'relative', 'total'],
             text=[f"¥{abs(v):,.0f}" for v in y_values],
             textposition='outside',
-            connector={"line": {"color": "rgb(63, 63, 63)"}},
             increasing={"marker": {"color": "#2ecc71"}},
             decreasing={"marker": {"color": "#e74c3c"}},
             totals={"marker": {"color": "#3498db"}}
         ))
-        
-        fig.update_layout(
-            title="損益の流れ",
-            showlegend=False,
-            height=500,
-            xaxis_title="",
-            yaxis_title="金額（千円）"
-        )
-        
+        fig.update_layout(title="損益の流れ", showlegend=False, height=500)
         return fig
     except Exception as e:
         import sys
@@ -82,57 +54,13 @@ def create_pl_waterfall(pl_data):
         return None
 
 
-def create_bs_sankey(bs_data):
-    """BS Sankey図"""
-    try:
-        # データから値を抽出
-        current_assets = 0
-        fixed_assets = 0
-        current_liabilities = 0
-        fixed_liabilities = 0
-        equity = 0
-        
-        for _, row in bs_data.iterrows():
-            item = row.get('項目名', '')
-            amount = float(row.get('金額', 0))
-            
-            if item == '流動資産':
-                current_assets = amount
-            elif item == '固定資産':
-                fixed_assets = amount
-            elif item == '流動負債':
-                current_liabilities = amount
-            elif item == '固定負債':
-                fixed_liabilities = amount
-            elif item == '純資産合計':
-                equity = amount
-        
-        labels = ['調達', '流動資産', '固定資産', '流動負債', '固定負債', '純資産']
-        sources, targets, values = [], [], []
-        
-        if current_assets > 0:
-            sources.append(0); targets.append(1); values.append(current_assets)
-        if fixed_assets > 0:
-            sources.append(0); targets.append(2); values.append(fixed_assets)
-        if current_liabilities > 0:
-            sources.append(3); targets.append(0); values.append(current_liabilities)
-        if fixed_liabilities > 0:
-            sources.append(4); targets.append(0); values.append(fixed_liabilities)
-        if equity > 0:
-            sources.append(5); targets.append(0); values.append(equity)
-        
-        fig = go.Figure(data=[go.Sankey(
-            node=dict(pad=15, thickness=20, label=labels, 
-                     color=["#3498db", "#2ecc71", "#e67e22", "#e74c3c", "#9b59b6", "#1abc9c"]),
-            link=dict(source=sources, target=targets, value=values)
-        )])
-        
-        fig.update_layout(title="資金の流れ", height=600)
-        return fig
-    except Exception as e:
-        import sys
-        sys.stderr.write(f"Sankey error: {e}\n")
-        return None
+# AI Forecast import
+try:
+    from advanced_forecast_engine import get_advanced_forecast_engine
+    from advanced_forecast_ui import show_advanced_forecast_page
+    ADVANCED_FORECAST_AVAILABLE = True
+except ImportError:
+    ADVANCED_FORECAST_AVAILABLE = False
 
 
 # ページ設定 - 完全ライトモード
@@ -944,12 +872,6 @@ else:
     if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
         st.session_state.page = "収益構造分析"
     
-    # AI Forecast menu
-    if ADVANCED_FORECAST_AVAILABLE:
-        if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_ai_forecast"):
-            st.session_state.page = "AI自動予測"
-
-    
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 設定")
     if st.sidebar.button("システム設定", width="stretch", key="nav_settings"):
@@ -1652,37 +1574,33 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # アラート表示エリア
             st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
             
-            # 実データからKPIを計算
+                        # 実データからKPIを計算
             try:
                 actuals_df = load_actual_data_cached(selected_period_id, processor)
-                has_data = actuals_df is not None and not actuals_df.empty
                 
-                if has_data:
+                if actuals_df is not None and not actuals_df.empty:
+                    # 実データを使用
                     current_month = st.session_state.current_month
-                    current_month_data = actuals_df[actuals_df['fiscal_month'] == current_month]
+                    current_data = actuals_df[actuals_df['fiscal_month'] == current_month]
                     
-                    # 営業CF計算
+                    # 営業CF
                     operating_profit = 0
-                    if '営業損益金額' in current_month_data['account_name'].values:
-                        operating_profit = float(current_month_data[
-                            current_month_data['account_name'] == '営業損益金額'
-                        ]['amount'].values[0])
+                    if not current_data.empty:
+                        profit_row = current_data[current_data['account_name'].str.contains('営業', na=False)]
+                        if not profit_row.empty:
+                            operating_profit = float(profit_row['amount'].values[0])
                     operating_cf = operating_profit * 0.8
                     
                     # 現金残高
-                    cash_data = actuals_df[actuals_df['account_name'] == '現金及び預金']
-                    if not cash_data.empty:
-                        cash_balance = float(cash_data['amount'].sum())
-                    else:
-                        current_assets = actuals_df[actuals_df['account_name'] == '流動資産']
-                        cash_balance = float(current_assets['amount'].sum()) * 0.3 if not current_assets.empty else 100000000
+                    cash_row = actuals_df[actuals_df['account_name'].str.contains('現金', na=False)]
+                    cash_balance = float(cash_row['amount'].sum()) if not cash_row.empty else 100000000
                     
                     # 固定費
-                    sg_expense = actuals_df[actuals_df['account_name'] == '販売費及び一般管理費']
-                    if not sg_expense.empty:
-                        total_sg = float(sg_expense['amount'].sum())
-                        months_count = actuals_df['fiscal_month'].nunique()
-                        fixed_cost_monthly = total_sg / months_count if months_count > 0 else 40000000
+                    sg_row = actuals_df[actuals_df['account_name'].str.contains('販売費', na=False)]
+                    if not sg_row.empty:
+                        total_sg = float(sg_row['amount'].sum())
+                        months_count = max(actuals_df['fiscal_month'].nunique(), 1)
+                        fixed_cost_monthly = total_sg / months_count
                     else:
                         fixed_cost_monthly = 40000000
                     
@@ -1692,31 +1610,36 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     # 前月比
                     prev_month = current_month - 1 if current_month > 1 else 12
                     prev_data = actuals_df[actuals_df['fiscal_month'] == prev_month]
-                    if not prev_data.empty and '営業損益金額' in prev_data['account_name'].values:
-                        prev_profit = float(prev_data[prev_data['account_name'] == '営業損益金額']['amount'].values[0])
-                        prev_cf = prev_profit * 0.8
-                        cf_growth = ((operating_cf - prev_cf) / abs(prev_cf) * 100) if prev_cf != 0 else 0
+                    if not prev_data.empty:
+                        prev_profit_row = prev_data[prev_data['account_name'].str.contains('営業', na=False)]
+                        if not prev_profit_row.empty:
+                            prev_profit = float(prev_profit_row['amount'].values[0])
+                            prev_cf = prev_profit * 0.8
+                            cf_growth = ((operating_cf - prev_cf) / abs(prev_cf) * 100) if prev_cf != 0 else 0
+                        else:
+                            cf_growth = 0
                     else:
                         cf_growth = 0
                     
                     # アラート
                     alerts = []
                     if cash_runway < 3:
-                        alerts.append({'level': 'critical', 'message': f'現金残高が固定費の{cash_runway:.1f}ヶ月分'})
+                        alerts.append({'level': 'critical', 'message': f'⚠️ 資金耐久月数: {cash_runway:.1f}ヶ月'})
                     elif cash_runway < 6:
-                        alerts.append({'level': 'warning', 'message': f'現金残高が固定費の{cash_runway:.1f}ヶ月分'})
+                        alerts.append({'level': 'warning', 'message': f'資金耐久月数: {cash_runway:.1f}ヶ月'})
                     if operating_cf < 0:
-                        alerts.append({'level': 'critical', 'message': '営業CFがマイナス'})
+                        alerts.append({'level': 'critical', 'message': '営業CFマイナス'})
                     
                     use_real_data = True
                 else:
+                    # デモデータ
                     use_real_data = False
                     operating_cf = 31500000
                     cash_balance = 376343476
                     cash_runway = 8.5
                     forecast_3months = 380000000
                     cf_growth = 8.3
-                    alerts = [{'level': 'info', 'message': '💡 実データ未登録'}]
+                    alerts = [{'level': 'info', 'message': '💡 実績データを入力してください'}]
             except Exception as e:
                 import sys
                 sys.stderr.write(f"CFO error: {e}\n")
@@ -1726,9 +1649,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 cash_runway = 8.5
                 forecast_3months = 380000000
                 cf_growth = 8.3
-                alerts = [{'level': 'warning', 'message': 'エラー: デモデータ表示中'}]
-
-
+                alerts = [{'level': 'warning', 'message': f'エラー: {str(e)[:50]}'}]
             
             # アラート表示
             for alert in alerts:
@@ -2079,18 +2000,16 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 csv,
                 f"PL_{st.session_state.selected_comp_name}_第{st.session_state.selected_period_num}期.csv",
                 "text/csv",
-                key='download-csv'            )
+                key='download-csv'
+            )
             
-            # ウォーターフォールチャート
+            # ウォーターフォール
             if not display_df.empty:
                 st.markdown("---")
                 st.subheader("📊 ウォーターフォールチャート")
                 fig = create_pl_waterfall(display_df)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("ウォーターフォールを表示するにはデータが必要です")
-
 
         elif st.session_state.page == "予測データ入力":
             st.title("月次計画（予測入力）")
@@ -2109,6 +2028,20 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # 一括入力機能（Manageboard風）
             with st.expander("🔧 入力アシスト機能", expanded=False):
                 st.markdown("#### 一括入力・コピー機能")
+            
+            st.markdown("---")
+            
+            # 自動予測機能
+            st.subheader("🤖 AI自動予測からインポート")
+            
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.info("💡 過去データから自動予測した値を一括インポートできます")
+            with col2:
+                if st.button("🔮 AI予測を実行", type="primary", use_container_width=True):
+                    st.session_state.page = "AI自動予測"
+                    st.rerun()
+
                 
                 col1, col2 = st.columns(2)
                 
@@ -4161,93 +4094,75 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             st.table(pd.DataFrame(summary_data))
         
 
-# AI Forecast page
+# AI自動予測ページ
 elif st.session_state.page == "AI自動予測":
     st.title("🔮 AI自動予測")
     
-    with st.expander("🔍 デバッグ情報"):
-        st.write("ADVANCED_FORECAST_AVAILABLE:", ADVANCED_FORECAST_AVAILABLE)
-        st.write("selected_period_id:", st.session_state.get('selected_period_id'))
-        import os
-        st.write("Python files:", [f for f in os.listdir('.') if f.endswith('.py')][:10])
+    if not ADVANCED_FORECAST_AVAILABLE:
+        st.error("❌ AI予測機能が利用できません")
+        st.info("advanced_forecast_engine.py と advanced_forecast_ui.py を配置してください")
+        st.stop()
     
-    if ADVANCED_FORECAST_AVAILABLE:
-        try:
-            if 'data_handler_adapter' not in st.session_state:
-                class DataHandlerAdapter:
-                    def __init__(self, processor):
-                        self._processor = processor
-                        self._connection = None
-                    
-                    def _get_connection(self):
-                        if self._connection is None:
-                            if self._processor.use_postgres:
-                                import psycopg2
-                                self._connection = psycopg2.connect(self._processor.db_url)
-                            else:
-                                import sqlite3
-                                self._connection = sqlite3.connect('financial_simulator.db')
-                        return self._connection
-                    
-                    def get_actual_vs_forecast_split(self, period_id):
-                        try:
-                            conn = self._get_connection()
-                            if self._processor.use_postgres:
-                                query = "SELECT MAX(fiscal_month) as latest_actual FROM actuals WHERE fiscal_period_id = %s"
-                                df = pd.read_sql_query(query, conn, params=(period_id,))
-                            else:
-                                query = "SELECT MAX(fiscal_month) as latest_actual FROM actuals WHERE fiscal_period_id = ?"
-                                df = pd.read_sql_query(query, conn, params=(period_id,))
-                            
-                            latest_actual = df['latest_actual'].iloc[0] if not df.empty and not pd.isna(df['latest_actual'].iloc[0]) else 0
-                            
-                            if latest_actual and latest_actual > 0:
-                                latest_actual = int(latest_actual)
-                                actual_months = list(range(1, latest_actual + 1))
-                                forecast_months = list(range(latest_actual + 1, 13))
-                            else:
-                                actual_months = []
-                                forecast_months = list(range(1, 13))
-                            
-                            return {
-                                'has_actual': latest_actual > 0,
-                                'latest_actual_month': latest_actual,
-                                'actual_months': actual_months,
-                                'forecast_months': forecast_months
-                            }
-                        except:
-                            return {'has_actual': False, 'latest_actual_month': 0, 'actual_months': [], 'forecast_months': list(range(1, 13))}
-                    
-                    def get_cumulative_actual_data(self, period_id, up_to_month):
-                        try:
-                            actuals_df = self._processor.load_actual_data(period_id)
-                            if actuals_df is None or actuals_df.empty:
-                                return {}
-                            if 'fiscal_month' in actuals_df.columns:
-                                actuals_df = actuals_df[actuals_df['fiscal_month'] <= up_to_month]
-                            result = {}
-                            for _, row in actuals_df.iterrows():
-                                account = row.get('account_name', row.get('account', ''))
-                                amount = row.get('amount', row.get('value', 0))
-                                if account:
-                                    result[account] = amount
-                            return result
-                        except:
-                            return {}
+    try:
+        # データハンドラーアダプター
+        if 'data_handler_adapter' not in st.session_state:
+            class DataHandlerAdapter:
+                def __init__(self, proc):
+                    self._processor = proc
                 
-                st.session_state.data_handler_adapter = DataHandlerAdapter(processor)
+                def get_actual_vs_forecast_split(self, period_id):
+                    try:
+                        actuals = self._processor.load_actual_data(period_id)
+                        if actuals is None or actuals.empty:
+                            return {'has_actual': False, 'latest_actual_month': 0, 
+                                   'actual_months': [], 'forecast_months': list(range(1, 13))}
+                        
+                        latest = int(actuals['fiscal_month'].max())
+                        return {
+                            'has_actual': True,
+                            'latest_actual_month': latest,
+                            'actual_months': list(range(1, latest + 1)),
+                            'forecast_months': list(range(latest + 1, 13))
+                        }
+                    except:
+                        return {'has_actual': False, 'latest_actual_month': 0,
+                               'actual_months': [], 'forecast_months': list(range(1, 13))}
+                
+                def get_cumulative_actual_data(self, period_id, up_to_month):
+                    try:
+                        actuals = self._processor.load_actual_data(period_id)
+                        if actuals is None or actuals.empty:
+                            return {}
+                        actuals = actuals[actuals['fiscal_month'] <= up_to_month]
+                        result = {}
+                        for _, row in actuals.iterrows():
+                            account = row.get('account_name', '')
+                            amount = row.get('amount', 0)
+                            if account:
+                                result[account] = amount
+                        return result
+                    except:
+                        return {}
             
-            if 'advanced_engine' not in st.session_state:
-                st.session_state.advanced_engine = get_advanced_forecast_engine(st.session_state.data_handler_adapter)
-            
-            show_advanced_forecast_page(st.session_state.data_handler_adapter, st.session_state.advanced_engine)
-        except Exception as e:
-            st.error(f"Error: {e}")
+            st.session_state.data_handler_adapter = DataHandlerAdapter(processor)
+        
+        # 予測エンジン
+        if 'advanced_engine' not in st.session_state:
+            st.session_state.advanced_engine = get_advanced_forecast_engine(
+                st.session_state.data_handler_adapter
+            )
+        
+        # 予測画面表示
+        show_advanced_forecast_page(
+            st.session_state.data_handler_adapter,
+            st.session_state.advanced_engine
+        )
+    
+    except Exception as e:
+        st.error(f"❌ エラー: {e}")
+        with st.expander("詳細"):
             import traceback
             st.code(traceback.format_exc())
-    else:
-        st.error("AI Forecast not available")
-        st.info("Please place advanced_forecast_engine.py and advanced_forecast_ui.py")
 
 
 else:
