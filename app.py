@@ -2267,6 +2267,17 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 # ウォーターフォール
                 st.markdown("---")
                 st.subheader("📊 ウォーターフォールチャート")
+                
+                # デバッグ情報
+                with st.expander("🔍 ウォーターフォールデバッグ", expanded=False):
+                    st.write("display_df shape:", display_df.shape)
+                    st.write("Columns:", display_df.columns.tolist())
+                    if '項目名' in display_df.columns:
+                        st.write("項目名:", display_df['項目名'].tolist()[:10])
+                    if '金額' in display_df.columns:
+                        st.write("金額サンプル:", display_df['金額'].head().tolist())
+                    st.dataframe(display_df.head(10))
+                
                 fig = create_pl_waterfall(display_df)
                 if fig:
                     st.plotly_chart(fig, width="stretch")
@@ -2289,13 +2300,23 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             </div>
             """, unsafe_allow_html=True)
             
+            # デバッグ情報
+            with st.expander("🔍 BSデバッグ情報", expanded=False):
+                st.write("selected_period_id:", selected_period_id)
+            
             # BSデータ取得
             try:
                 actuals_df = load_actual_data_cached(selected_period_id, processor)
                 
+                st.write("actuals_df loaded:", actuals_df is not None)
+                if actuals_df is not None:
+                    st.write("Shape:", actuals_df.shape)
+                    st.write("Columns:", actuals_df.columns.tolist()[:5])
+                
                 # 横持ち変換
                 if actuals_df is not None and not actuals_df.empty:
                     actuals_df = convert_wide_to_long(actuals_df)
+                    st.write("After conversion:", actuals_df.shape)
                 
                 if actuals_df is not None and not actuals_df.empty:
                     # カラム名正規化
@@ -2305,7 +2326,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     bs_items = [
                         '流動資産', '固定資産', '資産合計',
                         '流動負債', '固定負債', '負債合計',
-                        '純資産合計', '負債・純資産合計'
+                        '純資産合計', '負債・純資産合計',
+                        '現金及び預金', '売掛金', '棚卸資産',
+                        '買掛金', '借入金', '資本金'
                     ]
                     
                     # account_nameカラムを探す
@@ -2321,12 +2344,20 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             amount_col = col
                             break
                     
+                    st.write(f"Detected columns: account={account_col}, amount={amount_col}")
+                    
                     if account_col and amount_col:
+                        # 全科目を表示
+                        all_accounts = actuals_df[account_col].unique().tolist()
+                        st.write(f"Available accounts ({len(all_accounts)}):", all_accounts[:20])
+                        
                         # BSアイテムのみ抽出
                         bs_df = actuals_df[actuals_df[account_col].isin(bs_items)].copy()
-                        bs_df = bs_df.rename(columns={account_col: '項目名', amount_col: '金額'})
+                        st.write(f"BS items found: {len(bs_df)}")
                         
                         if not bs_df.empty:
+                            bs_df = bs_df.rename(columns={account_col: '項目名', amount_col: '金額'})
+                            
                             # データ表示
                             st.dataframe(
                                 bs_df.style.format({'金額': lambda x: f"¥{safe_int(x):,}"}),
@@ -2338,14 +2369,25 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.markdown("---")
                             st.subheader("📊 資金の流れ (Sankey)")
                             
-                            # create_bs_sankey関数を使用
                             fig = create_bs_sankey(bs_df)
                             if fig:
                                 st.plotly_chart(fig, width="stretch")
                             else:
                                 st.info("Sankey図を表示するにはデータが必要です")
                         else:
-                            st.info("BSデータが見つかりません")
+                            st.warning("⚠️ BSデータが見つかりません")
+                            st.info("""
+                            **BSデータを表示するには:**
+                            
+                            以下のような科目名でデータを入力してください:
+                            - 流動資産、固定資産、資産合計
+                            - 流動負債、固定負債、負債合計
+                            - 純資産合計
+                            - 現金及び預金、売掛金、棚卸資産
+                            - 買掛金、借入金、資本金
+                            
+                            現在のデータには BS科目が含まれていません。
+                            """)
                     else:
                         st.warning("必要なカラムが見つかりません")
                 else:
