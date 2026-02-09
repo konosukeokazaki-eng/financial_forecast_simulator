@@ -19,26 +19,69 @@ from profitability_analysis_ui import show_profitability_analysis_page
 # ==================== 可視化関数 ====================
 
 def create_pl_waterfall(pl_data):
-    """PLウォーターフォール"""
+    """PLウォーターフォール（横持ち対応）"""
     try:
-        sales = cogs = sg_expense = operating_profit = 0
-        for _, row in pl_data.iterrows():
-            item = str(row.get('項目名', ''))
-            amount = float(row.get('金額', 0))
-            if item == '売上高':
-                sales = amount
-            elif item == '売上原価':
-                cogs = amount
-            elif item == '販売費及び一般管理費':
-                sg_expense = amount
-            elif item == '営業損益金額':
-                operating_profit = amount
+        # データが横持ちの場合（月が列）
+        if '項目名' in pl_data.columns:
+            # 合計列を使用
+            if '合計' in pl_data.columns:
+                sales = cogs = sg_expense = operating_profit = 0
+                
+                for _, row in pl_data.iterrows():
+                    item = str(row.get('項目名', ''))
+                    amount = float(row.get('合計', 0))
+                    
+                    if item == '売上高':
+                        sales = amount
+                    elif item == '売上原価':
+                        cogs = amount
+                    elif '販売' in item and '管理費' in item:
+                        sg_expense = amount
+                    elif item == '営業損益金額':
+                        operating_profit = amount
+            else:
+                # 最新月の列を使用
+                month_cols = [col for col in pl_data.columns if '-' in str(col) or col.isdigit()]
+                if month_cols:
+                    latest_month = month_cols[-1]
+                    
+                    for _, row in pl_data.iterrows():
+                        item = str(row.get('項目名', ''))
+                        amount = float(row.get(latest_month, 0))
+                        
+                        if item == '売上高':
+                            sales = amount
+                        elif item == '売上原価':
+                            cogs = amount
+                        elif '販売' in item and '管理費' in item:
+                            sg_expense = amount
+                        elif item == '営業損益金額':
+                            operating_profit = amount
+                else:
+                    return None
+        else:
+            # 縦持ち形式
+            sales = cogs = sg_expense = operating_profit = 0
+            for _, row in pl_data.iterrows():
+                item = str(row.get('項目名', ''))
+                amount = float(row.get('金額', 0))
+                if item == '売上高':
+                    sales = amount
+                elif item == '売上原価':
+                    cogs = amount
+                elif '販売' in item and '管理費' in item:
+                    sg_expense = amount
+                elif item == '営業損益金額':
+                    operating_profit = amount
         
+        # グラフ作成
+        gross_profit = sales - cogs
         x_labels = ['売上高', '売上原価', '売上総利益', '販管費', '営業利益']
-        y_values = [sales, -cogs, sales - cogs, -sg_expense, operating_profit]
+        y_values = [sales, -cogs, gross_profit, -sg_expense, operating_profit]
         
         fig = go.Figure(go.Waterfall(
-            x=x_labels, y=y_values,
+            x=x_labels, 
+            y=y_values,
             measure=['absolute', 'relative', 'total', 'relative', 'total'],
             text=[f"¥{abs(v):,.0f}" for v in y_values],
             textposition='outside',
@@ -46,11 +89,19 @@ def create_pl_waterfall(pl_data):
             decreasing={"marker": {"color": "#e74c3c"}},
             totals={"marker": {"color": "#3498db"}}
         ))
-        fig.update_layout(title="損益の流れ", showlegend=False, height=500)
+        
+        fig.update_layout(
+            title="損益の流れ", 
+            showlegend=False, 
+            height=500,
+            yaxis_title="金額（円）"
+        )
         return fig
     except Exception as e:
         import sys
         sys.stderr.write(f"Waterfall error: {e}\n")
+        import traceback
+        sys.stderr.write(traceback.format_exc())
         return None
 
 
