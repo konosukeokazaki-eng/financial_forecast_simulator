@@ -1579,6 +1579,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 # データ読み込み
                 actuals_df = load_actual_data_cached(selected_period_id, processor)
                 
+                # 横持ち→縦持ち変換
+                if actuals_df is not None and not actuals_df.empty:
+                    actuals_df = convert_wide_to_long(actuals_df)
+                
                 # データがNoneまたは空の場合
                 if actuals_df is None or actuals_df.empty:
                     # デモデータを使用
