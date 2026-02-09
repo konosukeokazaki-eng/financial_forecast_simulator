@@ -136,6 +136,92 @@ st.markdown("""
 
 # ==================== 可視化関数 ====================
 
+def create_bs_sankey(bs_data):
+    """BS Sankey図作成"""
+    try:
+        if bs_data is None or bs_data.empty:
+            return None
+        
+        # 簡易版：主要な項目のみ表示
+        source = []
+        target = []
+        value = []
+        labels = []
+        
+        # ラベルのインデックスマップ
+        label_dict = {}
+        
+        def get_label_idx(label):
+            if label not in label_dict:
+                label_dict[label] = len(labels)
+                labels.append(label)
+            return label_dict[label]
+        
+        # BSデータから主要項目を抽出
+        for _, row in bs_data.iterrows():
+            item = str(row.get('項目名', ''))
+            amount = float(row.get('金額', 0))
+            
+            if amount > 0:  # プラスの値のみ
+                # 資産側
+                if '現金' in item or '預金' in item:
+                    source.append(get_label_idx('流動資産'))
+                    target.append(get_label_idx(item))
+                    value.append(amount)
+                elif '売掛' in item:
+                    source.append(get_label_idx('流動資産'))
+                    target.append(get_label_idx(item))
+                    value.append(amount)
+                elif '固定資産' in item:
+                    source.append(get_label_idx('資産'))
+                    target.append(get_label_idx(item))
+                    value.append(amount)
+                # 負債側
+                elif '買掛' in item:
+                    source.append(get_label_idx('流動負債'))
+                    target.append(get_label_idx(item))
+                    value.append(amount)
+                elif '借入' in item:
+                    source.append(get_label_idx('負債'))
+                    target.append(get_label_idx(item))
+                    value.append(amount)
+                # 純資産側
+                elif '資本' in item or '剰余' in item:
+                    source.append(get_label_idx('純資産'))
+                    target.append(get_label_idx(item))
+                    value.append(amount)
+        
+        if not source:
+            return None
+        
+        fig = go.Figure(data=[go.Sankey(
+            node=dict(
+                pad=15,
+                thickness=20,
+                line=dict(color="black", width=0.5),
+                label=labels,
+                color="lightblue"
+            ),
+            link=dict(
+                source=source,
+                target=target,
+                value=value
+            )
+        )])
+        
+        fig.update_layout(
+            title="貸借対照表の構造",
+            font_size=12,
+            height=600
+        )
+        
+        return fig
+    except Exception as e:
+        import sys
+        sys.stderr.write(f"BS Sankey error: {e}\n")
+        return None
+
+
 def create_pl_waterfall(pl_data):
     """PLウォーターフォール（横持ち対応）"""
     try:
