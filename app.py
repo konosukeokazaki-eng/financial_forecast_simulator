@@ -850,6 +850,10 @@ else:
         st.session_state.page = "損益計算書 (PL)"
     if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
         st.session_state.page = "貸借対照表 (BS)"
+    
+        st.session_state.page = "損益計算書 (PL)"
+    if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
+        st.session_state.page = "貸借対照表 (BS)"
     if st.sidebar.button("CF計算書", width="stretch", key="nav_cf"):
         st.session_state.page = "キャッシュフロー計算書 (CF)"
     if st.sidebar.button("CF詳細分析", width="stretch", key="nav_cf_detail"):
@@ -2118,6 +2122,87 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
 
+
+        # 貸借対照表 (BS) ページ
+        elif st.session_state.page == "貸借対照表 (BS)":
+            st.title("貸借対照表 (BS)")
+            
+            st.markdown(f"""
+            <div class="info-box">
+                <strong>🏢 {st.session_state.selected_comp_name}</strong> | 
+                第{st.session_state.selected_period_num}期 | 
+                実績締月: {st.session_state.current_month} | 
+                シナリオ: <strong>{st.session_state.scenario}</strong>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # BSデータ取得
+            try:
+                actuals_df = load_actual_data_cached(selected_period_id, processor)
+                
+                # 横持ち変換
+                if actuals_df is not None and not actuals_df.empty:
+                    actuals_df = convert_wide_to_long(actuals_df)
+                
+                if actuals_df is not None and not actuals_df.empty:
+                    # カラム名正規化
+                    actuals_df.columns = actuals_df.columns.str.lower()
+                    
+                    # BSデータ抽出
+                    bs_items = [
+                        '流動資産', '固定資産', '資産合計',
+                        '流動負債', '固定負債', '負債合計',
+                        '純資産合計', '負債・純資産合計'
+                    ]
+                    
+                    # account_nameカラムを探す
+                    account_col = None
+                    for col in ['account_name', '科目', 'item_name', '項目名']:
+                        if col in actuals_df.columns:
+                            account_col = col
+                            break
+                    
+                    amount_col = None
+                    for col in ['amount', '金額', 'value']:
+                        if col in actuals_df.columns:
+                            amount_col = col
+                            break
+                    
+                    if account_col and amount_col:
+                        # BSアイテムのみ抽出
+                        bs_df = actuals_df[actuals_df[account_col].isin(bs_items)].copy()
+                        bs_df = bs_df.rename(columns={account_col: '項目名', amount_col: '金額'})
+                        
+                        if not bs_df.empty:
+                            # データ表示
+                            st.dataframe(
+                                bs_df.style.format({'金額': lambda x: f"¥{safe_int(x):,}"}),
+                                use_container_width=True,
+                                height=400
+                            )
+                            
+                            # Sankey図
+                            st.markdown("---")
+                            st.subheader("📊 資金の流れ (Sankey)")
+                            
+                            # create_bs_sankey関数を使用
+                            fig = create_bs_sankey(bs_df)
+                            if fig:
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.info("Sankey図を表示するにはデータが必要です")
+                        else:
+                            st.info("BSデータが見つかりません")
+                    else:
+                        st.warning("必要なカラムが見つかりません")
+                else:
+                    st.info("実績データを入力してください")
+            except Exception as e:
+                st.error(f"エラー: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
+
         elif st.session_state.page == "予測データ入力":
             st.title("月次計画（予測入力）")
             
@@ -2135,6 +2220,29 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # 一括入力機能（Manageboard風）
             with st.expander("🔧 入力アシスト機能", expanded=False):
                 st.markdown("#### 一括入力・コピー機能")
+            
+            st.markdown("---")
+            
+            # シナリオ自動生成
+            st.subheader("🎯 シナリオ自動生成")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.info("**標準シナリオ**\n現在の入力値をそのまま使用")
+            
+            with col2:
+                st.success("**楽観シナリオ**\n- 売上高: +10%\n- 売上原価: -10%\n- 販管費: -5%")
+                if st.button("楽観シナリオを生成", use_container_width=True):
+                    st.info("楽観シナリオ生成機能は次のバージョンで実装予定です")
+            
+            with col3:
+                st.error("**悲観シナリオ**\n- 売上高: -10%\n- 売上原価: +10%\n- 販管費: +10%")
+                if st.button("悲観シナリオを生成", use_container_width=True):
+                    st.info("悲観シナリオ生成機能は次のバージョンで実装予定です")
+            
+            st.markdown("---")
+
             
             st.markdown("---")
             
