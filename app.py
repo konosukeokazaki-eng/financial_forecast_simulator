@@ -2050,11 +2050,67 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # 2カラムセクション
             col1, col2 = st.columns(2)
             
-            # CF内訳データを準備（サンプルデータ）
+            # CF内訳データを準備（実データから取得）
             cf_operating = operating_cf
-            cf_investing = -2000000
-            cf_financing = -5000000
-            cf_net_change = operating_cf - 2000000 - 5000000
+            
+            # デバッグ情報
+            with st.expander("🔍 CF内訳デバッグ", expanded=False):
+                st.write("**データ確認:**")
+                st.write("actuals_df exists:", actuals_df is not None)
+                if actuals_df is not None:
+                    st.write("Shape:", actuals_df.shape)
+                    st.write("Current month:", st.session_state.current_month)
+            
+            # 投資CF・財務CFを実データから取得
+            try:
+                if actuals_df is not None and not actuals_df.empty:
+                    current_month_num = int(str(st.session_state.current_month).split('-')[-1]) if '-' in str(st.session_state.current_month) else int(st.session_state.current_month)
+                    current_data = actuals_df[actuals_df[month_col] == current_month_num]
+                    
+                    st.write(f"Current month num: {current_month_num}")
+                    st.write(f"Current data rows: {len(current_data)}")
+                    st.write("Available accounts:", current_data[account_col].unique().tolist() if not current_data.empty else [])
+                    
+                    # 投資CF（設備投資、固定資産取得など）
+                    investing_rows = current_data[
+                        current_data[account_col].astype(str).str.contains('設備投資|固定資産|投資', na=False)
+                    ]
+                    cf_investing = -abs(float(investing_rows[amount_col].sum())) if not investing_rows.empty else 0
+                    
+                    st.write(f"Investing rows found: {len(investing_rows)}")
+                    st.write(f"cf_investing: {cf_investing}")
+                    
+                    # 財務CF（借入、返済など）
+                    financing_rows = current_data[
+                        current_data[account_col].astype(str).str.contains('借入|返済|増資|配当', na=False)
+                    ]
+                    cf_financing = float(financing_rows[amount_col].sum()) if not financing_rows.empty else 0
+                    
+                    st.write(f"Financing rows found: {len(financing_rows)}")
+                    st.write(f"cf_financing: {cf_financing}")
+                    
+                    # 現金増減
+                    cf_net_change = cf_operating + cf_investing + cf_financing
+                    
+                    st.write(f"**計算結果:**")
+                    st.write(f"- 営業CF: ¥{cf_operating:,.0f}")
+                    st.write(f"- 投資CF: ¥{cf_investing:,.0f}")
+                    st.write(f"- 財務CF: ¥{cf_financing:,.0f}")
+                    st.write(f"- 現金増減: ¥{cf_net_change:,.0f}")
+                else:
+                    # データなし
+                    cf_investing = 0
+                    cf_financing = 0
+                    cf_net_change = cf_operating
+                    st.write("データなし - ゼロ表示")
+            except Exception as e:
+                # エラー時
+                import traceback
+                st.error(f"エラー: {e}")
+                st.code(traceback.format_exc())
+                cf_investing = 0
+                cf_financing = 0
+                cf_net_change = cf_operating
             
             with col1:
                 st.markdown('<div class="section-card fade-in">', unsafe_allow_html=True)
