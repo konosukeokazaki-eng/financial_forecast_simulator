@@ -2005,17 +2005,11 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # 2カラムセクション
             col1, col2 = st.columns(2)
             
-            # CF内訳データを準備
-            if use_real_data and latest_cf:
-                cf_operating = latest_cf.get('営業CF', {}).get('合計', 0)
-                cf_investing = latest_cf.get('投資CF', {}).get('合計', 0)
-                cf_financing = latest_cf.get('財務CF', {}).get('合計', 0)
-                cf_net_change = latest_cf.get('現金増減', 0)
-            else:
-                cf_operating = 31500000
-                cf_investing = -2000000
-                cf_financing = -5000000
-                cf_net_change = 24500000
+            # CF内訳データを準備（サンプルデータ）
+            cf_operating = operating_cf
+            cf_investing = -2000000
+            cf_financing = -5000000
+            cf_net_change = operating_cf - 2000000 - 5000000
             
             with col1:
                 st.markdown('<div class="section-card fade-in">', unsafe_allow_html=True)
@@ -2488,13 +2482,13 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 "項目名": st.column_config.TextColumn("項目名", width="large", disabled=True),
                 "タイプ": st.column_config.TextColumn("タイプ", width="small", disabled=True),
                 "親項目": None,  # 非表示
-                "合計": st.column_config.NumberColumn("合計", format="%,.0f", disabled=True, width="medium")
+                "合計": st.column_config.NumberColumn("合計", format="%.0f", disabled=True, width="medium")
             }
             
             for month in month_cols:
                 column_config[month] = st.column_config.NumberColumn(
                     month,
-                    format="%,.0f",  # カンマ区切り（通貨記号なし）
+                    format="%.0f",  # カンマ区切り（通貨記号なし）
                     width="small",
                     help=f"{month}の予測値（千円）"
                 )
@@ -4240,7 +4234,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             disabled=["項目名"],
                             column_config={
                                 col: st.column_config.NumberColumn(
-                                    format="%,.0f",
+                                    format="%.0f",
                                     min_value=-999999999,
                                     max_value=999999999
                                 ) for col in st.session_state.forecast_imported_df.columns if col != '項目名'
