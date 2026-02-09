@@ -2356,34 +2356,48 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.write("**データ取得確認:**")
                 st.write("selected_period_id:", selected_period_id)
             
-            # BSデータ取得 - 現在月のデータを取得
+            # BSデータ取得 - actual_dataから直接全データを取得
             try:
-                # まず全データを取得
-                all_actuals_df = load_actual_data_cached(selected_period_id, processor)
+                # データベースから直接全項目を取得（all_itemsフィルタなし）
+                query = """
+                SELECT DISTINCT item_name as 項目名, month, amount 
+                FROM actual_data 
+                WHERE fiscal_period_id = ?
+                ORDER BY item_name, month
+                """
                 
-                st.write("all_actuals_df loaded:", all_actuals_df is not None)
-                if all_actuals_df is not None:
-                    st.write("Original shape:", all_actuals_df.shape)
-                    st.write("Original columns:", all_actuals_df.columns.tolist()[:5])
+                all_data_df = processor._read_sql_query(query, params=(selected_period_id,))
                 
-                # 横持ち変換
-                if all_actuals_df is not None and not all_actuals_df.empty:
-                    actuals_df = convert_wide_to_long(all_actuals_df)
-                    st.write("After conversion:", actuals_df.shape)
+                st.write("**データベース直接取得:**")
+                st.write("all_data_df loaded:", all_data_df is not None)
+                
+                if all_data_df is not None and not all_data_df.empty:
+                    st.write("Shape:", all_data_df.shape)
+                    st.write("Unique items:", all_data_df['項目名'].nunique())
+                    
+                    # すべての項目名を表示
+                    all_items = all_data_df['項目名'].unique().tolist()
+                    st.write(f"**全項目 ({len(all_items)}):**")
+                    st.write(all_items)
+                    
+                    # 横持ち変換
+                    pivot_df = all_data_df.pivot(index='項目名', columns='month', values='amount').reset_index()
+                    st.write("Pivot shape:", pivot_df.shape)
+                    
+                    # 縦持ちに変換
+                    actuals_df = convert_wide_to_long(pivot_df)
+                    st.write("After long conversion:", actuals_df.shape)
                     
                     # カラム名正規化
                     actuals_df.columns = actuals_df.columns.str.lower()
                     
-                    # 現在月のデータのみ取得
+                    # 現在月フィルタ
                     current_month_str = str(st.session_state.current_month)
                     if '-' in current_month_str:
                         current_month_num = int(current_month_str.split('-')[-1])
                     else:
                         current_month_num = int(current_month_str)
                     
-                    st.write(f"Current month: {current_month_num}")
-                    
-                    # 月フィルタ
                     month_col = None
                     for col in ['fiscal_month', 'month', '月']:
                         if col in actuals_df.columns:
@@ -2392,9 +2406,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     
                     if month_col:
                         actuals_df = actuals_df[actuals_df[month_col] == current_month_num]
-                        st.write(f"After month filter: {actuals_df.shape}")
+                        st.write(f"Current month {current_month_num} data:", actuals_df.shape)
                     
-                    # account_nameカラムを探す
+                    # カラム検出
                     account_col = None
                     for col in ['account_name', '科目', 'item_name', '項目名']:
                         if col in actuals_df.columns:
@@ -2407,27 +2421,26 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             amount_col = col
                             break
                     
-                    st.write(f"Detected columns: account={account_col}, amount={amount_col}")
+                    st.write(f"Detected: account={account_col}, amount={amount_col}")
                     
                     if account_col and amount_col:
-                        # 全科目を表示
-                        all_accounts = actuals_df[account_col].unique().tolist()
-                        st.write(f"**Available accounts ({len(all_accounts)}):**")
-                        st.write(all_accounts)
+                        # 全科目表示
+                        current_accounts = actuals_df[account_col].unique().tolist()
+                        st.write(f"**当月の科目 ({len(current_accounts)}):**")
+                        st.write(current_accounts)
                         
-                        # BS科目の定義を拡張
+                        # BS科目キーワード
                         bs_keywords = [
                             '資産', '負債', '純資産', '資本',
                             '現金', '預金', '売掛', '買掛', '借入',
-                            '棚卸', '在庫', '有形固定', '無形固定',
-                            '投資', '繰延', '引当'
+                            '棚卸', '在庫', '固定', '投資', '引当'
                         ]
                         
-                        # BS科目を抽出（キーワードマッチ）
+                        # BS科目抽出
                         bs_df = actuals_df[
                             actuals_df[account_col].astype(str).str.contains(
-                                '|'.join(bs_keywords), 
-                                na=False, 
+                                '|'.join(bs_keywords),
+                                na=False,
                                 case=False
                             )
                         ].copy()
@@ -2437,7 +2450,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         if not bs_df.empty:
                             bs_df = bs_df.rename(columns={account_col: '項目名', amount_col: '金額'})
                             
-                            st.success(f"✅ {len(bs_df)}件のBS科目が見つかりました")
+                            st.success(f"✅ {len(bs_df)}件のBS科目が見つかりました！")
                             
                             # データ表示
                             st.dataframe(
@@ -2457,16 +2470,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 st.info("Sankey図を表示するにはデータが必要です")
                         else:
                             st.warning("⚠️ BS科目が見つかりませんでした")
-                            st.info(f"""
-                            **BSデータを表示するには:**
+                            st.info("""
+                            **データベースには項目がありますが、BS科目ではありません**
                             
-                            以下のようなキーワードを含む科目名でデータを入力してください:
-                            - 資産、負債、純資産、資本
-                            - 現金、預金、売掛、買掛、借入
-                            - 棚卸、在庫、固定資産、投資
-                            
-                            **現在のデータ:**
-                            すべてPL科目のようです。BSデータを別途入力してください。
+                            BSデータを入力してください。
                             """)
                     else:
                         st.error("必要なカラムが見つかりません")
