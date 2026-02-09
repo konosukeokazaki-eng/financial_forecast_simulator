@@ -662,6 +662,119 @@ def safe_int(value):
     except (ValueError, TypeError):
         return 0
 
+
+def safe_float(value):
+    """NaN/None対応の安全なfloat変換"""
+    try:
+        if pd.isna(value) or value is None:
+            return 0.0
+        return float(value)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+# データ形式変換関数
+def convert_wide_to_long(df):
+    """横持ち→縦持ち変換"""
+    try:
+        # 項目名カラムを探す
+        item_col = None
+        for col in df.columns:
+            if col in ['項目名', 'item_name', '科目', 'account_name', 'account']:
+                item_col = col
+                break
+        
+        if not item_col:
+            return df
+        
+        # 他のカラムが日付形式かチェック
+        other_cols = [c for c in df.columns if c != item_col]
+        if not other_cols:
+            return df
+        
+        sample = str(other_cols[0])
+        if not ('-' in sample or '/' in sample):
+            return df
+        
+        # 縦持ちに変換
+        long_df = df.melt(
+            id_vars=[item_col],
+            value_vars=other_cols,
+            var_name='period',
+            value_name='amount'
+        )
+        
+        # 月番号抽出
+        def get_month(s):
+            try:
+                s = str(s)
+                if '-' in s:
+                    return int(s.split('-')[-1])
+                if '/' in s:
+                    return int(s.split('/')[-1])
+                return 0
+            except:
+                return 0
+        
+        long_df['fiscal_month'] = long_df['period'].apply(get_month)
+        long_df['account_name'] = long_df[item_col]
+        long_df = long_df[['fiscal_month', 'account_name', 'amount']]
+        long_df = long_df[long_df['fiscal_month'] > 0]
+        long_df = long_df[long_df['amount'].notna()]
+        long_df['amount'] = pd.to_numeric(long_df['amount'], errors='coerce').fillna(0)
+        
+        return long_df
+    except:
+        return df
+
+
+# シナリオ自動生成関数
+def generate_scenario_data(base_data, scenario_type):
+    """
+    ベースデータからシナリオデータを自動生成
+    
+    Args:
+        base_data: dict {項目名: 金額}
+        scenario_type: 'optimistic' or 'pessimistic'
+    
+    Returns:
+        dict: 調整後のデータ
+    """
+    result = base_data.copy()
+    
+    if scenario_type == 'optimistic':
+        # 楽観シナリオ
+        adjustments = {
+            '売上高': 1.10,
+            '売上': 1.10,
+            '売上原価': 0.90,
+            '原価': 0.90,
+            '販売費及び一般管理費': 0.95,
+            '販管費': 0.95,
+            '一般管理費': 0.95
+        }
+    else:
+        # 悲観シナリオ
+        adjustments = {
+            '売上高': 0.90,
+            '売上': 0.90,
+            '売上原価': 1.10,
+            '原価': 1.10,
+            '販売費及び一般管理費': 1.10,
+            '販管費': 1.10,
+            '一般管理費': 1.10
+        }
+    
+    # 調整適用
+    for item, value in result.items():
+        for key, ratio in adjustments.items():
+            if key in item:
+                result[item] = value * ratio
+                break
+    
+    return result
+
+
 # サイドバー
 st.sidebar.markdown("""
 <div style='text-align: center; padding: 1rem 0;'>
@@ -2089,39 +2202,54 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             </div>
             """, unsafe_allow_html=True)
             
+            # PLデータ取得
+            if 'pl_df' in st.session_state and st.session_state.pl_df is not None:
+                pl_df = st.session_state.pl_df
+                
+                # 表示モードでフィルタ
+                if st.session_state.get('display_mode') == "要約":
+                    display_df = pl_df[pl_df['タイプ'] == '要約'].copy()
+                else:
+                    display_df = pl_df.copy()
+            else:
+                display_df = pd.DataFrame()
+            
             # フィルタリング
             col1, col2 = st.columns([2, 1])
             with col1:
                 search_term = st.text_input("🔍 項目名で検索", "")
             
-            display_df = pl_display.copy()
-            if search_term:
-                display_df = display_df[display_df['項目名'].str.contains(search_term)]
+            if not display_df.empty and search_term:
+                display_df = display_df[display_df['項目名'].str.contains(search_term, na=False)]
             
-            # フォーマット
-            formatted_df = display_df.style\
-                .format(lambda x: f"¥{safe_int(x):,}" if isinstance(x, (int, float)) else x)\
-                .apply(lambda row: ['background-color: #f8f9fa; font-weight: bold' if row['タイプ'] == '要約' else '' for _ in row], axis=1)
-            
-            st.dataframe(formatted_df, width="stretch", height=700)
-            
-            # CSVダウンロード
-            csv = display_df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                "📥 CSVとしてダウンロード",
-                csv,
-                f"PL_{st.session_state.selected_comp_name}_第{st.session_state.selected_period_num}期.csv",
-                "text/csv",
-                key='download-csv'
-            )
-            
-            # ウォーターフォール
             if not display_df.empty:
+                # フォーマット
+                formatted_df = display_df.style\
+                    .format(lambda x: f"¥{safe_int(x):,}" if isinstance(x, (int, float)) else x)\
+                    .apply(lambda row: ['background-color: #f8f9fa; font-weight: bold' if row.get('タイプ') == '要約' else '' for _ in row], axis=1)
+                
+                st.dataframe(formatted_df, use_container_width=True, height=700)
+                
+                # CSVダウンロード
+                csv = display_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    "📥 CSVとしてダウンロード",
+                    csv,
+                    f"PL_{st.session_state.selected_comp_name}_第{st.session_state.selected_period_num}期.csv",
+                    "text/csv",
+                    key='download-csv'
+                )
+                
+                # ウォーターフォール
                 st.markdown("---")
                 st.subheader("📊 ウォーターフォールチャート")
                 fig = create_pl_waterfall(display_df)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("ウォーターフォールを表示するにはデータが必要です")
+            else:
+                st.info("PLデータがありません。実績データまたは予測データを入力してください。")
 
 
         # 貸借対照表 (BS) ページ
