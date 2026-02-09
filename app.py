@@ -137,88 +137,222 @@ st.markdown("""
 # ==================== 可視化関数 ====================
 
 def create_bs_sankey(bs_data):
-    """BS Sankey図作成"""
+    """BS Sankey図作成 - 左:資産、右:負債・純資産"""
     try:
         if bs_data is None or bs_data.empty:
             return None
         
-        # 簡易版：主要な項目のみ表示
+        # データ準備
         source = []
         target = []
         value = []
         labels = []
+        colors = []
         
-        # ラベルのインデックスマップ
         label_dict = {}
+        label_counter = 0
         
-        def get_label_idx(label):
+        def add_label(label, color="#ADD8E6"):
+            nonlocal label_counter
             if label not in label_dict:
-                label_dict[label] = len(labels)
+                label_dict[label] = label_counter
                 labels.append(label)
+                colors.append(color)
+                label_counter += 1
             return label_dict[label]
         
-        # BSデータから主要項目を抽出
+        # 集計用辞書
+        assets_current = {}  # 流動資産
+        assets_fixed = {}    # 固定資産
+        liabilities_current = {}  # 流動負債
+        liabilities_fixed = {}    # 固定負債
+        equity = {}          # 純資産
+        
+        # データ分類
         for _, row in bs_data.iterrows():
             item = str(row.get('項目名', ''))
-            amount = float(row.get('金額', 0))
+            amount = abs(float(row.get('金額', 0)))
             
-            if amount > 0:  # プラスの値のみ
-                # 資産側
-                if '現金' in item or '預金' in item:
-                    source.append(get_label_idx('流動資産'))
-                    target.append(get_label_idx(item))
-                    value.append(amount)
-                elif '売掛' in item:
-                    source.append(get_label_idx('流動資産'))
-                    target.append(get_label_idx(item))
-                    value.append(amount)
-                elif '固定資産' in item:
-                    source.append(get_label_idx('資産'))
-                    target.append(get_label_idx(item))
-                    value.append(amount)
-                # 負債側
-                elif '買掛' in item:
-                    source.append(get_label_idx('流動負債'))
-                    target.append(get_label_idx(item))
-                    value.append(amount)
-                elif '借入' in item:
-                    source.append(get_label_idx('負債'))
-                    target.append(get_label_idx(item))
-                    value.append(amount)
-                # 純資産側
-                elif '資本' in item or '剰余' in item:
-                    source.append(get_label_idx('純資産'))
-                    target.append(get_label_idx(item))
-                    value.append(amount)
+            if amount == 0:
+                continue
+            
+            # 流動資産
+            if any(x in item for x in ['現金', '預金', '当座', '普通', '定期', '外貨']):
+                if '合計' not in item:
+                    assets_current[item] = amount
+            elif any(x in item for x in ['売掛', '売上債権']):
+                if '合計' not in item:
+                    assets_current[item] = amount
+            elif any(x in item for x in ['棚卸', '商品', '貯蔵']):
+                if '合計' not in item:
+                    assets_current[item] = amount
+            elif any(x in item for x in ['立替', '前払', '未収', '仮払']):
+                if '合計' not in item and '法人税' not in item:
+                    assets_current[item] = amount
+            
+            # 固定資産
+            elif any(x in item for x in ['有形固定', '附属設備', '車両']):
+                if '合計' not in item and '計' not in item:
+                    assets_fixed[item] = amount
+            elif any(x in item for x in ['投資有価証券', '関係会社株式', '出資金', '敷金', '差入保証', '長期貸付', '保険積立']):
+                assets_fixed[item] = amount
+            
+            # 流動負債
+            elif any(x in item for x in ['買掛', '仕入債務', '短期借入', '未払', '預り', '仮受']):
+                if '合計' not in item:
+                    liabilities_current[item] = amount
+            
+            # 固定負債
+            elif any(x in item for x in ['長期借入']):
+                if '合計' not in item:
+                    liabilities_fixed[item] = amount
+            
+            # 純資産
+            elif any(x in item for x in ['資本金', '利益準備金', '繰越利益剰余金']):
+                equity[item] = amount
+        
+        # ノード定義（左から右へ）
+        # レベル0: 総資産
+        total_assets_idx = add_label("資産合計", "#4A90E2")
+        
+        # レベル1: 流動資産・固定資産
+        current_assets_idx = add_label("流動資産", "#7CB9E8")
+        fixed_assets_idx = add_label("固定資産", "#6CA0DC")
+        
+        # レベル2: 資産詳細（左側）
+        current_asset_indices = {}
+        for item, amt in assets_current.items():
+            current_asset_indices[item] = add_label(item, "#B0D4F1")
+        
+        fixed_asset_indices = {}
+        for item, amt in assets_fixed.items():
+            fixed_asset_indices[item] = add_label(item, "#90C4E8")
+        
+        # レベル3: 負債・純資産合計
+        total_liab_equity_idx = add_label("負債・純資産", "#E89090")
+        
+        # レベル4: 流動負債・固定負債・純資産
+        current_liab_idx = add_label("流動負債", "#F0A0A0")
+        fixed_liab_idx = add_label("固定負債", "#E88080")
+        equity_idx = add_label("純資産", "#90E890")
+        
+        # レベル5: 負債・純資産詳細（右側）
+        current_liab_indices = {}
+        for item, amt in liabilities_current.items():
+            current_liab_indices[item] = add_label(item, "#F5C0C0")
+        
+        fixed_liab_indices = {}
+        for item, amt in liabilities_fixed.items():
+            fixed_liab_indices[item] = add_label(item, "#F0B0B0")
+        
+        equity_indices = {}
+        for item, amt in equity.items():
+            equity_indices[item] = add_label(item, "#B0F0B0")
+        
+        # リンク作成
+        # 資産側（左）
+        total_current_assets = sum(assets_current.values())
+        total_fixed_assets = sum(assets_fixed.values())
+        
+        if total_current_assets > 0:
+            source.append(total_assets_idx)
+            target.append(current_assets_idx)
+            value.append(total_current_assets)
+            
+            for item, amt in assets_current.items():
+                source.append(current_assets_idx)
+                target.append(current_asset_indices[item])
+                value.append(amt)
+        
+        if total_fixed_assets > 0:
+            source.append(total_assets_idx)
+            target.append(fixed_assets_idx)
+            value.append(total_fixed_assets)
+            
+            for item, amt in assets_fixed.items():
+                source.append(fixed_assets_idx)
+                target.append(fixed_asset_indices[item])
+                value.append(amt)
+        
+        # 負債・純資産側（右）
+        total_current_liab = sum(liabilities_current.values())
+        total_fixed_liab = sum(liabilities_fixed.values())
+        total_equity = sum(equity.values())
+        total_liab_equity = total_current_liab + total_fixed_liab + total_equity
+        
+        if total_liab_equity > 0:
+            if total_current_liab > 0:
+                source.append(current_liab_idx)
+                target.append(total_liab_equity_idx)
+                value.append(total_current_liab)
+                
+                for item, amt in liabilities_current.items():
+                    source.append(current_liab_indices[item])
+                    target.append(current_liab_idx)
+                    value.append(amt)
+            
+            if total_fixed_liab > 0:
+                source.append(fixed_liab_idx)
+                target.append(total_liab_equity_idx)
+                value.append(total_fixed_liab)
+                
+                for item, amt in liabilities_fixed.items():
+                    source.append(fixed_liab_indices[item])
+                    target.append(fixed_liab_idx)
+                    value.append(amt)
+            
+            if total_equity > 0:
+                source.append(equity_idx)
+                target.append(total_liab_equity_idx)
+                value.append(total_equity)
+                
+                for item, amt in equity.items():
+                    source.append(equity_indices[item])
+                    target.append(equity_idx)
+                    value.append(amt)
         
         if not source:
             return None
         
+        # Sankey図作成
         fig = go.Figure(data=[go.Sankey(
+            arrangement='snap',
             node=dict(
-                pad=15,
-                thickness=20,
-                line=dict(color="black", width=0.5),
+                pad=20,
+                thickness=25,
+                line=dict(color="white", width=2),
                 label=labels,
-                color="lightblue"
+                color=colors,
+                customdata=[f"¥{sum([value[i] for i in range(len(value)) if target[i] == idx or source[i] == idx]):,.0f}" for idx in range(len(labels))],
+                hovertemplate='%{label}<br>¥%{customdata}<extra></extra>'
             ),
             link=dict(
                 source=source,
                 target=target,
-                value=value
+                value=value,
+                color="rgba(200,200,200,0.3)",
+                hovertemplate='%{source.label} → %{target.label}<br>¥%{value:,.0f}<extra></extra>'
             )
         )])
         
         fig.update_layout(
-            title="貸借対照表の構造",
-            font_size=12,
-            height=600
+            title={
+                'text': "貸借対照表の構造（左:資産、右:負債・純資産）",
+                'x': 0.5,
+                'xanchor': 'center'
+            },
+            font=dict(size=11, family="sans-serif"),
+            height=700,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         
         return fig
     except Exception as e:
         import sys
+        import traceback
         sys.stderr.write(f"BS Sankey error: {e}\n")
+        sys.stderr.write(traceback.format_exc())
         return None
 
 
@@ -2578,11 +2712,6 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 if all_data_df is not None and not all_data_df.empty:
                     st.write("Shape:", all_data_df.shape)
                     st.write("Unique items:", all_data_df['項目名'].nunique())
-                    
-                    # すべての項目名を表示
-                    all_items = all_data_df['項目名'].unique().tolist()
-                    st.write(f"**全項目 ({len(all_items)}):**")
-                    st.write(all_items)
                     
                     # 横持ち変換
                     pivot_df = all_data_df.pivot(index='項目名', columns='month', values='amount').reset_index()
