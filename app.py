@@ -1907,48 +1907,12 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             st.markdown('<div class="section-card fade-in">', unsafe_allow_html=True)
             st.markdown('<h3 class="section-title">📈 キャッシュフロー推移と予測</h3>', unsafe_allow_html=True)
             
-            # データ準備
-            if use_real_data and cf_data:
-                # 実データからグラフを作成
-                chart_months = []
-                chart_actual = []
-                
-                for month_key in cf_data.keys():
-                    month_cf = cf_data[month_key]
-                    if '営業CF' in month_cf and '合計' in month_cf['営業CF']:
-                        chart_months.append(month_key.replace('月度', '月'))
-                        chart_actual.append(month_cf['営業CF']['合計'])
-                
-                # 予測データを生成
-                if chart_actual:
-                    avg_cf = np.mean(chart_actual[-3:]) if len(chart_actual) >= 3 else chart_actual[-1]
-                    
-                    # 将来6ヶ月の予測
-                    forecast_months = 6
-                    chart_forecast_std = [None] * len(chart_actual) + [avg_cf * (1 + i*0.02) for i in range(forecast_months)]
-                    chart_forecast_opt = [None] * len(chart_actual) + [avg_cf * 1.15 * (1 + i*0.02) for i in range(forecast_months)]
-                    chart_forecast_pes = [None] * len(chart_actual) + [avg_cf * 0.85 * (1 - i*0.01) for i in range(forecast_months)]
-                    
-                    # 実績にNoneを追加
-                    chart_actual = chart_actual + [None] * forecast_months
-                    
-                    # 月ラベルを追加
-                    for i in range(forecast_months):
-                        chart_months.append(f"予測{i+1}")
-                else:
-                    # データがない場合はサンプルを使用
-                    chart_months = ['3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '1月', '2月']
-                    chart_actual = [35000000, 28000000, 32000000, 31000000, 29000000, 31500000, None, None, None, None, None, None]
-                    chart_forecast_std = [None, None, None, None, None, 31500000, 32000000, 33000000, 34000000, 35000000, 36000000, 37000000]
-                    chart_forecast_opt = [None, None, None, None, None, 31500000, 34000000, 36000000, 38000000, 40000000, 42000000, 44000000]
-                    chart_forecast_pes = [None, None, None, None, None, 31500000, 30000000, 29000000, 28000000, 27000000, 26000000, 25000000]
-            else:
-                # サンプルデータを使用
-                chart_months = ['3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '1月', '2月']
-                chart_actual = [35000000, 28000000, 32000000, 31000000, 29000000, 31500000, None, None, None, None, None, None]
-                chart_forecast_std = [None, None, None, None, None, 31500000, 32000000, 33000000, 34000000, 35000000, 36000000, 37000000]
-                chart_forecast_opt = [None, None, None, None, None, 31500000, 34000000, 36000000, 38000000, 40000000, 42000000, 44000000]
-                chart_forecast_pes = [None, None, None, None, None, 31500000, 30000000, 29000000, 28000000, 27000000, 26000000, 25000000]
+            # サンプルデータを使用（実データからのグラフ作成は今後実装）
+            chart_months = ['3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '1月', '2月']
+            chart_actual = [35000000, 28000000, 32000000, 31000000, 29000000, operating_cf, None, None, None, None, None, None]
+            chart_forecast_std = [None, None, None, None, None, operating_cf, operating_cf*1.02, operating_cf*1.04, operating_cf*1.06, operating_cf*1.08, operating_cf*1.10, operating_cf*1.12]
+            chart_forecast_opt = [None, None, None, None, None, operating_cf, operating_cf*1.15, operating_cf*1.20, operating_cf*1.25, operating_cf*1.30, operating_cf*1.35, operating_cf*1.40]
+            chart_forecast_pes = [None, None, None, None, None, operating_cf, operating_cf*0.95, operating_cf*0.90, operating_cf*0.85, operating_cf*0.80, operating_cf*0.75, operating_cf*0.70]
             
             fig = go.Figure()
             
