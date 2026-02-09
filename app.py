@@ -1755,7 +1755,16 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         alerts = [{'level': 'warning', 'message': f'カラム検出失敗'}]
                     else:
                         # 計算実行
-                        current_month = int(st.session_state.current_month)
+                        # current_monthから月番号を抽出
+                        current_month_str = str(st.session_state.current_month)
+                        if '-' in current_month_str:
+                            current_month = int(current_month_str.split('-')[-1])
+                        elif '/' in current_month_str:
+                            current_month = int(current_month_str.split('/')[-1])
+                        else:
+                            current_month = int(current_month_str)
+                        
+                        st.write(f"Extracted month: {current_month}")
                         
                         # 営業CF
                         operating_profit = 0
@@ -1831,7 +1840,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 forecast_3months = 380000000
                 cf_growth = 8.3
                 alerts = [{'level': 'warning', 'message': '⚠️ データ処理エラー'}]
-                
+            
+            # アラート表示
+            for alert in alerts:
                 if alert['level'] == 'critical':
                     st.error(f"🚨 **資金危険**: {alert['message']}")
                 elif alert['level'] == 'warning':
