@@ -1574,65 +1574,105 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # アラート表示エリア
             st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
             
-                        # 実データからKPIを計算
+                                    # 実データからKPIを計算
             try:
                 actuals_df = load_actual_data_cached(selected_period_id, processor)
                 
                 if actuals_df is not None and not actuals_df.empty:
+                    # カラム名を確認・正規化
+                    actuals_df.columns = actuals_df.columns.str.lower()
+                    
+                    # fiscal_monthカラムの確認
+                    month_col = None
+                    for col in ['fiscal_month', 'month', '月', 'fiscal_month_num']:
+                        if col in actuals_df.columns:
+                            month_col = col
+                            break
+                    
+                    # account_nameカラムの確認
+                    account_col = None
+                    for col in ['account_name', 'account', '科目', '勘定科目', 'account_id']:
+                        if col in actuals_df.columns:
+                            account_col = col
+                            break
+                    
+                    # amountカラムの確認
+                    amount_col = None
+                    for col in ['amount', '金額', 'value', 'balance']:
+                        if col in actuals_df.columns:
+                            amount_col = col
+                            break
+                    
+                    if not all([month_col, account_col, amount_col]):
+                        # カラムが見つからない場合はデモデータ
+                        raise ValueError(f"必要なカラムが見つかりません: month={month_col}, account={account_col}, amount={amount_col}")
+                    
                     # 実データを使用
                     current_month = st.session_state.current_month
-                    current_data = actuals_df[actuals_df['fiscal_month'] == current_month]
+                    current_data = actuals_df[actuals_df[month_col] == current_month]
                     
-                    # 営業CF
+                    # 営業CF計算
                     operating_profit = 0
                     if not current_data.empty:
-                        profit_row = current_data[current_data['account_name'].str.contains('営業', na=False)]
-                        if not profit_row.empty:
-                            operating_profit = float(profit_row['amount'].values[0])
+                        # 営業利益を含む行を検索
+                        profit_rows = current_data[
+                            current_data[account_col].astype(str).str.contains('営業', na=False) |
+                            current_data[account_col].astype(str).str.contains('operating', case=False, na=False)
+                        ]
+                        if not profit_rows.empty:
+                            operating_profit = float(profit_rows[amount_col].values[0])
                     operating_cf = operating_profit * 0.8
                     
                     # 現金残高
-                    cash_row = actuals_df[actuals_df['account_name'].str.contains('現金', na=False)]
-                    cash_balance = float(cash_row['amount'].sum()) if not cash_row.empty else 100000000
+                    cash_rows = actuals_df[
+                        actuals_df[account_col].astype(str).str.contains('現金', na=False) |
+                        actuals_df[account_col].astype(str).str.contains('cash', case=False, na=False) |
+                        actuals_df[account_col].astype(str).str.contains('預金', na=False)
+                    ]
+                    cash_balance = float(cash_rows[amount_col].sum()) if not cash_rows.empty else 100000000
                     
-                    # 固定費
-                    sg_row = actuals_df[actuals_df['account_name'].str.contains('販売費', na=False)]
-                    if not sg_row.empty:
-                        total_sg = float(sg_row['amount'].sum())
-                        months_count = max(actuals_df['fiscal_month'].nunique(), 1)
+                    # 固定費計算
+                    sg_rows = actuals_df[
+                        actuals_df[account_col].astype(str).str.contains('販売費', na=False) |
+                        actuals_df[account_col].astype(str).str.contains('販管費', na=False) |
+                        actuals_df[account_col].astype(str).str.contains('一般管理費', na=False)
+                    ]
+                    if not sg_rows.empty:
+                        total_sg = float(sg_rows[amount_col].sum())
+                        months_count = max(actuals_df[month_col].nunique(), 1)
                         fixed_cost_monthly = total_sg / months_count
                     else:
                         fixed_cost_monthly = 40000000
                     
+                    # KPI計算
                     cash_runway = cash_balance / fixed_cost_monthly if fixed_cost_monthly > 0 else 99
                     forecast_3months = cash_balance + (operating_cf * 3)
                     
                     # 前月比
                     prev_month = current_month - 1 if current_month > 1 else 12
-                    prev_data = actuals_df[actuals_df['fiscal_month'] == prev_month]
+                    prev_data = actuals_df[actuals_df[month_col] == prev_month]
+                    cf_growth = 0
                     if not prev_data.empty:
-                        prev_profit_row = prev_data[prev_data['account_name'].str.contains('営業', na=False)]
-                        if not prev_profit_row.empty:
-                            prev_profit = float(prev_profit_row['amount'].values[0])
+                        prev_profit_rows = prev_data[
+                            prev_data[account_col].astype(str).str.contains('営業', na=False)
+                        ]
+                        if not prev_profit_rows.empty:
+                            prev_profit = float(prev_profit_rows[amount_col].values[0])
                             prev_cf = prev_profit * 0.8
                             cf_growth = ((operating_cf - prev_cf) / abs(prev_cf) * 100) if prev_cf != 0 else 0
-                        else:
-                            cf_growth = 0
-                    else:
-                        cf_growth = 0
                     
                     # アラート
                     alerts = []
                     if cash_runway < 3:
-                        alerts.append({'level': 'critical', 'message': f'⚠️ 資金耐久月数: {cash_runway:.1f}ヶ月'})
+                        alerts.append({'level': 'critical', 'message': f'⚠️ 資金耐久: {cash_runway:.1f}ヶ月'})
                     elif cash_runway < 6:
-                        alerts.append({'level': 'warning', 'message': f'資金耐久月数: {cash_runway:.1f}ヶ月'})
+                        alerts.append({'level': 'warning', 'message': f'資金耐久: {cash_runway:.1f}ヶ月'})
                     if operating_cf < 0:
                         alerts.append({'level': 'critical', 'message': '営業CFマイナス'})
                     
                     use_real_data = True
                 else:
-                    # デモデータ
+                    # データなし
                     use_real_data = False
                     operating_cf = 31500000
                     cash_balance = 376343476
@@ -1640,6 +1680,23 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     forecast_3months = 380000000
                     cf_growth = 8.3
                     alerts = [{'level': 'info', 'message': '💡 実績データを入力してください'}]
+            
+            except Exception as e:
+                import sys
+                import traceback
+                sys.stderr.write(f"CFO error: {e}\n")
+                sys.stderr.write(traceback.format_exc())
+                
+                # デバッグ情報をアラートに表示
+                use_real_data = False
+                operating_cf = 31500000
+                cash_balance = 376343476
+                cash_runway = 8.5
+                forecast_3months = 380000000
+                cf_growth = 8.3
+                
+                error_msg = str(e)[:100]
+                alerts = [{'level': 'warning', 'message': f'⚠️ エラー: {error_msg}'}]
             except Exception as e:
                 import sys
                 sys.stderr.write(f"CFO error: {e}\n")
