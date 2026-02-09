@@ -114,7 +114,7 @@ except ImportError:
     ADVANCED_FORECAST_AVAILABLE = False
 
 
-# ページ設定 - 完全ライトモード
+# ページ設定（先頭に配置）
 st.set_page_config(
     page_title="財務予測シミュレーター",
     page_icon="📊",
@@ -122,15 +122,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Streamlit標準テーマを強制的にライトモードに
+# ライトモードを強制
 st.markdown("""
-<script>
-    // ライトモードを強制
-    var theme = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-    if (theme) {
-        theme.style.backgroundColor = "#fafbfc";
+<style>
+    /* ライトモード強制 */
+    .stApp {
+        background-color: #FFFFFF;
+        color: #262730;
     }
-</script>
+    
+    .main .block-container {
+        background-color: #FFFFFF;
+    }
+    
+    /* カード背景 */
+    .element-container {
+        background-color: #FFFFFF;
+    }
+</style>
 """, unsafe_allow_html=True)
 
 # カスタムCSS - Manageboard風デザイン（実際のUIに準拠）
