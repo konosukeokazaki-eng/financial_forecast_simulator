@@ -2949,15 +2949,155 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 height=400
                             )
                             
-                            # Sankey図
+                            # 左右対比BS図
                             st.markdown("---")
-                            st.subheader("📊 資金の流れ (Sankey)")
+                            st.subheader("📊 貸借対照表（左：資産、右：負債・純資産）")
                             
-                            fig = create_bs_sankey(bs_df)
-                            if fig:
-                                st.plotly_chart(fig, width="stretch")
-                            else:
-                                st.info("Sankey図を表示するにはデータが必要です")
+                            try:
+                                # BSデータを集計
+                                assets_items = []
+                                liabilities_items = []
+                                equity_items = []
+                                
+                                for _, row in bs_df.iterrows():
+                                    item = str(row.get('項目名', ''))
+                                    amount = abs(float(row.get('金額', 0)))
+                                    
+                                    if amount == 0:
+                                        continue
+                                    
+                                    # 資産
+                                    if any(x in item for x in ['現金', '預金', '当座', '普通', '定期', '外貨']):
+                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '現金・預金'})
+                                    elif '売掛' in item or '債権' in item:
+                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '売掛金'})
+                                    elif '商品' in item or '貯蔵' in item or '棚卸' in item:
+                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '棚卸資産'})
+                                    elif '立替' in item or '前払' in item or '未収' in item or '仮払' in item:
+                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': 'その他流動資産'})
+                                    elif any(x in item for x in ['附属', '車両', '有形', '投資', '敷金', '差入', '保険積立', '長期']):
+                                        if '負債' not in item:
+                                            assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '固定資産'})
+                                    
+                                    # 負債
+                                    elif '買掛' in item or '仕入債務' in item:
+                                        liabilities_items.append({'項目': item, '金額': amount})
+                                    elif '借入' in item:
+                                        liabilities_items.append({'項目': item, '金額': amount})
+                                    elif '未払' in item or '預り' in item or '仮受' in item:
+                                        liabilities_items.append({'項目': item, '金額': amount})
+                                    
+                                    # 純資産
+                                    elif '資本' in item or '剰余' in item or '利益' in item:
+                                        if '負債' not in item:
+                                            equity_items.append({'項目': item, '金額': amount})
+                                
+                                # 集計
+                                total_assets = sum(item['金額'] for item in assets_items)
+                                total_liabilities = sum(item['金額'] for item in liabilities_items)
+                                total_equity = sum(item['金額'] for item in equity_items)
+                                
+                                # グラフ作成
+                                fig = go.Figure()
+                                
+                                # 左側：資産（マイナス値で左向き）
+                                asset_categories = {}
+                                for item in assets_items:
+                                    cat = item['カテゴリ']
+                                    if cat not in asset_categories:
+                                        asset_categories[cat] = []
+                                    asset_categories[cat].append(item)
+                                
+                                y_pos = 0
+                                colors_assets = {
+                                    '現金・預金': '#00BCD4',
+                                    '売掛金': '#0097A7',
+                                    '棚卸資産': '#00838F',
+                                    'その他流動資産': '#006064',
+                                    '固定資産': '#9E9E9E'
+                                }
+                                
+                                for cat, items in sorted(asset_categories.items(), key=lambda x: sum(i['金額'] for i in x[1]), reverse=True):
+                                    cat_total = sum(item['金額'] for item in items)
+                                    fig.add_trace(go.Bar(
+                                        name=cat,
+                                        y=[cat],
+                                        x=[-cat_total],  # マイナスで左向き
+                                        orientation='h',
+                                        marker_color=colors_assets.get(cat, '#00BCD4'),
+                                        text=[f'¥{cat_total/10000:,.0f}万'],
+                                        textposition='inside',
+                                        textfont=dict(color='white', size=14, family='Arial Black'),
+                                        hovertemplate=f'{cat}: ¥%{{x:,.0f}}<extra></extra>',
+                                        showlegend=True
+                                    ))
+                                
+                                # 右側：負債・純資産
+                                if liabilities_items:
+                                    liab_total = sum(item['金額'] for item in liabilities_items)
+                                    fig.add_trace(go.Bar(
+                                        name='負債',
+                                        y=['負債'],
+                                        x=[liab_total],
+                                        orientation='h',
+                                        marker_color='#8BC34A',
+                                        text=[f'¥{liab_total/10000:,.0f}万'],
+                                        textposition='inside',
+                                        textfont=dict(color='white', size=14, family='Arial Black'),
+                                        hovertemplate='負債: ¥%{x:,.0f}<extra></extra>',
+                                        showlegend=True
+                                    ))
+                                
+                                if equity_items:
+                                    eq_total = sum(item['金額'] for item in equity_items)
+                                    fig.add_trace(go.Bar(
+                                        name='純資産',
+                                        y=['純資産'],
+                                        x=[eq_total],
+                                        orientation='h',
+                                        marker_color='#F44336',
+                                        text=[f'¥{eq_total/10000:,.0f}万'],
+                                        textposition='inside',
+                                        textfont=dict(color='white', size=14, family='Arial Black'),
+                                        hovertemplate='純資産: ¥%{x:,.0f}<extra></extra>',
+                                        showlegend=True
+                                    ))
+                                
+                                fig.update_layout(
+                                    title={
+                                        'text': '貸借対照表（左：資産、右：負債・純資産）',
+                                        'font': {'size': 20, 'color': '#262730'}
+                                    },
+                                    xaxis_title='金額（万円）',
+                                    font=dict(size=12, color='#262730'),
+                                    plot_bgcolor='white',
+                                    paper_bgcolor='white',
+                                    height=500,
+                                    barmode='relative',
+                                    showlegend=True,
+                                    legend=dict(
+                                        orientation="v",
+                                        yanchor="top",
+                                        y=1,
+                                        xanchor="left",
+                                        x=1.02
+                                    ),
+                                    xaxis=dict(
+                                        zeroline=True,
+                                        zerolinewidth=2,
+                                        zerolinecolor='black'
+                                    )
+                                )
+                                
+                                # X軸を万円単位に変換
+                                fig.update_xaxes(tickformat='.0f', ticksuffix='万')
+                                
+                                st.plotly_chart(fig, use_container_width=True)
+                                
+                            except Exception as e:
+                                import traceback
+                                st.error(f"BS図エラー: {e}")
+                                st.code(traceback.format_exc())
                         else:
                             st.warning("⚠️ BS科目が見つかりませんでした")
                             st.info("BSデータを表示するにはBS科目を含むデータをインポートしてください。")
