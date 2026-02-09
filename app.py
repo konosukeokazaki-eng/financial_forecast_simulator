@@ -1907,12 +1907,57 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             st.markdown('<div class="section-card fade-in">', unsafe_allow_html=True)
             st.markdown('<h3 class="section-title">📈 キャッシュフロー推移と予測</h3>', unsafe_allow_html=True)
             
-            # サンプルデータを使用（実データからのグラフ作成は今後実装）
-            chart_months = ['3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '1月', '2月']
-            chart_actual = [35000000, 28000000, 32000000, 31000000, 29000000, operating_cf, None, None, None, None, None, None]
-            chart_forecast_std = [None, None, None, None, None, operating_cf, operating_cf*1.02, operating_cf*1.04, operating_cf*1.06, operating_cf*1.08, operating_cf*1.10, operating_cf*1.12]
-            chart_forecast_opt = [None, None, None, None, None, operating_cf, operating_cf*1.15, operating_cf*1.20, operating_cf*1.25, operating_cf*1.30, operating_cf*1.35, operating_cf*1.40]
-            chart_forecast_pes = [None, None, None, None, None, operating_cf, operating_cf*0.95, operating_cf*0.90, operating_cf*0.85, operating_cf*0.80, operating_cf*0.75, operating_cf*0.70]
+            # 実データから月次CFを作成
+            try:
+                if actuals_df is not None and not actuals_df.empty and month_col and account_col and amount_col:
+                    # 月ごとの営業利益を取得
+                    monthly_cf = []
+                    month_labels = []
+                    
+                    for m in range(1, 13):
+                        month_data = actuals_df[actuals_df[month_col] == m]
+                        if not month_data.empty:
+                            profit_rows = month_data[
+                                month_data[account_col].astype(str).str.contains('営業', na=False)
+                            ]
+                            if not profit_rows.empty:
+                                profit = float(profit_rows[amount_col].iloc[0])
+                                monthly_cf.append(profit * 0.8)  # CF換算
+                                month_labels.append(f"{m}月")
+                    
+                    # データがある場合は実データを使用
+                    if monthly_cf:
+                        # 実績データ（現在月まで）
+                        current_month_num = int(st.session_state.current_month.split('-')[-1]) if '-' in str(st.session_state.current_month) else int(st.session_state.current_month)
+                        
+                        chart_months = month_labels[:12]
+                        chart_actual = monthly_cf + [None] * (12 - len(monthly_cf))
+                        
+                        # 予測（現在月以降）
+                        last_cf = monthly_cf[-1] if monthly_cf else operating_cf
+                        forecast_start_idx = len(monthly_cf)
+                        
+                        chart_forecast_std = [None] * forecast_start_idx
+                        chart_forecast_opt = [None] * forecast_start_idx
+                        chart_forecast_pes = [None] * forecast_start_idx
+                        
+                        for i in range(forecast_start_idx, 12):
+                            growth_factor = (i - forecast_start_idx + 1) * 0.02
+                            chart_forecast_std.append(last_cf * (1 + growth_factor))
+                            chart_forecast_opt.append(last_cf * 1.15 * (1 + growth_factor))
+                            chart_forecast_pes.append(last_cf * 0.85 * (1 - growth_factor * 0.5))
+                    else:
+                        # データなし - サンプル使用
+                        raise ValueError("No monthly CF data")
+                else:
+                    raise ValueError("No actuals data")
+            except:
+                # サンプルデータを使用
+                chart_months = ['3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '1月', '2月']
+                chart_actual = [35000000, 28000000, 32000000, 31000000, 29000000, operating_cf, None, None, None, None, None, None]
+                chart_forecast_std = [None, None, None, None, None, operating_cf, operating_cf*1.02, operating_cf*1.04, operating_cf*1.06, operating_cf*1.08, operating_cf*1.10, operating_cf*1.12]
+                chart_forecast_opt = [None, None, None, None, None, operating_cf, operating_cf*1.15, operating_cf*1.20, operating_cf*1.25, operating_cf*1.30, operating_cf*1.35, operating_cf*1.40]
+                chart_forecast_pes = [None, None, None, None, None, operating_cf, operating_cf*0.95, operating_cf*0.90, operating_cf*0.85, operating_cf*0.80, operating_cf*0.75, operating_cf*0.70]
             
             fig = go.Figure()
             
