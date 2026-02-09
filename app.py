@@ -2301,35 +2301,47 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             """, unsafe_allow_html=True)
             
             # デバッグ情報
-            with st.expander("🔍 BSデバッグ情報", expanded=False):
+            with st.expander("🔍 BSデバッグ情報", expanded=True):
+                st.write("**データ取得確認:**")
                 st.write("selected_period_id:", selected_period_id)
             
-            # BSデータ取得
+            # BSデータ取得 - 現在月のデータを取得
             try:
-                actuals_df = load_actual_data_cached(selected_period_id, processor)
+                # まず全データを取得
+                all_actuals_df = load_actual_data_cached(selected_period_id, processor)
                 
-                st.write("actuals_df loaded:", actuals_df is not None)
-                if actuals_df is not None:
-                    st.write("Shape:", actuals_df.shape)
-                    st.write("Columns:", actuals_df.columns.tolist()[:5])
+                st.write("all_actuals_df loaded:", all_actuals_df is not None)
+                if all_actuals_df is not None:
+                    st.write("Original shape:", all_actuals_df.shape)
+                    st.write("Original columns:", all_actuals_df.columns.tolist()[:5])
                 
                 # 横持ち変換
-                if actuals_df is not None and not actuals_df.empty:
-                    actuals_df = convert_wide_to_long(actuals_df)
+                if all_actuals_df is not None and not all_actuals_df.empty:
+                    actuals_df = convert_wide_to_long(all_actuals_df)
                     st.write("After conversion:", actuals_df.shape)
-                
-                if actuals_df is not None and not actuals_df.empty:
+                    
                     # カラム名正規化
                     actuals_df.columns = actuals_df.columns.str.lower()
                     
-                    # BSデータ抽出
-                    bs_items = [
-                        '流動資産', '固定資産', '資産合計',
-                        '流動負債', '固定負債', '負債合計',
-                        '純資産合計', '負債・純資産合計',
-                        '現金及び預金', '売掛金', '棚卸資産',
-                        '買掛金', '借入金', '資本金'
-                    ]
+                    # 現在月のデータのみ取得
+                    current_month_str = str(st.session_state.current_month)
+                    if '-' in current_month_str:
+                        current_month_num = int(current_month_str.split('-')[-1])
+                    else:
+                        current_month_num = int(current_month_str)
+                    
+                    st.write(f"Current month: {current_month_num}")
+                    
+                    # 月フィルタ
+                    month_col = None
+                    for col in ['fiscal_month', 'month', '月']:
+                        if col in actuals_df.columns:
+                            month_col = col
+                            break
+                    
+                    if month_col:
+                        actuals_df = actuals_df[actuals_df[month_col] == current_month_num]
+                        st.write(f"After month filter: {actuals_df.shape}")
                     
                     # account_nameカラムを探す
                     account_col = None
@@ -2349,14 +2361,32 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     if account_col and amount_col:
                         # 全科目を表示
                         all_accounts = actuals_df[account_col].unique().tolist()
-                        st.write(f"Available accounts ({len(all_accounts)}):", all_accounts[:20])
+                        st.write(f"**Available accounts ({len(all_accounts)}):**")
+                        st.write(all_accounts)
                         
-                        # BSアイテムのみ抽出
-                        bs_df = actuals_df[actuals_df[account_col].isin(bs_items)].copy()
-                        st.write(f"BS items found: {len(bs_df)}")
+                        # BS科目の定義を拡張
+                        bs_keywords = [
+                            '資産', '負債', '純資産', '資本',
+                            '現金', '預金', '売掛', '買掛', '借入',
+                            '棚卸', '在庫', '有形固定', '無形固定',
+                            '投資', '繰延', '引当'
+                        ]
+                        
+                        # BS科目を抽出（キーワードマッチ）
+                        bs_df = actuals_df[
+                            actuals_df[account_col].astype(str).str.contains(
+                                '|'.join(bs_keywords), 
+                                na=False, 
+                                case=False
+                            )
+                        ].copy()
+                        
+                        st.write(f"**BS items found: {len(bs_df)}**")
                         
                         if not bs_df.empty:
                             bs_df = bs_df.rename(columns={account_col: '項目名', amount_col: '金額'})
+                            
+                            st.success(f"✅ {len(bs_df)}件のBS科目が見つかりました")
                             
                             # データ表示
                             st.dataframe(
@@ -2375,21 +2405,20 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             else:
                                 st.info("Sankey図を表示するにはデータが必要です")
                         else:
-                            st.warning("⚠️ BSデータが見つかりません")
-                            st.info("""
+                            st.warning("⚠️ BS科目が見つかりませんでした")
+                            st.info(f"""
                             **BSデータを表示するには:**
                             
-                            以下のような科目名でデータを入力してください:
-                            - 流動資産、固定資産、資産合計
-                            - 流動負債、固定負債、負債合計
-                            - 純資産合計
-                            - 現金及び預金、売掛金、棚卸資産
-                            - 買掛金、借入金、資本金
+                            以下のようなキーワードを含む科目名でデータを入力してください:
+                            - 資産、負債、純資産、資本
+                            - 現金、預金、売掛、買掛、借入
+                            - 棚卸、在庫、固定資産、投資
                             
-                            現在のデータには BS科目が含まれていません。
+                            **現在のデータ:**
+                            すべてPL科目のようです。BSデータを別途入力してください。
                             """)
                     else:
-                        st.warning("必要なカラムが見つかりません")
+                        st.error("必要なカラムが見つかりません")
                 else:
                     st.info("実績データを入力してください")
             except Exception as e:
