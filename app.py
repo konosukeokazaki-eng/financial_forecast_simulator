@@ -850,10 +850,6 @@ else:
         st.session_state.page = "損益計算書 (PL)"
     if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
         st.session_state.page = "貸借対照表 (BS)"
-    
-        st.session_state.page = "損益計算書 (PL)"
-    if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
-        st.session_state.page = "貸借対照表 (BS)"
     if st.sidebar.button("CF計算書", width="stretch", key="nav_cf"):
         st.session_state.page = "キャッシュフロー計算書 (CF)"
     if st.sidebar.button("CF詳細分析", width="stretch", key="nav_cf_detail"):
@@ -875,6 +871,11 @@ else:
         st.session_state.page = "運転資本分析"
     if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
         st.session_state.page = "収益構造分析"
+    
+    # AI自動予測
+    if ADVANCED_FORECAST_AVAILABLE:
+        if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_ai_forecast"):
+            st.session_state.page = "AI自動予測"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 設定")
