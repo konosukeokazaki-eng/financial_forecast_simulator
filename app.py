@@ -2787,9 +2787,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 height=400
                             )
                             
-                            # 左右対比BS図
+                            # BOX型BS図
                             st.markdown("---")
-                            st.subheader("📊 貸借対照表（左：資産、右：負債・純資産）")
+                            st.subheader("📊 貸借対照表（BOX型）")
                             
                             try:
                                 # BSデータを集計
@@ -2830,111 +2830,117 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                         if '負債' not in item:
                                             equity_items.append({'項目': item, '金額': amount})
                                 
-                                # 集計
-                                total_assets = sum(item['金額'] for item in assets_items)
-                                total_liabilities = sum(item['金額'] for item in liabilities_items)
-                                total_equity = sum(item['金額'] for item in equity_items)
-                                
-                                # グラフ作成
-                                fig = go.Figure()
-                                
-                                # 左側：資産（マイナス値で左向き）
+                                # カテゴリ別集計
                                 asset_categories = {}
                                 for item in assets_items:
                                     cat = item['カテゴリ']
                                     if cat not in asset_categories:
-                                        asset_categories[cat] = []
-                                    asset_categories[cat].append(item)
+                                        asset_categories[cat] = 0
+                                    asset_categories[cat] += item['金額']
                                 
-                                y_pos = 0
-                                colors_assets = {
-                                    '現金・預金': '#00BCD4',
-                                    '売掛金': '#0097A7',
-                                    '棚卸資産': '#00838F',
-                                    'その他流動資産': '#006064',
-                                    '固定資産': '#9E9E9E'
-                                }
+                                total_assets = sum(asset_categories.values())
+                                total_liabilities = sum(item['金額'] for item in liabilities_items)
+                                total_equity = sum(item['金額'] for item in equity_items)
                                 
-                                for cat, items in sorted(asset_categories.items(), key=lambda x: sum(i['金額'] for i in x[1]), reverse=True):
-                                    cat_total = sum(item['金額'] for item in items)
-                                    fig.add_trace(go.Bar(
-                                        name=cat,
-                                        y=[cat],
-                                        x=[-cat_total],  # マイナスで左向き
-                                        orientation='h',
-                                        marker_color=colors_assets.get(cat, '#00BCD4'),
-                                        text=[f'¥{cat_total/10000:,.0f}万'],
-                                        textposition='inside',
-                                        textfont=dict(color='white', size=14, family='Arial Black'),
-                                        hovertemplate=f'{cat}: ¥%{{x:,.0f}}<extra></extra>',
-                                        showlegend=True
-                                    ))
-                                
-                                # 右側：負債・純資産
-                                if liabilities_items:
-                                    liab_total = sum(item['金額'] for item in liabilities_items)
-                                    fig.add_trace(go.Bar(
-                                        name='負債',
-                                        y=['負債'],
-                                        x=[liab_total],
-                                        orientation='h',
-                                        marker_color='#8BC34A',
-                                        text=[f'¥{liab_total/10000:,.0f}万'],
-                                        textposition='inside',
-                                        textfont=dict(color='white', size=14, family='Arial Black'),
-                                        hovertemplate='負債: ¥%{x:,.0f}<extra></extra>',
-                                        showlegend=True
-                                    ))
-                                
-                                if equity_items:
-                                    eq_total = sum(item['金額'] for item in equity_items)
-                                    fig.add_trace(go.Bar(
-                                        name='純資産',
-                                        y=['純資産'],
-                                        x=[eq_total],
-                                        orientation='h',
-                                        marker_color='#F44336',
-                                        text=[f'¥{eq_total/10000:,.0f}万'],
-                                        textposition='inside',
-                                        textfont=dict(color='white', size=14, family='Arial Black'),
-                                        hovertemplate='純資産: ¥%{x:,.0f}<extra></extra>',
-                                        showlegend=True
-                                    ))
-                                
-                                fig.update_layout(
-                                    title={
-                                        'text': '貸借対照表（左：資産、右：負債・純資産）',
-                                        'font': {'size': 20, 'color': '#262730'}
-                                    },
-                                    xaxis_title='金額（万円）',
-                                    font=dict(size=12, color='#262730'),
-                                    plot_bgcolor='white',
-                                    paper_bgcolor='white',
-                                    height=500,
-                                    barmode='relative',
-                                    showlegend=True,
-                                    legend=dict(
-                                        orientation="v",
-                                        yanchor="top",
-                                        y=1,
-                                        xanchor="left",
-                                        x=1.02
-                                    ),
-                                    xaxis=dict(
-                                        zeroline=True,
-                                        zerolinewidth=2,
-                                        zerolinecolor='black'
-                                    )
-                                )
-                                
-                                # X軸を万円単位に変換
-                                fig.update_xaxes(tickformat='.0f', ticksuffix='万')
-                                
-                                st.plotly_chart(fig, use_container_width=True)
+                                # HTML/CSSでBOX型表示
+                                st.markdown(f"""
+                                <div style="display: flex; gap: 40px; justify-content: center; margin: 20px 0;">
+                                    <!-- 左側：資産 -->
+                                    <div style="flex: 1; max-width: 500px;">
+                                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                                    color: white; padding: 15px; border-radius: 10px 10px 0 0; 
+                                                    text-align: center; font-weight: bold; font-size: 18px;">
+                                            資産の部
+                                        </div>
+                                        <div style="border: 3px solid #667eea; border-radius: 0 0 10px 10px; 
+                                                    background: white; min-height: 400px;">
+                                            <!-- 流動資産 -->
+                                            <div style="padding: 15px; border-bottom: 2px solid #e0e0e0;">
+                                                <div style="font-weight: bold; color: #333; margin-bottom: 10px;">
+                                                    流動資産
+                                                </div>
+                                                {''.join([f'''
+                                                <div style="display: flex; justify-content: space-between; 
+                                                            padding: 5px 10px; color: #666;">
+                                                    <span>{cat}</span>
+                                                    <span style="font-weight: bold;">¥{amt/10000:,.0f}万</span>
+                                                </div>
+                                                ''' for cat, amt in sorted(asset_categories.items(), key=lambda x: x[1], reverse=True) 
+                                                if cat != '固定資産'])}
+                                            </div>
+                                            <!-- 固定資産 -->
+                                            {f'''
+                                            <div style="padding: 15px; border-bottom: 2px solid #e0e0e0;">
+                                                <div style="font-weight: bold; color: #333; margin-bottom: 10px;">
+                                                    固定資産
+                                                </div>
+                                                <div style="display: flex; justify-content: space-between; 
+                                                            padding: 5px 10px; color: #666;">
+                                                    <span>固定資産</span>
+                                                    <span style="font-weight: bold;">¥{asset_categories.get('固定資産', 0)/10000:,.0f}万</span>
+                                                </div>
+                                            </div>
+                                            ''' if '固定資産' in asset_categories else ''}
+                                            <!-- 資産合計 -->
+                                            <div style="padding: 20px; background: #f5f5f5; border-radius: 0 0 8px 8px;">
+                                                <div style="display: flex; justify-content: space-between; 
+                                                            font-weight: bold; font-size: 20px; color: #667eea;">
+                                                    <span>資産合計</span>
+                                                    <span>¥{total_assets/10000:,.0f}万</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 右側：負債・純資産 -->
+                                    <div style="flex: 1; max-width: 500px;">
+                                        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                                                    color: white; padding: 15px; border-radius: 10px 10px 0 0; 
+                                                    text-align: center; font-weight: bold; font-size: 18px;">
+                                            負債・純資産の部
+                                        </div>
+                                        <div style="border: 3px solid #f093fb; border-radius: 0 0 10px 10px; 
+                                                    background: white; min-height: 400px;">
+                                            <!-- 負債 -->
+                                            <div style="padding: 15px; border-bottom: 2px solid #e0e0e0;">
+                                                <div style="font-weight: bold; color: #333; margin-bottom: 10px;">
+                                                    負債
+                                                </div>
+                                                <div style="display: flex; justify-content: space-between; 
+                                                            padding: 5px 10px; color: #666;">
+                                                    <span>負債合計</span>
+                                                    <span style="font-weight: bold;">¥{total_liabilities/10000:,.0f}万</span>
+                                                </div>
+                                            </div>
+                                            <!-- 純資産 -->
+                                            <div style="padding: 15px; border-bottom: 2px solid #e0e0e0;">
+                                                <div style="font-weight: bold; color: #333; margin-bottom: 10px;">
+                                                    純資産
+                                                </div>
+                                                {''.join([f'''
+                                                <div style="display: flex; justify-content: space-between; 
+                                                            padding: 5px 10px; color: #666;">
+                                                    <span>{item["項目"]}</span>
+                                                    <span style="font-weight: bold;">¥{item["金額"]/10000:,.0f}万</span>
+                                                </div>
+                                                ''' for item in sorted(equity_items, key=lambda x: x['金額'], reverse=True)])}
+                                            </div>
+                                            <!-- 負債・純資産合計 -->
+                                            <div style="padding: 20px; background: #f5f5f5; border-radius: 0 0 8px 8px;">
+                                                <div style="display: flex; justify-content: space-between; 
+                                                            font-weight: bold; font-size: 20px; color: #f093fb;">
+                                                    <span>負債・純資産合計</span>
+                                                    <span>¥{(total_liabilities + total_equity)/10000:,.0f}万</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
                                 
                             except Exception as e:
                                 import traceback
-                                st.error(f"BS図エラー: {e}")
+                                st.error(f"BOX型BS図エラー: {e}")
                                 st.code(traceback.format_exc())
                         else:
                             st.warning("⚠️ BS科目が見つかりませんでした")
