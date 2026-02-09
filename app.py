@@ -2791,331 +2791,241 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.markdown("---")
                             st.subheader("📊 貸借対照表（BOX型）")
                             
+                            # 表示モード選択
+                            display_mode = st.radio(
+                                "表示モード",
+                                ["要約表示", "詳細表示"],
+                                horizontal=True,
+                                key="bs_display_mode"
+                            )
+                            
                             try:
-                                # BSデータを集計
-                                assets_items = []
-                                liabilities_items = []
-                                equity_items = []
-                                unclassified_items = []  # 分類できなかった項目
+                                if display_mode == "要約表示":
+                                    # 要約表示用の勘定科目定義
+                                    summary_accounts = {
+                                        '資産': [
+                                            '現金･預金合計', '売上債権合計', '有価証券合計', '棚卸資産合計',
+                                            '他流動資産合計', '流動資産合計', '有形固定資産計',
+                                            '無形固定資産計', '投資その他の資産合計', '固定資産合計',
+                                            '繰延資産合計', '資産合計'
+                                        ],
+                                        '負債': [
+                                            '仕入債務合計', '他流動負債合計', '流動負債合計',
+                                            '固定負債合計', '負債合計'
+                                        ],
+                                        '純資産': [
+                                            '資本金合計', '資本準備金合計', 'その他資本剰余金合計',
+                                            '資本剰余金合計', '利益準備金合計', '任意積立金合計',
+                                            '繰越利益剰余金合計', 'その他利益剰余金合計',
+                                            '利益剰余金合計', '株主資本合計', '評価･換算差額等合計',
+                                            '新株予約権合計', '純資産合計', '負債･純資産合計'
+                                        ]
+                                    }
+                                    
+                                    # データから該当する勘定科目を抽出
+                                    assets_data = []
+                                    liabilities_data = []
+                                    equity_data = []
+                                    
+                                    for _, row in bs_df.iterrows():
+                                        item = str(row.get('項目名', ''))
+                                        amount = float(row.get('金額', 0))
+                                        
+                                        if item in summary_accounts['資産']:
+                                            if item != '資産合計':  # 合計は別途計算
+                                                assets_data.append({'項目': item, '金額': amount})
+                                        elif item in summary_accounts['負債']:
+                                            if item != '負債合計':
+                                                liabilities_data.append({'項目': item, '金額': amount})
+                                        elif item in summary_accounts['純資産']:
+                                            if item not in ['純資産合計', '負債･純資産合計']:
+                                                equity_data.append({'項目': item, '金額': amount})
+                                    
+                                    total_assets = sum(item['金額'] for item in assets_data)
+                                    total_liabilities = sum(item['金額'] for item in liabilities_data)
+                                    total_equity = sum(item['金額'] for item in equity_data)
+                                    
+                                else:
+                                    # 詳細表示：0以外の全項目
+                                    assets_data = []
+                                    liabilities_data = []
+                                    equity_data = []
+                                    
+                                    for _, row in bs_df.iterrows():
+                                        item = str(row.get('項目名', ''))
+                                        amount = float(row.get('金額', 0))
+                                        
+                                        if amount == 0 or '合計' in item:
+                                            continue
+                                        
+                                        # 資産判定
+                                        if any(x in item for x in ['現金', '預金', '売掛', '債権', '有価証券', '棚卸', '商品', '貯蔵',
+                                                                    '立替', '前払', '未収', '仮払', '流動資産',
+                                                                    '附属', '車両', '有形', '無形', '投資', '敷金', '差入',
+                                                                    '保険積立', '長期', '固定資産', '繰延資産']):
+                                            if '負債' not in item and '純資産' not in item:
+                                                assets_data.append({'項目': item, '金額': amount})
+                                        # 負債判定
+                                        elif any(x in item for x in ['買掛', '仕入債務', '借入', '未払', '預り', '仮受', '負債']):
+                                            if '純資産' not in item:
+                                                liabilities_data.append({'項目': item, '金額': amount})
+                                        # 純資産判定
+                                        elif any(x in item for x in ['資本', '剰余', '利益', '準備金', '積立', '株主', '評価', '換算', '新株予約']):
+                                            equity_data.append({'項目': item, '金額': amount})
+                                    
+                                    total_assets = sum(item['金額'] for item in assets_data)
+                                    total_liabilities = sum(item['金額'] for item in liabilities_data)
+                                    total_equity = sum(item['金額'] for item in equity_data)
                                 
-                                for _, row in bs_df.iterrows():
-                                    item = str(row.get('項目名', ''))
-                                    amount = abs(float(row.get('金額', 0)))
-                                    
-                                    if amount == 0:
-                                        continue
-                                    
-                                    classified = False
-                                    
-                                    # 資産
-                                    if any(x in item for x in ['現金', '預金', '当座', '普通', '定期', '外貨']):
-                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '現金・預金'})
-                                        classified = True
-                                    elif '売掛' in item or ('債権' in item and '負債' not in item):
-                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '売掛金'})
-                                        classified = True
-                                    elif '商品' in item or '貯蔵' in item or '棚卸' in item:
-                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '棚卸資産'})
-                                        classified = True
-                                    elif any(x in item for x in ['立替', '前払', '未収', '仮払']):
-                                        if '負債' not in item:
-                                            assets_items.append({'項目': item, '金額': amount, 'カテゴリ': 'その他流動資産'})
-                                            classified = True
-                                    elif any(x in item for x in ['附属', '車両', '有形', '投資', '敷金', '差入', '保険積立', '長期']):
-                                        if '負債' not in item and '純資産' not in item:
-                                            assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '固定資産'})
-                                            classified = True
-                                    elif '資産' in item and '合計' not in item and '負債' not in item and '純資産' not in item:
-                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': 'その他資産'})
-                                        classified = True
-                                    
-                                    # 負債
-                                    if not classified:
-                                        if '買掛' in item or '仕入債務' in item:
-                                            liabilities_items.append({'項目': item, '金額': amount})
-                                            classified = True
-                                        elif '借入' in item:
-                                            liabilities_items.append({'項目': item, '金額': amount})
-                                            classified = True
-                                        elif any(x in item for x in ['未払', '預り', '仮受']):
-                                            liabilities_items.append({'項目': item, '金額': amount})
-                                            classified = True
-                                        elif '負債' in item and '合計' not in item and '純資産' not in item:
-                                            liabilities_items.append({'項目': item, '金額': amount})
-                                            classified = True
-                                    
-                                    # 純資産
-                                    if not classified:
-                                        if any(x in item for x in ['資本', '剰余', '利益']):
-                                            if '負債' not in item and '資産' not in item:
-                                                equity_items.append({'項目': item, '金額': amount})
-                                                classified = True
-                                        elif '純資産' in item and '合計' not in item:
-                                            equity_items.append({'項目': item, '金額': amount})
-                                            classified = True
-                                    
-                                    # 分類できなかった項目
-                                    if not classified and '合計' not in item:
-                                        unclassified_items.append({'項目': item, '金額': amount})
-                                
-                                # カテゴリ別集計
-                                asset_categories = {}
-                                for item in assets_items:
-                                    cat = item['カテゴリ']
-                                    if cat not in asset_categories:
-                                        asset_categories[cat] = 0
-                                    asset_categories[cat] += item['金額']
-                                
-                                total_assets = sum(asset_categories.values())
-                                total_liabilities = sum(item['金額'] for item in liabilities_items)
-                                total_equity = sum(item['金額'] for item in equity_items)
-                                
-                                # デバッグ情報
-                                with st.expander("🔍 BS分類デバッグ", expanded=False):
-                                    st.write(f"**資産:** {len(assets_items)}項目, 合計 ¥{total_assets/10000:,.0f}万")
-                                    st.write(f"**負債:** {len(liabilities_items)}項目, 合計 ¥{total_liabilities/10000:,.0f}万")
-                                    st.write(f"**純資産:** {len(equity_items)}項目, 合計 ¥{total_equity/10000:,.0f}万")
-                                    if unclassified_items:
-                                        st.warning(f"**未分類:** {len(unclassified_items)}項目")
-                                        for item in unclassified_items:
-                                            st.write(f"- {item['項目']}: ¥{item['金額']/10000:,.0f}万")
-                                
-                                # PlotlyでBOX型BS図を作成
+                                # モダンなPlotlyグラフ作成
                                 fig = go.Figure()
                                 
-                                # 左側BOX（資産）
-                                # 背景ボックス
+                                # 左BOX（資産） - モダンデザイン
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0, x1=0.45, y0=0, y1=1,
-                                    fillcolor="#E8EAF6",
-                                    line=dict(color="#667eea", width=3)
+                                    x0=0, x1=0.48, y0=0, y1=1,
+                                    fillcolor="rgba(99, 102, 241, 0.05)",
+                                    line=dict(color="rgba(99, 102, 241, 0.3)", width=2)
                                 )
                                 
-                                # ヘッダー
+                                # グラデーションヘッダー風
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0, x1=0.45, y0=0.93, y1=1,
-                                    fillcolor="#667eea",
+                                    x0=0, x1=0.48, y0=0.94, y1=1,
+                                    fillcolor="rgb(99, 102, 241)",
                                     line=dict(width=0)
                                 )
                                 
                                 fig.add_annotation(
-                                    x=0.225, y=0.965,
-                                    text="<b>資産の部</b>",
+                                    x=0.24, y=0.97,
+                                    text="<b>資産</b>",
                                     showarrow=False,
-                                    font=dict(size=16, color="white"),
+                                    font=dict(size=18, color="white", family="Arial Black"),
                                     xref="paper", yref="paper"
                                 )
                                 
-                                # 資産の内訳
-                                y_pos = 0.85
-                                fig.add_annotation(
-                                    x=0.03, y=y_pos,
-                                    text="<b>流動資産</b>",
-                                    showarrow=False,
-                                    font=dict(size=14, color="#333"),
-                                    xref="paper", yref="paper",
-                                    xanchor="left"
-                                )
-                                
-                                y_pos -= 0.05
-                                for cat, amt in sorted(asset_categories.items(), key=lambda x: x[1], reverse=True):
-                                    if cat != '固定資産':
-                                        fig.add_annotation(
-                                            x=0.05, y=y_pos,
-                                            text=f"{cat}",
-                                            showarrow=False,
-                                            font=dict(size=12, color="#666"),
-                                            xref="paper", yref="paper",
-                                            xanchor="left"
-                                        )
-                                        fig.add_annotation(
-                                            x=0.42, y=y_pos,
-                                            text=f"<b>¥{amt/10000:,.0f}万</b>",
-                                            showarrow=False,
-                                            font=dict(size=12, color="#666"),
-                                            xref="paper", yref="paper",
-                                            xanchor="right"
-                                        )
-                                        y_pos -= 0.04
-                                
-                                # 固定資産
-                                y_pos -= 0.03
-                                if '固定資産' in asset_categories:
+                                # 資産項目
+                                y_pos = 0.88
+                                for item_data in sorted(assets_data, key=lambda x: abs(x['金額']), reverse=True)[:10]:  # 上位10項目
                                     fig.add_annotation(
-                                        x=0.03, y=y_pos,
-                                        text="<b>固定資産</b>",
+                                        x=0.02, y=y_pos,
+                                        text=item_data['項目'],
                                         showarrow=False,
-                                        font=dict(size=14, color="#333"),
-                                        xref="paper", yref="paper",
-                                        xanchor="left"
-                                    )
-                                    y_pos -= 0.04
-                                    fig.add_annotation(
-                                        x=0.05, y=y_pos,
-                                        text="固定資産",
-                                        showarrow=False,
-                                        font=dict(size=12, color="#666"),
+                                        font=dict(size=11, color="#1F2937"),
                                         xref="paper", yref="paper",
                                         xanchor="left"
                                     )
                                     fig.add_annotation(
-                                        x=0.42, y=y_pos,
-                                        text=f"<b>¥{asset_categories['固定資産']/10000:,.0f}万</b>",
+                                        x=0.46, y=y_pos,
+                                        text=f"<b>{abs(item_data['金額'])/10000:,.0f}</b>",
                                         showarrow=False,
-                                        font=dict(size=12, color="#666"),
+                                        font=dict(size=11, color="#4B5563"),
                                         xref="paper", yref="paper",
                                         xanchor="right"
                                     )
+                                    y_pos -= 0.06
                                 
                                 # 資産合計
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0, x1=0.45, y0=0, y1=0.08,
-                                    fillcolor="#F5F5F5",
+                                    x0=0, x1=0.48, y0=0, y1=0.08,
+                                    fillcolor="rgb(99, 102, 241)",
                                     line=dict(width=0)
                                 )
                                 fig.add_annotation(
-                                    x=0.05, y=0.04,
+                                    x=0.02, y=0.04,
                                     text="<b>資産合計</b>",
                                     showarrow=False,
-                                    font=dict(size=16, color="#667eea"),
+                                    font=dict(size=16, color="white", family="Arial Black"),
                                     xref="paper", yref="paper",
                                     xanchor="left"
                                 )
                                 fig.add_annotation(
-                                    x=0.42, y=0.04,
-                                    text=f"<b>¥{total_assets/10000:,.0f}万</b>",
+                                    x=0.46, y=0.04,
+                                    text=f"<b>¥{abs(total_assets)/10000:,.0f}万</b>",
                                     showarrow=False,
-                                    font=dict(size=16, color="#667eea"),
+                                    font=dict(size=16, color="white", family="Arial Black"),
                                     xref="paper", yref="paper",
                                     xanchor="right"
                                 )
                                 
-                                # 右側BOX（負債・純資産）
-                                # 背景ボックス
+                                # 右BOX（負債・純資産） - モダンデザイン
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0.55, x1=1, y0=0, y1=1,
-                                    fillcolor="#FCE4EC",
-                                    line=dict(color="#f093fb", width=3)
+                                    x0=0.52, x1=1, y0=0, y1=1,
+                                    fillcolor="rgba(236, 72, 153, 0.05)",
+                                    line=dict(color="rgba(236, 72, 153, 0.3)", width=2)
                                 )
                                 
-                                # ヘッダー
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0.55, x1=1, y0=0.93, y1=1,
-                                    fillcolor="#f093fb",
+                                    x0=0.52, x1=1, y0=0.94, y1=1,
+                                    fillcolor="rgb(236, 72, 153)",
                                     line=dict(width=0)
                                 )
                                 
                                 fig.add_annotation(
-                                    x=0.775, y=0.965,
-                                    text="<b>負債・純資産の部</b>",
+                                    x=0.76, y=0.97,
+                                    text="<b>負債・純資産</b>",
                                     showarrow=False,
-                                    font=dict(size=16, color="white"),
+                                    font=dict(size=18, color="white", family="Arial Black"),
                                     xref="paper", yref="paper"
                                 )
                                 
-                                # 負債
-                                y_pos = 0.85
-                                fig.add_annotation(
-                                    x=0.58, y=y_pos,
-                                    text="<b>負債</b>",
-                                    showarrow=False,
-                                    font=dict(size=14, color="#333"),
-                                    xref="paper", yref="paper",
-                                    xanchor="left"
-                                )
-                                y_pos -= 0.04
-                                fig.add_annotation(
-                                    x=0.60, y=y_pos,
-                                    text="負債合計",
-                                    showarrow=False,
-                                    font=dict(size=12, color="#666"),
-                                    xref="paper", yref="paper",
-                                    xanchor="left"
-                                )
-                                fig.add_annotation(
-                                    x=0.97, y=y_pos,
-                                    text=f"<b>¥{total_liabilities/10000:,.0f}万</b>",
-                                    showarrow=False,
-                                    font=dict(size=12, color="#666"),
-                                    xref="paper", yref="paper",
-                                    xanchor="right"
-                                )
-                                
-                                # 純資産
-                                y_pos -= 0.08
-                                fig.add_annotation(
-                                    x=0.58, y=y_pos,
-                                    text="<b>純資産</b>",
-                                    showarrow=False,
-                                    font=dict(size=14, color="#333"),
-                                    xref="paper", yref="paper",
-                                    xanchor="left"
-                                )
-                                
-                                y_pos -= 0.04
-                                for item in sorted(equity_items, key=lambda x: x['金額'], reverse=True):
+                                # 負債・純資産項目
+                                y_pos = 0.88
+                                all_right_items = liabilities_data + equity_data
+                                for item_data in sorted(all_right_items, key=lambda x: abs(x['金額']), reverse=True)[:10]:
                                     fig.add_annotation(
-                                        x=0.60, y=y_pos,
-                                        text=item['項目'],
+                                        x=0.54, y=y_pos,
+                                        text=item_data['項目'],
                                         showarrow=False,
-                                        font=dict(size=12, color="#666"),
+                                        font=dict(size=11, color="#1F2937"),
                                         xref="paper", yref="paper",
                                         xanchor="left"
                                     )
                                     fig.add_annotation(
-                                        x=0.97, y=y_pos,
-                                        text=f"<b>¥{item['金額']/10000:,.0f}万</b>",
+                                        x=0.98, y=y_pos,
+                                        text=f"<b>{abs(item_data['金額'])/10000:,.0f}</b>",
                                         showarrow=False,
-                                        font=dict(size=12, color="#666"),
+                                        font=dict(size=11, color="#4B5563"),
                                         xref="paper", yref="paper",
                                         xanchor="right"
                                     )
-                                    y_pos -= 0.04
+                                    y_pos -= 0.06
                                 
                                 # 負債・純資産合計
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0.55, x1=1, y0=0, y1=0.08,
-                                    fillcolor="#F5F5F5",
+                                    x0=0.52, x1=1, y0=0, y1=0.08,
+                                    fillcolor="rgb(236, 72, 153)",
                                     line=dict(width=0)
                                 )
                                 fig.add_annotation(
-                                    x=0.60, y=0.04,
+                                    x=0.54, y=0.04,
                                     text="<b>負債・純資産合計</b>",
                                     showarrow=False,
-                                    font=dict(size=16, color="#f093fb"),
+                                    font=dict(size=16, color="white", family="Arial Black"),
                                     xref="paper", yref="paper",
                                     xanchor="left"
                                 )
                                 fig.add_annotation(
-                                    x=0.97, y=0.04,
-                                    text=f"<b>¥{(total_liabilities + total_equity)/10000:,.0f}万</b>",
+                                    x=0.98, y=0.04,
+                                    text=f"<b>¥{abs(total_liabilities + total_equity)/10000:,.0f}万</b>",
                                     showarrow=False,
-                                    font=dict(size=16, color="#f093fb"),
+                                    font=dict(size=16, color="white", family="Arial Black"),
                                     xref="paper", yref="paper",
                                     xanchor="right"
                                 )
                                 
-                                # レイアウト設定
                                 fig.update_layout(
-                                    title={
-                                        'text': '貸借対照表（BOX型）',
-                                        'font': {'size': 20, 'color': '#262730'},
-                                        'x': 0.5,
-                                        'xanchor': 'center'
-                                    },
                                     xaxis=dict(visible=False, range=[0, 1]),
                                     yaxis=dict(visible=False, range=[0, 1]),
-                                    plot_bgcolor='white',
+                                    plot_bgcolor='rgba(0,0,0,0)',
                                     paper_bgcolor='white',
-                                    height=600,
+                                    height=700,
                                     showlegend=False,
-                                    margin=dict(l=20, r=20, t=80, b=20)
+                                    margin=dict(l=10, r=10, t=30, b=10)
                                 )
                                 
                                 st.plotly_chart(fig, use_container_width=True)
