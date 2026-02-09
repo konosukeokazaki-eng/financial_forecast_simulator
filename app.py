@@ -2796,6 +2796,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 assets_items = []
                                 liabilities_items = []
                                 equity_items = []
+                                unclassified_items = []  # 分類できなかった項目
                                 
                                 for _, row in bs_df.iterrows():
                                     item = str(row.get('項目名', ''))
@@ -2804,31 +2805,58 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                     if amount == 0:
                                         continue
                                     
+                                    classified = False
+                                    
                                     # 資産
                                     if any(x in item for x in ['現金', '預金', '当座', '普通', '定期', '外貨']):
                                         assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '現金・預金'})
-                                    elif '売掛' in item or '債権' in item:
+                                        classified = True
+                                    elif '売掛' in item or ('債権' in item and '負債' not in item):
                                         assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '売掛金'})
+                                        classified = True
                                     elif '商品' in item or '貯蔵' in item or '棚卸' in item:
                                         assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '棚卸資産'})
-                                    elif '立替' in item or '前払' in item or '未収' in item or '仮払' in item:
-                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': 'その他流動資産'})
-                                    elif any(x in item for x in ['附属', '車両', '有形', '投資', '敷金', '差入', '保険積立', '長期']):
+                                        classified = True
+                                    elif any(x in item for x in ['立替', '前払', '未収', '仮払']):
                                         if '負債' not in item:
+                                            assets_items.append({'項目': item, '金額': amount, 'カテゴリ': 'その他流動資産'})
+                                            classified = True
+                                    elif any(x in item for x in ['附属', '車両', '有形', '投資', '敷金', '差入', '保険積立', '長期']):
+                                        if '負債' not in item and '純資産' not in item:
                                             assets_items.append({'項目': item, '金額': amount, 'カテゴリ': '固定資産'})
+                                            classified = True
+                                    elif '資産' in item and '合計' not in item and '負債' not in item and '純資産' not in item:
+                                        assets_items.append({'項目': item, '金額': amount, 'カテゴリ': 'その他資産'})
+                                        classified = True
                                     
                                     # 負債
-                                    elif '買掛' in item or '仕入債務' in item:
-                                        liabilities_items.append({'項目': item, '金額': amount})
-                                    elif '借入' in item:
-                                        liabilities_items.append({'項目': item, '金額': amount})
-                                    elif '未払' in item or '預り' in item or '仮受' in item:
-                                        liabilities_items.append({'項目': item, '金額': amount})
+                                    if not classified:
+                                        if '買掛' in item or '仕入債務' in item:
+                                            liabilities_items.append({'項目': item, '金額': amount})
+                                            classified = True
+                                        elif '借入' in item:
+                                            liabilities_items.append({'項目': item, '金額': amount})
+                                            classified = True
+                                        elif any(x in item for x in ['未払', '預り', '仮受']):
+                                            liabilities_items.append({'項目': item, '金額': amount})
+                                            classified = True
+                                        elif '負債' in item and '合計' not in item and '純資産' not in item:
+                                            liabilities_items.append({'項目': item, '金額': amount})
+                                            classified = True
                                     
                                     # 純資産
-                                    elif '資本' in item or '剰余' in item or '利益' in item:
-                                        if '負債' not in item:
+                                    if not classified:
+                                        if any(x in item for x in ['資本', '剰余', '利益']):
+                                            if '負債' not in item and '資産' not in item:
+                                                equity_items.append({'項目': item, '金額': amount})
+                                                classified = True
+                                        elif '純資産' in item and '合計' not in item:
                                             equity_items.append({'項目': item, '金額': amount})
+                                            classified = True
+                                    
+                                    # 分類できなかった項目
+                                    if not classified and '合計' not in item:
+                                        unclassified_items.append({'項目': item, '金額': amount})
                                 
                                 # カテゴリ別集計
                                 asset_categories = {}
@@ -2841,6 +2869,16 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 total_assets = sum(asset_categories.values())
                                 total_liabilities = sum(item['金額'] for item in liabilities_items)
                                 total_equity = sum(item['金額'] for item in equity_items)
+                                
+                                # デバッグ情報
+                                with st.expander("🔍 BS分類デバッグ", expanded=False):
+                                    st.write(f"**資産:** {len(assets_items)}項目, 合計 ¥{total_assets/10000:,.0f}万")
+                                    st.write(f"**負債:** {len(liabilities_items)}項目, 合計 ¥{total_liabilities/10000:,.0f}万")
+                                    st.write(f"**純資産:** {len(equity_items)}項目, 合計 ¥{total_equity/10000:,.0f}万")
+                                    if unclassified_items:
+                                        st.warning(f"**未分類:** {len(unclassified_items)}項目")
+                                        for item in unclassified_items:
+                                            st.write(f"- {item['項目']}: ¥{item['金額']/10000:,.0f}万")
                                 
                                 # HTML/CSSでBOX型表示
                                 st.markdown(f"""
