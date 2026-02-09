@@ -2880,101 +2880,245 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                         for item in unclassified_items:
                                             st.write(f"- {item['項目']}: ¥{item['金額']/10000:,.0f}万")
                                 
-                                # HTML/CSSでBOX型表示
-                                st.markdown(f"""
-                                <div style="display: flex; gap: 40px; justify-content: center; margin: 20px 0;">
-                                    <!-- 左側：資産 -->
-                                    <div style="flex: 1; max-width: 500px;">
-                                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                                                    color: white; padding: 15px; border-radius: 10px 10px 0 0; 
-                                                    text-align: center; font-weight: bold; font-size: 18px;">
-                                            資産の部
-                                        </div>
-                                        <div style="border: 3px solid #667eea; border-radius: 0 0 10px 10px; 
-                                                    background: white; min-height: 400px;">
-                                            <!-- 流動資産 -->
-                                            <div style="padding: 15px; border-bottom: 2px solid #e0e0e0;">
-                                                <div style="font-weight: bold; color: #333; margin-bottom: 10px;">
-                                                    流動資産
-                                                </div>
-                                                {''.join([f'''
-                                                <div style="display: flex; justify-content: space-between; 
-                                                            padding: 5px 10px; color: #666;">
-                                                    <span>{cat}</span>
-                                                    <span style="font-weight: bold;">¥{amt/10000:,.0f}万</span>
-                                                </div>
-                                                ''' for cat, amt in sorted(asset_categories.items(), key=lambda x: x[1], reverse=True) 
-                                                if cat != '固定資産'])}
-                                            </div>
-                                            <!-- 固定資産 -->
-                                            {f'''
-                                            <div style="padding: 15px; border-bottom: 2px solid #e0e0e0;">
-                                                <div style="font-weight: bold; color: #333; margin-bottom: 10px;">
-                                                    固定資産
-                                                </div>
-                                                <div style="display: flex; justify-content: space-between; 
-                                                            padding: 5px 10px; color: #666;">
-                                                    <span>固定資産</span>
-                                                    <span style="font-weight: bold;">¥{asset_categories.get('固定資産', 0)/10000:,.0f}万</span>
-                                                </div>
-                                            </div>
-                                            ''' if '固定資産' in asset_categories else ''}
-                                            <!-- 資産合計 -->
-                                            <div style="padding: 20px; background: #f5f5f5; border-radius: 0 0 8px 8px;">
-                                                <div style="display: flex; justify-content: space-between; 
-                                                            font-weight: bold; font-size: 20px; color: #667eea;">
-                                                    <span>資産合計</span>
-                                                    <span>¥{total_assets/10000:,.0f}万</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- 右側：負債・純資産 -->
-                                    <div style="flex: 1; max-width: 500px;">
-                                        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
-                                                    color: white; padding: 15px; border-radius: 10px 10px 0 0; 
-                                                    text-align: center; font-weight: bold; font-size: 18px;">
-                                            負債・純資産の部
-                                        </div>
-                                        <div style="border: 3px solid #f093fb; border-radius: 0 0 10px 10px; 
-                                                    background: white; min-height: 400px;">
-                                            <!-- 負債 -->
-                                            <div style="padding: 15px; border-bottom: 2px solid #e0e0e0;">
-                                                <div style="font-weight: bold; color: #333; margin-bottom: 10px;">
-                                                    負債
-                                                </div>
-                                                <div style="display: flex; justify-content: space-between; 
-                                                            padding: 5px 10px; color: #666;">
-                                                    <span>負債合計</span>
-                                                    <span style="font-weight: bold;">¥{total_liabilities/10000:,.0f}万</span>
-                                                </div>
-                                            </div>
-                                            <!-- 純資産 -->
-                                            <div style="padding: 15px; border-bottom: 2px solid #e0e0e0;">
-                                                <div style="font-weight: bold; color: #333; margin-bottom: 10px;">
-                                                    純資産
-                                                </div>
-                                                {''.join([f'''
-                                                <div style="display: flex; justify-content: space-between; 
-                                                            padding: 5px 10px; color: #666;">
-                                                    <span>{item["項目"]}</span>
-                                                    <span style="font-weight: bold;">¥{item["金額"]/10000:,.0f}万</span>
-                                                </div>
-                                                ''' for item in sorted(equity_items, key=lambda x: x['金額'], reverse=True)])}
-                                            </div>
-                                            <!-- 負債・純資産合計 -->
-                                            <div style="padding: 20px; background: #f5f5f5; border-radius: 0 0 8px 8px;">
-                                                <div style="display: flex; justify-content: space-between; 
-                                                            font-weight: bold; font-size: 20px; color: #f093fb;">
-                                                    <span>負債・純資産合計</span>
-                                                    <span>¥{(total_liabilities + total_equity)/10000:,.0f}万</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
+                                # PlotlyでBOX型BS図を作成
+                                fig = go.Figure()
+                                
+                                # 左側BOX（資産）
+                                # 背景ボックス
+                                fig.add_shape(
+                                    type="rect",
+                                    x0=0, x1=0.45, y0=0, y1=1,
+                                    fillcolor="#E8EAF6",
+                                    line=dict(color="#667eea", width=3)
+                                )
+                                
+                                # ヘッダー
+                                fig.add_shape(
+                                    type="rect",
+                                    x0=0, x1=0.45, y0=0.93, y1=1,
+                                    fillcolor="#667eea",
+                                    line=dict(width=0)
+                                )
+                                
+                                fig.add_annotation(
+                                    x=0.225, y=0.965,
+                                    text="<b>資産の部</b>",
+                                    showarrow=False,
+                                    font=dict(size=16, color="white"),
+                                    xref="paper", yref="paper"
+                                )
+                                
+                                # 資産の内訳
+                                y_pos = 0.85
+                                fig.add_annotation(
+                                    x=0.03, y=y_pos,
+                                    text="<b>流動資産</b>",
+                                    showarrow=False,
+                                    font=dict(size=14, color="#333"),
+                                    xref="paper", yref="paper",
+                                    xanchor="left"
+                                )
+                                
+                                y_pos -= 0.05
+                                for cat, amt in sorted(asset_categories.items(), key=lambda x: x[1], reverse=True):
+                                    if cat != '固定資産':
+                                        fig.add_annotation(
+                                            x=0.05, y=y_pos,
+                                            text=f"{cat}",
+                                            showarrow=False,
+                                            font=dict(size=12, color="#666"),
+                                            xref="paper", yref="paper",
+                                            xanchor="left"
+                                        )
+                                        fig.add_annotation(
+                                            x=0.42, y=y_pos,
+                                            text=f"<b>¥{amt/10000:,.0f}万</b>",
+                                            showarrow=False,
+                                            font=dict(size=12, color="#666"),
+                                            xref="paper", yref="paper",
+                                            xanchor="right"
+                                        )
+                                        y_pos -= 0.04
+                                
+                                # 固定資産
+                                y_pos -= 0.03
+                                if '固定資産' in asset_categories:
+                                    fig.add_annotation(
+                                        x=0.03, y=y_pos,
+                                        text="<b>固定資産</b>",
+                                        showarrow=False,
+                                        font=dict(size=14, color="#333"),
+                                        xref="paper", yref="paper",
+                                        xanchor="left"
+                                    )
+                                    y_pos -= 0.04
+                                    fig.add_annotation(
+                                        x=0.05, y=y_pos,
+                                        text="固定資産",
+                                        showarrow=False,
+                                        font=dict(size=12, color="#666"),
+                                        xref="paper", yref="paper",
+                                        xanchor="left"
+                                    )
+                                    fig.add_annotation(
+                                        x=0.42, y=y_pos,
+                                        text=f"<b>¥{asset_categories['固定資産']/10000:,.0f}万</b>",
+                                        showarrow=False,
+                                        font=dict(size=12, color="#666"),
+                                        xref="paper", yref="paper",
+                                        xanchor="right"
+                                    )
+                                
+                                # 資産合計
+                                fig.add_shape(
+                                    type="rect",
+                                    x0=0, x1=0.45, y0=0, y1=0.08,
+                                    fillcolor="#F5F5F5",
+                                    line=dict(width=0)
+                                )
+                                fig.add_annotation(
+                                    x=0.05, y=0.04,
+                                    text="<b>資産合計</b>",
+                                    showarrow=False,
+                                    font=dict(size=16, color="#667eea"),
+                                    xref="paper", yref="paper",
+                                    xanchor="left"
+                                )
+                                fig.add_annotation(
+                                    x=0.42, y=0.04,
+                                    text=f"<b>¥{total_assets/10000:,.0f}万</b>",
+                                    showarrow=False,
+                                    font=dict(size=16, color="#667eea"),
+                                    xref="paper", yref="paper",
+                                    xanchor="right"
+                                )
+                                
+                                # 右側BOX（負債・純資産）
+                                # 背景ボックス
+                                fig.add_shape(
+                                    type="rect",
+                                    x0=0.55, x1=1, y0=0, y1=1,
+                                    fillcolor="#FCE4EC",
+                                    line=dict(color="#f093fb", width=3)
+                                )
+                                
+                                # ヘッダー
+                                fig.add_shape(
+                                    type="rect",
+                                    x0=0.55, x1=1, y0=0.93, y1=1,
+                                    fillcolor="#f093fb",
+                                    line=dict(width=0)
+                                )
+                                
+                                fig.add_annotation(
+                                    x=0.775, y=0.965,
+                                    text="<b>負債・純資産の部</b>",
+                                    showarrow=False,
+                                    font=dict(size=16, color="white"),
+                                    xref="paper", yref="paper"
+                                )
+                                
+                                # 負債
+                                y_pos = 0.85
+                                fig.add_annotation(
+                                    x=0.58, y=y_pos,
+                                    text="<b>負債</b>",
+                                    showarrow=False,
+                                    font=dict(size=14, color="#333"),
+                                    xref="paper", yref="paper",
+                                    xanchor="left"
+                                )
+                                y_pos -= 0.04
+                                fig.add_annotation(
+                                    x=0.60, y=y_pos,
+                                    text="負債合計",
+                                    showarrow=False,
+                                    font=dict(size=12, color="#666"),
+                                    xref="paper", yref="paper",
+                                    xanchor="left"
+                                )
+                                fig.add_annotation(
+                                    x=0.97, y=y_pos,
+                                    text=f"<b>¥{total_liabilities/10000:,.0f}万</b>",
+                                    showarrow=False,
+                                    font=dict(size=12, color="#666"),
+                                    xref="paper", yref="paper",
+                                    xanchor="right"
+                                )
+                                
+                                # 純資産
+                                y_pos -= 0.08
+                                fig.add_annotation(
+                                    x=0.58, y=y_pos,
+                                    text="<b>純資産</b>",
+                                    showarrow=False,
+                                    font=dict(size=14, color="#333"),
+                                    xref="paper", yref="paper",
+                                    xanchor="left"
+                                )
+                                
+                                y_pos -= 0.04
+                                for item in sorted(equity_items, key=lambda x: x['金額'], reverse=True):
+                                    fig.add_annotation(
+                                        x=0.60, y=y_pos,
+                                        text=item['項目'],
+                                        showarrow=False,
+                                        font=dict(size=12, color="#666"),
+                                        xref="paper", yref="paper",
+                                        xanchor="left"
+                                    )
+                                    fig.add_annotation(
+                                        x=0.97, y=y_pos,
+                                        text=f"<b>¥{item['金額']/10000:,.0f}万</b>",
+                                        showarrow=False,
+                                        font=dict(size=12, color="#666"),
+                                        xref="paper", yref="paper",
+                                        xanchor="right"
+                                    )
+                                    y_pos -= 0.04
+                                
+                                # 負債・純資産合計
+                                fig.add_shape(
+                                    type="rect",
+                                    x0=0.55, x1=1, y0=0, y1=0.08,
+                                    fillcolor="#F5F5F5",
+                                    line=dict(width=0)
+                                )
+                                fig.add_annotation(
+                                    x=0.60, y=0.04,
+                                    text="<b>負債・純資産合計</b>",
+                                    showarrow=False,
+                                    font=dict(size=16, color="#f093fb"),
+                                    xref="paper", yref="paper",
+                                    xanchor="left"
+                                )
+                                fig.add_annotation(
+                                    x=0.97, y=0.04,
+                                    text=f"<b>¥{(total_liabilities + total_equity)/10000:,.0f}万</b>",
+                                    showarrow=False,
+                                    font=dict(size=16, color="#f093fb"),
+                                    xref="paper", yref="paper",
+                                    xanchor="right"
+                                )
+                                
+                                # レイアウト設定
+                                fig.update_layout(
+                                    title={
+                                        'text': '貸借対照表（BOX型）',
+                                        'font': {'size': 20, 'color': '#262730'},
+                                        'x': 0.5,
+                                        'xanchor': 'center'
+                                    },
+                                    xaxis=dict(visible=False, range=[0, 1]),
+                                    yaxis=dict(visible=False, range=[0, 1]),
+                                    plot_bgcolor='white',
+                                    paper_bgcolor='white',
+                                    height=600,
+                                    showlegend=False,
+                                    margin=dict(l=20, r=20, t=80, b=20)
+                                )
+                                
+                                st.plotly_chart(fig, use_container_width=True)
                                 
                             except Exception as e:
                                 import traceback
