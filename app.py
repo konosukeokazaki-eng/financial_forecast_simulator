@@ -1692,18 +1692,23 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # アラート表示エリア
             st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
             
-                                                # 実データからKPIを計算
+                                                            # 実データからKPIを計算
             try:
+                # デバッグ情報
+                with st.expander("🔍 CFOデバッグ情報", expanded=False):
+                    st.write("selected_period_id:", selected_period_id)
+                    st.write("current_month:", st.session_state.current_month)
+                
                 # データ読み込み
                 actuals_df = load_actual_data_cached(selected_period_id, processor)
                 
-                # 横持ち→縦持ち変換
-                if actuals_df is not None and not actuals_df.empty:
-                    actuals_df = convert_wide_to_long(actuals_df)
+                st.write("actuals_df loaded:", actuals_df is not None)
+                if actuals_df is not None:
+                    st.write("Shape:", actuals_df.shape)
+                    st.write("Columns:", actuals_df.columns.tolist())
                 
-                # データがNoneまたは空の場合
                 if actuals_df is None or actuals_df.empty:
-                    # デモデータを使用
+                    # データなし
                     use_real_data = False
                     operating_cf = 31500000
                     cash_balance = 376343476
@@ -1713,93 +1718,66 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     alerts = [{'level': 'info', 'message': '💡 実績データを入力してください'}]
                 
                 else:
-                    # データが存在する場合
-                    # カラム名を正規化（小文字化）
-                    original_columns = actuals_df.columns.tolist()
-                    actuals_df.columns = actuals_df.columns.str.lower().str.strip()
+                    # 横持ち変換
+                    actuals_df = convert_wide_to_long(actuals_df)
                     
-                    # カラム名のマッピング
-                    month_candidates = ['fiscal_month', 'month', '月', 'fiscal_month_num', 'period_month']
-                    account_candidates = ['account_name', 'account', '科目', '勘定科目', 'account_id', 'item_name', '項目名']
-                    amount_candidates = ['amount', '金額', 'value', 'balance', 'sum', '合計']
+                    st.write("After conversion:", actuals_df.shape)
+                    st.dataframe(actuals_df.head())
                     
-                    # カラムを検出
-                    month_col = None
-                    for candidate in month_candidates:
-                        candidate_lower = candidate.lower()
-                        if candidate_lower in actuals_df.columns:
-                            month_col = candidate_lower
+                    # カラム名正規化
+                    actuals_df.columns = actuals_df.columns.str.lower()
+                    
+                    # カラム検出
+                    month_col = account_col = amount_col = None
+                    for col in ['fiscal_month', 'month', '月']:
+                        if col in actuals_df.columns:
+                            month_col = col
+                            break
+                    for col in ['account_name', 'account', '科目', '項目名']:
+                        if col in actuals_df.columns:
+                            account_col = col
+                            break
+                    for col in ['amount', '金額', 'value']:
+                        if col in actuals_df.columns:
+                            amount_col = col
                             break
                     
-                    account_col = None
-                    for candidate in account_candidates:
-                        candidate_lower = candidate.lower()
-                        if candidate_lower in actuals_df.columns:
-                            account_col = candidate_lower
-                            break
+                    st.write(f"Detected: month={month_col}, account={account_col}, amount={amount_col}")
                     
-                    amount_col = None
-                    for candidate in amount_candidates:
-                        candidate_lower = candidate.lower()
-                        if candidate_lower in actuals_df.columns:
-                            amount_col = candidate_lower
-                            break
-                    
-                    # カラムが見つからない場合
                     if not all([month_col, account_col, amount_col]):
-                        # デバッグ用に情報を出力
-                        import sys
-                        sys.stderr.write(f"Available columns: {actuals_df.columns.tolist()}\n")
-                        
-                        # デモデータにフォールバック
+                        # カラムなし
                         use_real_data = False
                         operating_cf = 31500000
                         cash_balance = 376343476
                         cash_runway = 8.5
                         forecast_3months = 380000000
                         cf_growth = 8.3
-                        alerts = [{
-                            'level': 'warning', 
-                            'message': f'データ構造エラー (カラム: {", ".join(actuals_df.columns.tolist()[:5])}...)'
-                        }]
-                    
+                        alerts = [{'level': 'warning', 'message': f'カラム検出失敗'}]
                     else:
-                        # 実データで計算
+                        # 計算実行
                         current_month = int(st.session_state.current_month)
                         
-                        # 当月データ
-                        current_data = actuals_df[actuals_df[month_col] == current_month]
-                        
-                        # 営業CF計算
+                        # 営業CF
                         operating_profit = 0
+                        current_data = actuals_df[actuals_df[month_col] == current_month]
                         if not current_data.empty:
-                            # 営業利益の行を検索
-                            profit_mask = (
-                                current_data[account_col].astype(str).str.contains('営業', na=False) |
-                                current_data[account_col].astype(str).str.contains('operating', case=False, na=False)
-                            )
-                            profit_rows = current_data[profit_mask]
+                            profit_rows = current_data[
+                                current_data[account_col].astype(str).str.contains('営業', na=False)
+                            ]
                             if not profit_rows.empty:
                                 operating_profit = float(profit_rows[amount_col].iloc[0])
-                        
                         operating_cf = operating_profit * 0.8
                         
                         # 現金残高
-                        cash_mask = (
-                            actuals_df[account_col].astype(str).str.contains('現金', na=False) |
-                            actuals_df[account_col].astype(str).str.contains('cash', case=False, na=False) |
-                            actuals_df[account_col].astype(str).str.contains('預金', na=False)
-                        )
-                        cash_rows = actuals_df[cash_mask]
+                        cash_rows = actuals_df[
+                            actuals_df[account_col].astype(str).str.contains('現金|預金', na=False)
+                        ]
                         cash_balance = float(cash_rows[amount_col].sum()) if not cash_rows.empty else 100000000
                         
                         # 固定費
-                        sg_mask = (
-                            actuals_df[account_col].astype(str).str.contains('販売費', na=False) |
-                            actuals_df[account_col].astype(str).str.contains('販管費', na=False) |
-                            actuals_df[account_col].astype(str).str.contains('一般管理費', na=False)
-                        )
-                        sg_rows = actuals_df[sg_mask]
+                        sg_rows = actuals_df[
+                            actuals_df[account_col].astype(str).str.contains('販売費|販管費|一般管理費', na=False)
+                        ]
                         if not sg_rows.empty:
                             total_sg = float(sg_rows[amount_col].sum())
                             months_count = max(actuals_df[month_col].nunique(), 1)
@@ -1807,7 +1785,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         else:
                             fixed_cost_monthly = 40000000
                         
-                        # KPI計算
+                        # KPI
                         cash_runway = cash_balance / fixed_cost_monthly if fixed_cost_monthly > 0 else 99
                         forecast_3months = cash_balance + (operating_cf * 3)
                         
@@ -1816,8 +1794,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         prev_data = actuals_df[actuals_df[month_col] == prev_month]
                         cf_growth = 0
                         if not prev_data.empty:
-                            prev_profit_mask = prev_data[account_col].astype(str).str.contains('営業', na=False)
-                            prev_profit_rows = prev_data[prev_profit_mask]
+                            prev_profit_rows = prev_data[
+                                prev_data[account_col].astype(str).str.contains('営業', na=False)
+                            ]
                             if not prev_profit_rows.empty:
                                 prev_profit = float(prev_profit_rows[amount_col].iloc[0])
                                 prev_cf = prev_profit * 0.8
@@ -1840,44 +1819,19 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 sys.stderr.write(f"CFO error: {str(e)}\n")
                 sys.stderr.write(traceback.format_exc())
                 
-                # デモデータ
-                use_real_data = False
-                operating_cf = 31500000
-                cash_balance = 376343476
-                cash_runway = 8.5
-                forecast_3months = 380000000
-                cf_growth = 8.3
-                alerts = [{'level': 'warning', 'message': '⚠️ データ読み込みエラー'}]
-            
-            except Exception as e:
-                import sys
-                import traceback
-                sys.stderr.write(f"CFO error: {e}\n")
-                sys.stderr.write(traceback.format_exc())
+                # デバッグ表示
+                with st.expander("❌ エラー詳細", expanded=True):
+                    st.error(f"エラー: {str(e)}")
+                    st.code(traceback.format_exc())
                 
-                # デバッグ情報をアラートに表示
                 use_real_data = False
                 operating_cf = 31500000
                 cash_balance = 376343476
                 cash_runway = 8.5
                 forecast_3months = 380000000
                 cf_growth = 8.3
+                alerts = [{'level': 'warning', 'message': '⚠️ データ処理エラー'}]
                 
-                error_msg = str(e)[:100]
-                alerts = [{'level': 'warning', 'message': f'⚠️ エラー: {error_msg}'}]
-            except Exception as e:
-                import sys
-                sys.stderr.write(f"CFO error: {e}\n")
-                use_real_data = False
-                operating_cf = 31500000
-                cash_balance = 376343476
-                cash_runway = 8.5
-                forecast_3months = 380000000
-                cf_growth = 8.3
-                alerts = [{'level': 'warning', 'message': f'エラー: {str(e)[:50]}'}]
-            
-            # アラート表示
-            for alert in alerts:
                 if alert['level'] == 'critical':
                     st.error(f"🚨 **資金危険**: {alert['message']}")
                 elif alert['level'] == 'warning':
@@ -4442,13 +4396,27 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
 elif st.session_state.page == "AI自動予測":
     st.title("🔮 AI自動予測")
     
+    # デバッグ情報を常に表示
+    with st.expander("🔍 デバッグ情報", expanded=True):
+        st.write("**ADVANCED_FORECAST_AVAILABLE:**", ADVANCED_FORECAST_AVAILABLE)
+        st.write("**selected_period_id:**", st.session_state.get('selected_period_id'))
+        import os
+        py_files = [f for f in os.listdir('.') if f.endswith('.py')]
+        st.write("**Python files:**", py_files[:10])
+    
     if not ADVANCED_FORECAST_AVAILABLE:
         st.error("❌ AI予測機能が利用できません")
-        st.info("advanced_forecast_engine.py と advanced_forecast_ui.py を配置してください")
+        st.info("""
+        **必要なファイル:**
+        - advanced_forecast_engine.py
+        - advanced_forecast_ui.py
+        
+        これらのファイルを配置してアプリを再起動してください。
+        """)
         st.stop()
     
     try:
-        # データハンドラーアダプター
+        # データハンドラー
         if 'data_handler_adapter' not in st.session_state:
             class DataHandlerAdapter:
                 def __init__(self, proc):
@@ -4458,8 +4426,12 @@ elif st.session_state.page == "AI自動予測":
                     try:
                         actuals = self._processor.load_actual_data(period_id)
                         if actuals is None or actuals.empty:
-                            return {'has_actual': False, 'latest_actual_month': 0, 
-                                   'actual_months': [], 'forecast_months': list(range(1, 13))}
+                            return {
+                                'has_actual': False,
+                                'latest_actual_month': 0,
+                                'actual_months': [],
+                                'forecast_months': list(range(1, 13))
+                            }
                         
                         latest = int(actuals['fiscal_month'].max())
                         return {
@@ -4468,9 +4440,14 @@ elif st.session_state.page == "AI自動予測":
                             'actual_months': list(range(1, latest + 1)),
                             'forecast_months': list(range(latest + 1, 13))
                         }
-                    except:
-                        return {'has_actual': False, 'latest_actual_month': 0,
-                               'actual_months': [], 'forecast_months': list(range(1, 13))}
+                    except Exception as e:
+                        st.error(f"Split error: {e}")
+                        return {
+                            'has_actual': False,
+                            'latest_actual_month': 0,
+                            'actual_months': [],
+                            'forecast_months': list(range(1, 13))
+                        }
                 
                 def get_cumulative_actual_data(self, period_id, up_to_month):
                     try:
@@ -4485,7 +4462,8 @@ elif st.session_state.page == "AI自動予測":
                             if account:
                                 result[account] = amount
                         return result
-                    except:
+                    except Exception as e:
+                        st.error(f"Cumulative error: {e}")
                         return {}
             
             st.session_state.data_handler_adapter = DataHandlerAdapter(processor)
@@ -4497,6 +4475,7 @@ elif st.session_state.page == "AI自動予測":
             )
         
         # 予測画面表示
+        st.success("✅ AI予測機能が正常にロードされました")
         show_advanced_forecast_page(
             st.session_state.data_handler_adapter,
             st.session_state.advanced_engine
@@ -4504,10 +4483,9 @@ elif st.session_state.page == "AI自動予測":
     
     except Exception as e:
         st.error(f"❌ エラー: {e}")
-        with st.expander("詳細"):
+        with st.expander("詳細", expanded=True):
             import traceback
             st.code(traceback.format_exc())
-
 
 else:
     # 会社または期が未登録の場合
