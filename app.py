@@ -14,6 +14,124 @@ from profitability_analyzer import ProfitabilityAnalyzer, analyze_profitability_
 from cfo_advisor import CFOAdvisor
 from profitability_analysis_ui import show_profitability_analysis_page
 
+# ==================== 完全ライトモード設定 ====================
+st.markdown("""
+<style>
+    /* 全体の背景を白に統一 */
+    .stApp {
+        background-color: #FFFFFF !important;
+        color: #262730 !important;
+    }
+    
+    /* メインコンテンツエリア */
+    .main {
+        background-color: #FFFFFF !important;
+    }
+    
+    .main .block-container {
+        background-color: #FFFFFF !important;
+    }
+    
+    /* すべての要素の背景 */
+    .element-container {
+        background-color: transparent !important;
+    }
+    
+    /* カード・パネル */
+    .stAlert, .stInfo, .stWarning, .stError, .stSuccess {
+        background-color: #F0F2F6 !important;
+        color: #262730 !important;
+    }
+    
+    /* データフレーム */
+    .dataframe {
+        background-color: #FFFFFF !important;
+        color: #262730 !important;
+    }
+    
+    /* エクスパンダー */
+    .streamlit-expanderHeader {
+        background-color: #F0F2F6 !important;
+        color: #262730 !important;
+    }
+    
+    .streamlit-expanderContent {
+        background-color: #FFFFFF !important;
+        color: #262730 !important;
+    }
+    
+    /* メトリクス */
+    .stMetric {
+        background-color: #F0F2F6 !important;
+    }
+    
+    /* タブ */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #F0F2F6 !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: #FFFFFF !important;
+        color: #262730 !important;
+    }
+    
+    /* テキスト入力 */
+    .stTextInput > div > div {
+        background-color: #FFFFFF !important;
+        color: #262730 !important;
+    }
+    
+    /* セレクトボックス */
+    .stSelectbox > div > div {
+        background-color: #FFFFFF !important;
+        color: #262730 !important;
+    }
+    
+    /* コードブロック */
+    .stCodeBlock {
+        background-color: #F0F2F6 !important;
+    }
+    
+    code {
+        background-color: #F0F2F6 !important;
+        color: #262730 !important;
+    }
+    
+    /* マークダウン */
+    .stMarkdown {
+        color: #262730 !important;
+    }
+    
+    /* ボタン */
+    .stButton > button {
+        background-color: #FFFFFF !important;
+        color: #262730 !important;
+        border: 1px solid #E0E0E0 !important;
+    }
+    
+    .stButton > button:hover {
+        background-color: #F0F2F6 !important;
+        border-color: #1f77b4 !important;
+    }
+    
+    /* プライマリボタン */
+    .stButton > button[kind="primary"] {
+        background-color: #1f77b4 !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* チェックボックス・ラジオボタン */
+    .stCheckbox, .stRadio {
+        color: #262730 !important;
+    }
+    
+    /* サイドバーのテキスト */
+    section[data-testid="stSidebar"] * {
+        color: #262730 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 
 
 # ==================== 可視化関数 ====================
@@ -114,7 +232,7 @@ except ImportError:
     ADVANCED_FORECAST_AVAILABLE = False
 
 
-# ページ設定（先頭に配置）
+# ページ設定 - 完全ライトモード
 st.set_page_config(
     page_title="財務予測シミュレーター",
     page_icon="📊",
@@ -122,24 +240,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ライトモードを強制
+# Streamlit標準テーマを強制的にライトモードに
 st.markdown("""
-<style>
-    /* ライトモード強制 */
-    .stApp {
-        background-color: #FFFFFF;
-        color: #262730;
+<script>
+    // ライトモードを強制
+    var theme = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+    if (theme) {
+        theme.style.backgroundColor = "#fafbfc";
     }
-    
-    .main .block-container {
-        background-color: #FFFFFF;
-    }
-    
-    /* カード背景 */
-    .element-container {
-        background-color: #FFFFFF;
-    }
-</style>
+</script>
 """, unsafe_allow_html=True)
 
 # カスタムCSS - Manageboard風デザイン（実際のUIに準拠）
@@ -2361,7 +2470,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             """, unsafe_allow_html=True)
             
             # デバッグ情報
-            with st.expander("🔍 BSデバッグ情報", expanded=True):
+            with st.expander("🔍 BSデバッグ情報", expanded=False):
                 st.write("**データ取得確認:**")
                 st.write("selected_period_id:", selected_period_id)
             
@@ -4691,7 +4800,7 @@ elif st.session_state.page == "AI自動予測":
     st.title("🔮 AI自動予測")
     
     # デバッグ情報を常に表示
-    with st.expander("🔍 デバッグ情報", expanded=True):
+    with st.expander("🔍 デバッグ情報", expanded=False):
         st.write("**ADVANCED_FORECAST_AVAILABLE:**", ADVANCED_FORECAST_AVAILABLE)
         st.write("**selected_period_id:**", st.session_state.get('selected_period_id'))
         import os
