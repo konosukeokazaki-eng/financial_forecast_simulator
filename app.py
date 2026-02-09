@@ -2468,11 +2468,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 st.plotly_chart(fig, width="stretch")
                             else:
                                 st.info("Sankey図を表示するにはデータが必要です")
-                        else:
                             st.warning("⚠️ BS科目が見つかりませんでした")
                             
                             # actual_dataテーブルの全データを確認
-                            with st.expander("🔍 データベース全確認", expanded=True):
+                            with st.expander("🔍 データベース全確認", expanded=False):
                                 st.write("**actual_dataテーブルのすべてのデータを確認:**")
                                 
                                 try:
@@ -2508,15 +2507,54 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                     import traceback
                                     st.code(traceback.format_exc())
                             
+                            st.error("""
+                            **確定**: BSデータは保存されていません
+                            
+                            **原因:**
+                            「貸･事業所(合計)」シートがインポート時に読み込まれていない可能性があります。
+                            
+                            **理由:**
+                            - インポート処理は最初の3シートのみを読み込む仕様
+                            - 「貸･事業所(合計)」が4番目以降のシートにある
+                            - またはBS科目が科目マッピングで除外されている
+                            """)
+                            
                             st.info("""
-                            **確認結果:**
+                            **解決方法:**
                             
-                            上記の「全項目名」リストにBS科目（資産、負債、純資産関連）が
-                            含まれていない場合、BSデータは保存されていません。
+                            ### 方法1: BSデータを手動入力（推奨）
                             
-                            **BSデータを追加する方法:**
-                            1. データインポートページでBSを含むExcelをインポート
-                            2. 実績データ入力ページでBS科目を手動入力
+                            実績データ入力ページで以下のBS科目を入力してください:
+                            
+                            **資産の部:**
+                            - 現金及び預金
+                            - 売掛金
+                            - 棚卸資産
+                            - 流動資産合計
+                            - 有形固定資産
+                            - 無形固定資産
+                            - 投資その他の資産
+                            - 固定資産合計
+                            - 資産合計
+                            
+                            **負債の部:**
+                            - 買掛金
+                            - 短期借入金
+                            - 未払金
+                            - 流動負債合計
+                            - 長期借入金
+                            - 固定負債合計
+                            - 負債合計
+                            
+                            **純資産の部:**
+                            - 資本金
+                            - 利益剰余金
+                            - 純資産合計
+                            
+                            ### 方法2: Excelファイル修正後に再インポート
+                            
+                            1. 「貸･事業所(合計)」シートを最初の3シート以内に移動
+                            2. 再度インポート実行
                             """)
                     else:
                         st.error("必要なカラムが見つかりません")
