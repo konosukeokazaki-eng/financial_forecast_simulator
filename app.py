@@ -2470,10 +2470,53 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 st.info("Sankey図を表示するにはデータが必要です")
                         else:
                             st.warning("⚠️ BS科目が見つかりませんでした")
-                            st.info("""
-                            **データベースには項目がありますが、BS科目ではありません**
                             
-                            BSデータを入力してください。
+                            # actual_dataテーブルの全データを確認
+                            with st.expander("🔍 データベース全確認", expanded=True):
+                                st.write("**actual_dataテーブルのすべてのデータを確認:**")
+                                
+                                try:
+                                    # 全期間・全項目を取得
+                                    all_query = """
+                                    SELECT fiscal_period_id, item_name, month, amount 
+                                    FROM actual_data 
+                                    ORDER BY fiscal_period_id, item_name, month
+                                    """
+                                    all_table_df = processor._read_sql_query(all_query, params=())
+                                    
+                                    if not all_table_df.empty:
+                                        st.write(f"**テーブル全体:** {len(all_table_df)} 行")
+                                        st.write(f"**会計期間数:** {all_table_df['fiscal_period_id'].nunique()}")
+                                        st.write(f"**全項目数:** {all_table_df['item_name'].nunique()}")
+                                        
+                                        # すべての項目名リスト
+                                        all_items_list = sorted(all_table_df['item_name'].unique().tolist())
+                                        st.write(f"**全項目名 ({len(all_items_list)}):**")
+                                        for i, item in enumerate(all_items_list):
+                                            st.write(f"{i+1}. {item}")
+                                        
+                                        # 期間ごとの集計
+                                        st.write("**期間ごとの項目数:**")
+                                        for period_id in sorted(all_table_df['fiscal_period_id'].unique()):
+                                            period_items = all_table_df[all_table_df['fiscal_period_id']==period_id]['item_name'].unique()
+                                            st.write(f"期間ID {period_id}: {len(period_items)}項目")
+                                    else:
+                                        st.warning("actual_dataテーブルが空です")
+                                    
+                                except Exception as e:
+                                    st.error(f"クエリエラー: {e}")
+                                    import traceback
+                                    st.code(traceback.format_exc())
+                            
+                            st.info("""
+                            **確認結果:**
+                            
+                            上記の「全項目名」リストにBS科目（資産、負債、純資産関連）が
+                            含まれていない場合、BSデータは保存されていません。
+                            
+                            **BSデータを追加する方法:**
+                            1. データインポートページでBSを含むExcelをインポート
+                            2. 実績データ入力ページでBS科目を手動入力
                             """)
                     else:
                         st.error("必要なカラムが見つかりません")
