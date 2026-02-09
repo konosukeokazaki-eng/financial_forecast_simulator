@@ -1765,7 +1765,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     
                     else:
                         # 実データで計算
-                        current_month = st.session_state.current_month
+                        current_month = int(st.session_state.current_month)
                         
                         # 当月データ
                         current_data = actuals_df[actuals_df[month_col] == current_month]
@@ -2228,7 +2228,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     .format(lambda x: f"¥{safe_int(x):,}" if isinstance(x, (int, float)) else x)\
                     .apply(lambda row: ['background-color: #f8f9fa; font-weight: bold' if row.get('タイプ') == '要約' else '' for _ in row], axis=1)
                 
-                st.dataframe(formatted_df, use_container_width=True, height=700)
+                st.dataframe(formatted_df, width="stretch", height=700)
                 
                 # CSVダウンロード
                 csv = display_df.to_csv(index=False).encode('utf-8-sig')
@@ -2245,7 +2245,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.subheader("📊 ウォーターフォールチャート")
                 fig = create_pl_waterfall(display_df)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 else:
                     st.info("ウォーターフォールを表示するにはデータが必要です")
             else:
@@ -2306,7 +2306,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             # データ表示
                             st.dataframe(
                                 bs_df.style.format({'金額': lambda x: f"¥{safe_int(x):,}"}),
-                                use_container_width=True,
+                                width="stretch",
                                 height=400
                             )
                             
@@ -2317,7 +2317,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             # create_bs_sankey関数を使用
                             fig = create_bs_sankey(bs_df)
                             if fig:
-                                st.plotly_chart(fig, use_container_width=True)
+                                st.plotly_chart(fig, width="stretch")
                             else:
                                 st.info("Sankey図を表示するにはデータが必要です")
                         else:
@@ -2362,12 +2362,12 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             with col2:
                 st.success("**楽観シナリオ**\n- 売上高: +10%\n- 売上原価: -10%\n- 販管費: -5%")
-                if st.button("楽観シナリオを生成", use_container_width=True):
+                if st.button("楽観シナリオを生成", width="stretch"):
                     st.info("楽観シナリオ生成機能は次のバージョンで実装予定です")
             
             with col3:
                 st.error("**悲観シナリオ**\n- 売上高: -10%\n- 売上原価: +10%\n- 販管費: +10%")
-                if st.button("悲観シナリオを生成", use_container_width=True):
+                if st.button("悲観シナリオを生成", width="stretch"):
                     st.info("悲観シナリオ生成機能は次のバージョンで実装予定です")
             
             st.markdown("---")
@@ -2382,7 +2382,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             with col1:
                 st.info("💡 過去データから自動予測した値を一括インポートできます")
             with col2:
-                if st.button("🔮 AI予測を実行", type="primary", use_container_width=True):
+                if st.button("🔮 AI予測を実行", type="primary", width="stretch"):
                     st.session_state.page = "AI自動予測"
                     st.rerun()
 
