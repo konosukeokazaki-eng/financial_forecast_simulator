@@ -2791,276 +2791,285 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.markdown("---")
                             st.subheader("📊 貸借対照表（BOX型）")
                             
-                            # 表示モード選択
-                            display_mode = st.radio(
-                                "表示モード",
-                                ["要約表示", "詳細表示"],
-                                horizontal=True,
-                                key="bs_display_mode"
-                            )
-                            
                             try:
-                                # 正しい勘定科目グループ定義
-                                asset_groups = {
-                                    '現金･預金': ['現金', '小口現金', '当座預金', '普通預金', '定期預金', '通知預金', 
-                                                 '定期積金', '別段預金', '郵便貯金', '現金･預金合計'],
-                                    '売上債権': ['受取手形', '不渡手形', '売掛金', '貸倒引当金(売)', '売上債権合計'],
-                                    '有価証券': ['有価証券', '有価証券合計'],
-                                    '棚卸資産': ['商品', '製品', '副産物作業くず', '半製品', '原材料', '仕掛品', '貯蔵品', '棚卸資産合計'],
-                                    '他流動資産': ['前渡金', '立替金', '前払費用', '繰延税金資産(流)', '未収収益', '短期貸付金',
-                                                  '未収入金', '仮払金', '預け金', '仮払消費税等', '貸倒引当金(他)', 
-                                                  '修正申告調整勘定', '他流動資産合計'],
-                                    '有形固定資産': ['建物', '附属設備', '構築物', '機械装置', '車両運搬具', '工具器具備品',
-                                                   '一括償却資産', '減価償却累計額', '土地', '建設仮勘定', '有形固定資産計'],
-                                    '無形固定資産': ['電話加入権', '施設利用権', '工業所有権', '営業権', '借地権', 
-                                                   'ソフトウェア', '無形固定資産計'],
-                                    '投資その他': ['投資有価証券', '関係会社株式', '出資金', '関係会社出資金', '敷金',
-                                                  '差入保証金', '長期貸付金', '長期固定性預金', '長期滞留債権',
-                                                  '長期前払費用', '前払年金費用', '繰延税金資産(固)', '預託金',
-                                                  '貸倒引当金(投)', '保険積立金', '投資その他の資産合計']
-                                }
+                                # まず全データを確認
+                                st.write("**取得データ確認:**")
+                                st.dataframe(bs_df, height=200)
                                 
-                                liability_groups = {
-                                    '仕入債務': ['支払手形', '買掛金', '仕入債務合計'],
-                                    '他流動負債': ['設備支払手形', '短期借入金', '未払金', '未払費用', '未払配当金',
-                                                  '未払役員賞与', '未払法人税等', '未払消費税等', '繰延税金負債(流)',
-                                                  '前受金', '預り金', '前受収益', '仮受金', '預り保証金', '割引手形',
-                                                  '裏書手形', '仮受消費税等', '他流動負債合計'],
-                                    '固定負債': ['長期借入金', '長期未払金', '繰延税金負債(固)', '退職給付引当金', '固定負債合計']
-                                }
+                                # 資産・負債・純資産の合計行を探す
+                                total_assets_row = bs_df[bs_df['項目名'] == '資産合計']
+                                total_liabilities_row = bs_df[bs_df['項目名'] == '負債合計']
+                                total_equity_row = bs_df[bs_df['項目名'] == '純資産合計']
+                                total_liab_equity_row = bs_df[bs_df['項目名'] == '負債･純資産合計']
                                 
-                                equity_groups = {
-                                    '資本金': ['資本金', '資本金合計'],
-                                    '資本剰余金': ['資本準備金', '資本準備金合計', '資本金及び準備金減少差益',
-                                                  '自己株式処分差額', 'その他資本剰余金合計', '資本剰余金合計'],
-                                    '利益剰余金': ['利益準備金', '利益準備金合計', '別途積立金', '任意積立金合計',
-                                                  '繰越利益', '当期純損益金額', '繰越利益剰余金合計',
-                                                  'その他利益剰余金合計', '利益剰余金合計']
-                                }
+                                # 合計値を取得（合計行がある場合はそれを使用）
+                                if not total_assets_row.empty:
+                                    total_assets = float(total_assets_row.iloc[0]['金額'])
+                                    st.success(f"資産合計（合計行から）: ¥{total_assets/10000:,.0f}万")
+                                else:
+                                    # 流動資産合計 + 固定資産合計
+                                    current_assets_row = bs_df[bs_df['項目名'] == '流動資産合計']
+                                    fixed_assets_row = bs_df[bs_df['項目名'] == '固定資産合計']
+                                    current_assets = float(current_assets_row.iloc[0]['金額']) if not current_assets_row.empty else 0
+                                    fixed_assets = float(fixed_assets_row.iloc[0]['金額']) if not fixed_assets_row.empty else 0
+                                    total_assets = current_assets + fixed_assets
+                                    st.warning(f"資産合計（計算）: 流動¥{current_assets/10000:,.0f}万 + 固定¥{fixed_assets/10000:,.0f}万 = ¥{total_assets/10000:,.0f}万")
                                 
-                                # データから勘定科目を分類
-                                assets_by_group = {group: [] for group in asset_groups.keys()}
-                                liabilities_by_group = {group: [] for group in liability_groups.keys()}
-                                equity_by_group = {group: [] for group in equity_groups.keys()}
+                                if not total_liabilities_row.empty:
+                                    total_liabilities = float(total_liabilities_row.iloc[0]['金額'])
+                                    st.success(f"負債合計（合計行から）: ¥{total_liabilities/10000:,.0f}万")
+                                else:
+                                    # 流動負債合計 + 固定負債合計
+                                    current_liab_row = bs_df[bs_df['項目名'] == '流動負債合計']
+                                    fixed_liab_row = bs_df[bs_df['項目名'] == '固定負債合計']
+                                    current_liab = float(current_liab_row.iloc[0]['金額']) if not current_liab_row.empty else 0
+                                    fixed_liab = float(fixed_liab_row.iloc[0]['金額']) if not fixed_liab_row.empty else 0
+                                    total_liabilities = current_liab + fixed_liab
+                                    st.warning(f"負債合計（計算）: 流動¥{current_liab/10000:,.0f}万 + 固定¥{fixed_liab/10000:,.0f}万 = ¥{total_liabilities/10000:,.0f}万")
                                 
-                                for _, row in bs_df.iterrows():
-                                    item = str(row.get('項目名', ''))
-                                    amount = float(row.get('金額', 0))
-                                    
-                                    if '合計' in item:
-                                        continue  # 合計行はスキップ
-                                    
-                                    # 資産分類
-                                    for group, accounts in asset_groups.items():
-                                        if item in accounts:
-                                            assets_by_group[group].append({'項目': item, '金額': amount})
-                                            break
+                                if not total_equity_row.empty:
+                                    total_equity = float(total_equity_row.iloc[0]['金額'])
+                                    st.success(f"純資産合計（合計行から）: ¥{total_equity/10000:,.0f}万")
+                                else:
+                                    # 株主資本合計を探す
+                                    shareholders_equity_row = bs_df[bs_df['項目名'] == '株主資本合計']
+                                    total_equity = float(shareholders_equity_row.iloc[0]['金額']) if not shareholders_equity_row.empty else 0
+                                    st.warning(f"純資産合計（計算）: ¥{total_equity/10000:,.0f}万")
+                                
+                                # 貸借チェック
+                                total_liab_equity = total_liabilities + total_equity
+                                difference = total_assets - total_liab_equity
+                                
+                                st.markdown("---")
+                                st.write("**貸借対照表等式チェック:**")
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("資産合計", f"¥{total_assets/10000:,.0f}万")
+                                with col2:
+                                    st.metric("負債+純資産", f"¥{total_liab_equity/10000:,.0f}万")
+                                with col3:
+                                    if abs(difference) < 1:  # 1円未満の誤差
+                                        st.metric("差額", "✅ 一致", delta=None)
                                     else:
-                                        # 負債分類
-                                        for group, accounts in liability_groups.items():
-                                            if item in accounts:
-                                                liabilities_by_group[group].append({'項目': item, '金額': amount})
-                                                break
-                                        else:
-                                            # 純資産分類
-                                            for group, accounts in equity_groups.items():
-                                                if item in accounts:
-                                                    equity_by_group[group].append({'項目': item, '金額': amount})
-                                                    break
+                                        st.metric("差額", f"⚠️ ¥{difference/10000:,.0f}万", delta=None)
                                 
-                                # グループ別合計
-                                asset_group_totals = {g: sum(i['金額'] for i in items) 
-                                                     for g, items in assets_by_group.items() if items}
-                                liability_group_totals = {g: sum(i['金額'] for i in items) 
-                                                         for g, items in liabilities_by_group.items() if items}
-                                equity_group_totals = {g: sum(i['金額'] for i in items) 
-                                                      for g, items in equity_by_group.items() if items}
+                                if abs(difference) >= 1:
+                                    st.error(f"""
+                                    **貸借が一致していません！**
+                                    
+                                    資産合計: ¥{total_assets/10000:,.2f}万
+                                    負債合計: ¥{total_liabilities/10000:,.2f}万
+                                    純資産合計: ¥{total_equity/10000:,.2f}万
+                                    負債+純資産: ¥{total_liab_equity/10000:,.2f}万
+                                    
+                                    差額: ¥{difference/10000:,.2f}万
+                                    
+                                    データに問題がある可能性があります。
+                                    """)
                                 
-                                # 大分類合計
-                                current_assets = sum(asset_group_totals.get(g, 0) 
-                                                    for g in ['現金･預金', '売上債権', '有価証券', '棚卸資産', '他流動資産'])
-                                fixed_assets = sum(asset_group_totals.get(g, 0) 
-                                                  for g in ['有形固定資産', '無形固定資産', '投資その他'])
-                                total_assets = current_assets + fixed_assets
+                                # 詳細データの取得（グラフ用）
+                                # 流動資産の内訳
+                                current_asset_groups = {}
+                                for item in ['現金･預金合計', '売上債権合計', '有価証券合計', '棚卸資産合計', '他流動資産合計']:
+                                    row = bs_df[bs_df['項目名'] == item]
+                                    if not row.empty:
+                                        current_asset_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
                                 
-                                current_liabilities = sum(liability_group_totals.get(g, 0) 
-                                                         for g in ['仕入債務', '他流動負債'])
-                                fixed_liabilities = liability_group_totals.get('固定負債', 0)
-                                total_liabilities = current_liabilities + fixed_liabilities
+                                # 固定資産の内訳
+                                fixed_asset_groups = {}
+                                for item in ['有形固定資産計', '無形固定資産計', '投資その他の資産合計']:
+                                    row = bs_df[bs_df['項目名'] == item]
+                                    if not row.empty:
+                                        fixed_asset_groups[item.replace('合計', '').replace('計', '')] = float(row.iloc[0]['金額'])
                                 
-                                total_equity = sum(equity_group_totals.values())
+                                # 流動負債の内訳
+                                current_liab_groups = {}
+                                for item in ['仕入債務合計', '他流動負債合計']:
+                                    row = bs_df[bs_df['項目名'] == item]
+                                    if not row.empty:
+                                        current_liab_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
                                 
-                                # 画像風のカラフルなBOX型BS
+                                # 純資産の内訳
+                                equity_groups = {}
+                                for item in ['資本金合計', '資本剰余金合計', '利益剰余金合計']:
+                                    row = bs_df[bs_df['項目名'] == item]
+                                    if not row.empty:
+                                        equity_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
+                                
+                                # カラフルなBOX型BS図作成
                                 fig = go.Figure()
                                 
-                                # カラーパレット（画像風）
+                                # カラーパレット
                                 colors = {
-                                    '流動資産': '#FFB74D',  # オレンジ
-                                    '他人資本': '#81C784',  # 緑
-                                    '固定資産': '#E57373',  # ピンク
-                                    '自己資本': '#64B5F6',  # 青
+                                    '流動資産': '#FFB74D',
+                                    '固定資産': '#E57373',
+                                    '他人資本': '#81C784',
+                                    '自己資本': '#64B5F6',
                                 }
                                 
-                                # 左側（資産）の構造
-                                # 流動資産ボックス
+                                # 左側：資産の部
+                                # 流動資産
+                                current_asset_ratio = current_assets / total_assets if total_assets > 0 else 0.5
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0, x1=0.22, y0=0.5, y1=1,
+                                    x0=0, x1=0.22, y0=1-current_asset_ratio, y1=1,
                                     fillcolor=colors['流動資産'],
-                                    line=dict(color="white", width=2)
+                                    line=dict(color="white", width=3)
                                 )
                                 fig.add_annotation(
-                                    x=0.11, y=0.75,
-                                    text="<b>流動資産</b>",
+                                    x=0.11, y=1-current_asset_ratio/2,
+                                    text=f"<b>流動資産</b><br>¥{current_assets/10000:,.0f}万",
                                     showarrow=False,
-                                    font=dict(size=14, color="white", family="Arial Black"),
+                                    font=dict(size=12, color="white", family="Arial Black"),
                                 )
                                 
-                                # 固定資産ボックス
+                                # 固定資産
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0, x1=0.22, y0=0, y1=0.48,
+                                    x0=0, x1=0.22, y0=0, y1=1-current_asset_ratio-0.02,
                                     fillcolor=colors['固定資産'],
-                                    line=dict(color="white", width=2)
+                                    line=dict(color="white", width=3)
                                 )
                                 fig.add_annotation(
-                                    x=0.11, y=0.24,
-                                    text="<b>固定資産</b>",
+                                    x=0.11, y=(1-current_asset_ratio)/2,
+                                    text=f"<b>固定資産</b><br>¥{fixed_assets/10000:,.0f}万",
                                     showarrow=False,
-                                    font=dict(size=14, color="white", family="Arial Black"),
+                                    font=dict(size=12, color="white", family="Arial Black"),
                                 )
                                 
-                                # 詳細ボックス（流動資産内訳）
-                                x_start = 0.24
-                                y_start = 0.5
-                                box_height = 0.5 / max(len(asset_group_totals), 1)
-                                
-                                y_pos = y_start
-                                detail_colors = ['#FFE082', '#FFCC80', '#FFB74D', '#FFA726', '#FF9800']
-                                for i, (group, total) in enumerate(sorted(asset_group_totals.items(), 
-                                                                         key=lambda x: x[1], reverse=True)):
-                                    if group in ['現金･預金', '売上債権', '有価証券', '棚卸資産', '他流動資産']:
-                                        if total > 0:
-                                            height = (total / current_assets) * 0.48 if current_assets > 0 else 0.1
+                                # 流動資産の詳細
+                                x_pos = 0.24
+                                y_pos = 1
+                                for group, amount in sorted(current_asset_groups.items(), key=lambda x: x[1], reverse=True):
+                                    if amount != 0:
+                                        height = (amount / current_assets) * (current_asset_ratio - 0.02) if current_assets > 0 else 0
+                                        if height > 0.05:
                                             fig.add_shape(
                                                 type="rect",
-                                                x0=x_start, x1=x_start+0.22, y0=y_pos, y1=y_pos+height,
-                                                fillcolor=detail_colors[i % len(detail_colors)],
-                                                line=dict(color="white", width=1)
+                                                x0=x_pos, x1=x_pos+0.22, y0=y_pos-height, y1=y_pos,
+                                                fillcolor='#FFE082',
+                                                line=dict(color="white", width=2)
                                             )
                                             fig.add_annotation(
-                                                x=x_start+0.11, y=y_pos+height/2,
-                                                text=f"<b>{group}</b><br>¥{abs(total)/10000:,.0f}万",
+                                                x=x_pos+0.11, y=y_pos-height/2,
+                                                text=f"<b>{group}</b><br>¥{amount/10000:,.0f}万",
                                                 showarrow=False,
-                                                font=dict(size=10, color="#333"),
+                                                font=dict(size=9, color="#333"),
                                             )
-                                            y_pos += height + 0.02
+                                            y_pos -= height
                                 
-                                # 右側（負債・純資産）
+                                # 固定資産の詳細
+                                y_pos = 1-current_asset_ratio-0.02
+                                for group, amount in sorted(fixed_asset_groups.items(), key=lambda x: x[1], reverse=True):
+                                    if amount != 0:
+                                        height = (amount / fixed_assets) * (1 - current_asset_ratio - 0.04) if fixed_assets > 0 else 0
+                                        if height > 0.05:
+                                            fig.add_shape(
+                                                type="rect",
+                                                x0=x_pos, x1=x_pos+0.22, y0=y_pos-height, y1=y_pos,
+                                                fillcolor='#EF9A9A',
+                                                line=dict(color="white", width=2)
+                                            )
+                                            fig.add_annotation(
+                                                x=x_pos+0.11, y=y_pos-height/2,
+                                                text=f"<b>{group}</b><br>¥{amount/10000:,.0f}万",
+                                                showarrow=False,
+                                                font=dict(size=9, color="#333"),
+                                            )
+                                            y_pos -= height
+                                
+                                # 右側：負債・純資産の部
                                 # 他人資本（負債）
+                                liab_ratio = total_liabilities / total_liab_equity if total_liab_equity > 0 else 0.5
+                                x_right_start = 0.54
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0.54, x1=0.76, y0=0.5, y1=1,
+                                    x0=x_right_start, x1=x_right_start+0.22, y0=1-liab_ratio, y1=1,
                                     fillcolor=colors['他人資本'],
-                                    line=dict(color="white", width=2)
+                                    line=dict(color="white", width=3)
                                 )
                                 fig.add_annotation(
-                                    x=0.65, y=0.75,
-                                    text="<b>他人資本</b>",
+                                    x=x_right_start+0.11, y=1-liab_ratio/2,
+                                    text=f"<b>他人資本<br>(負債)</b><br>¥{total_liabilities/10000:,.0f}万",
                                     showarrow=False,
-                                    font=dict(size=14, color="white", family="Arial Black"),
+                                    font=dict(size=12, color="white", family="Arial Black"),
                                 )
                                 
                                 # 自己資本（純資産）
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0.54, x1=0.76, y0=0, y1=0.48,
+                                    x0=x_right_start, x1=x_right_start+0.22, y0=0, y1=1-liab_ratio-0.02,
                                     fillcolor=colors['自己資本'],
-                                    line=dict(color="white", width=2)
+                                    line=dict(color="white", width=3)
                                 )
                                 fig.add_annotation(
-                                    x=0.65, y=0.24,
-                                    text="<b>自己資本</b>",
+                                    x=x_right_start+0.11, y=(1-liab_ratio)/2,
+                                    text=f"<b>自己資本<br>(純資産)</b><br>¥{total_equity/10000:,.0f}万",
                                     showarrow=False,
-                                    font=dict(size=14, color="white", family="Arial Black"),
+                                    font=dict(size=12, color="white", family="Arial Black"),
                                 )
                                 
-                                # 詳細ボックス（負債・純資産内訳）
-                                x_start = 0.78
-                                # 負債詳細
-                                y_pos = 0.5
-                                liability_colors = ['#A5D6A7', '#81C784', '#66BB6A']
-                                for i, (group, total) in enumerate(liability_group_totals.items()):
-                                    if total > 0:
-                                        height = (total / total_liabilities) * 0.48 if total_liabilities > 0 else 0.1
-                                        fig.add_shape(
-                                            type="rect",
-                                            x0=x_start, x1=1, y0=y_pos, y1=y_pos+height,
-                                            fillcolor=liability_colors[i % len(liability_colors)],
-                                            line=dict(color="white", width=1)
-                                        )
-                                        fig.add_annotation(
-                                            x=x_start+0.11, y=y_pos+height/2,
-                                            text=f"<b>{group}</b><br>¥{abs(total)/10000:,.0f}万",
-                                            showarrow=False,
-                                            font=dict(size=10, color="#333"),
-                                        )
-                                        y_pos += height + 0.02
+                                # 負債の詳細
+                                x_pos = x_right_start + 0.24
+                                y_pos = 1
+                                for group, amount in sorted(current_liab_groups.items(), key=lambda x: x[1], reverse=True):
+                                    if amount != 0:
+                                        height = (amount / total_liabilities) * (liab_ratio - 0.02) if total_liabilities > 0 else 0
+                                        if height > 0.05:
+                                            fig.add_shape(
+                                                type="rect",
+                                                x0=x_pos, x1=1, y0=y_pos-height, y1=y_pos,
+                                                fillcolor='#A5D6A7',
+                                                line=dict(color="white", width=2)
+                                            )
+                                            fig.add_annotation(
+                                                x=x_pos+0.11, y=y_pos-height/2,
+                                                text=f"<b>{group}</b><br>¥{amount/10000:,.0f}万",
+                                                showarrow=False,
+                                                font=dict(size=9, color="#333"),
+                                            )
+                                            y_pos -= height
                                 
-                                # 純資産詳細
-                                y_pos = 0
-                                equity_colors = ['#90CAF9', '#64B5F6', '#42A5F5']
-                                for i, (group, total) in enumerate(equity_group_totals.items()):
-                                    if total > 0:
-                                        height = (total / total_equity) * 0.46 if total_equity > 0 else 0.1
-                                        fig.add_shape(
-                                            type="rect",
-                                            x0=x_start, x1=1, y0=y_pos, y1=y_pos+height,
-                                            fillcolor=equity_colors[i % len(equity_colors)],
-                                            line=dict(color="white", width=1)
-                                        )
-                                        fig.add_annotation(
-                                            x=x_start+0.11, y=y_pos+height/2,
-                                            text=f"<b>{group}</b><br>¥{abs(total)/10000:,.0f}万",
-                                            showarrow=False,
-                                            font=dict(size=10, color="#333"),
-                                        )
-                                        y_pos += height + 0.02
+                                # 純資産の詳細
+                                y_pos = 1-liab_ratio-0.02
+                                for group, amount in sorted(equity_groups.items(), key=lambda x: x[1], reverse=True):
+                                    if amount != 0:
+                                        height = (amount / total_equity) * (1 - liab_ratio - 0.04) if total_equity > 0 else 0
+                                        if height > 0.05:
+                                            fig.add_shape(
+                                                type="rect",
+                                                x0=x_pos, x1=1, y0=y_pos-height, y1=y_pos,
+                                                fillcolor='#90CAF9',
+                                                line=dict(color="white", width=2)
+                                            )
+                                            fig.add_annotation(
+                                                x=x_pos+0.11, y=y_pos-height/2,
+                                                text=f"<b>{group}</b><br>¥{amount/10000:,.0f}万",
+                                                showarrow=False,
+                                                font=dict(size=9, color="#333"),
+                                            )
+                                            y_pos -= height
                                 
                                 # 中央の矢印
                                 fig.add_annotation(
                                     x=0.5, y=0.5,
-                                    text="<b>総資産<br>金額</b>",
+                                    text=f"<b>総資産<br>金額</b><br>¥{total_assets/10000:,.0f}万",
                                     showarrow=False,
-                                    font=dict(size=14, color="#333", family="Arial Black"),
+                                    font=dict(size=13, color="#333", family="Arial Black"),
                                     bgcolor="white",
                                     bordercolor="#333",
                                     borderwidth=2,
                                     borderpad=10
                                 )
                                 
-                                # 合計表示
-                                fig.add_annotation(
-                                    x=0.11, y=-0.05,
-                                    text=f"<b>資産合計<br>¥{abs(total_assets)/10000:,.0f}万</b>",
-                                    showarrow=False,
-                                    font=dict(size=12, color="#333"),
-                                )
-                                fig.add_annotation(
-                                    x=0.89, y=-0.05,
-                                    text=f"<b>負債･純資産合計<br>¥{abs(total_liabilities+total_equity)/10000:,.0f}万</b>",
-                                    showarrow=False,
-                                    font=dict(size=12, color="#333"),
-                                )
-                                
                                 fig.update_layout(
                                     xaxis=dict(visible=False, range=[0, 1]),
-                                    yaxis=dict(visible=False, range=[-0.1, 1]),
+                                    yaxis=dict(visible=False, range=[0, 1]),
                                     plot_bgcolor='white',
                                     paper_bgcolor='white',
                                     height=600,
                                     showlegend=False,
-                                    margin=dict(l=10, r=10, t=30, b=50)
+                                    margin=dict(l=10, r=10, t=30, b=10)
                                 )
                                 
                                 st.plotly_chart(fig, use_container_width=True)
