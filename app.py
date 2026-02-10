@@ -2899,40 +2899,72 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                             equity_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
                                 
                                 else:  # 詳細表示（全勘定科目）
-                                    # 全BS科目を分類
+                                    # 全BS科目を分類（判定を厳密に）
                                     for _, row in bs_df.iterrows():
                                         item = str(row.get('項目名', ''))
                                         amount = float(row.get('金額', 0))
                                         
-                                        if '合計' in item or '計' in item:
-                                            continue  # 合計行はスキップ
+                                        # 合計・計を含む項目はスキップ
+                                        if any(x in item for x in ['合計', '計', '小計']):
+                                            continue
                                         
                                         if amount == 0:
                                             continue
                                         
-                                        # 流動資産
-                                        if any(x in item for x in ['現金', '預金', '小口', '当座', '普通', '定期']):
+                                        classified = False
+                                        
+                                        # 流動資産の判定
+                                        if not classified and any(x in item for x in ['現金', '預金', '小口', '当座', '普通', '定期', '通知', '別段', '郵便貯金']):
                                             current_asset_groups[item] = amount
-                                        elif any(x in item for x in ['売掛', '受取手形', '不渡手形']):
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['売掛', '受取手形', '不渡手形']):
                                             current_asset_groups[item] = amount
-                                        elif any(x in item for x in ['商品', '製品', '原材料', '仕掛', '貯蔵']):
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['有価証券']) and '投資' not in item:
                                             current_asset_groups[item] = amount
-                                        elif any(x in item for x in ['前渡', '立替', '前払', '未収', '仮払', '短期貸付']):
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['商品', '製品', '副産物', '半製品', '原材料', '仕掛', '貯蔵']):
                                             current_asset_groups[item] = amount
-                                        # 固定資産
-                                        elif any(x in item for x in ['建物', '附属設備', '構築', '機械', '車両', '工具', '土地', '一括償却']):
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['前渡', '立替', '前払', '未収', '仮払', '短期貸付', '預け金', '繰延税金資産']) and '長期' not in item:
+                                            current_asset_groups[item] = amount
+                                            classified = True
+                                        
+                                        # 固定資産の判定
+                                        if not classified and any(x in item for x in ['建物', '附属設備', '構築', '機械装置', '車両運搬', '工具器具備品', '土地', '一括償却', '建設仮勘定']):
                                             fixed_asset_groups[item] = amount
-                                        elif any(x in item for x in ['電話加入', '施設利用', '工業所有', '営業権', '借地権', 'ソフトウェア']):
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['電話加入', '施設利用', '工業所有', '営業権', '借地権', 'ソフトウェア']):
                                             fixed_asset_groups[item] = amount
-                                        elif any(x in item for x in ['投資有価証券', '関係会社株式', '出資金', '敷金', '差入保証', '長期貸付', '長期前払', '保険積立']):
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['投資有価証券', '関係会社株式', '出資金', '敷金', '差入保証', '長期貸付', '長期前払', '保険積立', '長期固定性預金', '長期滞留', '繰延税金資産']) and '長期' in item or '投資' in item:
                                             fixed_asset_groups[item] = amount
-                                        # 流動負債
-                                        elif any(x in item for x in ['支払手形', '買掛', '短期借入', '未払', '預り金', '前受', '仮受']):
+                                            classified = True
+                                        elif not classified and '減価償却累計額' in item:
+                                            fixed_asset_groups[item] = amount
+                                            classified = True
+                                        
+                                        # 流動負債の判定
+                                        if not classified and any(x in item for x in ['支払手形', '買掛', '設備支払手形']):
                                             current_liab_groups[item] = amount
-                                        # 固定負債は別途処理
-                                        # 純資産
-                                        elif any(x in item for x in ['資本金', '資本準備', '利益準備', '別途積立', '繰越利益']):
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['短期借入', '未払', '預り金', '前受', '仮受', '未払配当', '未払役員賞与', '未払法人税', '未払消費税', '預り保証金', '割引手形', '裏書手形']):
+                                            current_liab_groups[item] = amount
+                                            classified = True
+                                        
+                                        # 純資産の判定  
+                                        if not classified and any(x in item for x in ['資本金', '新株式申込証拠金']):
                                             equity_groups[item] = amount
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['資本準備', '資本剰余', '自己株式処分']):
+                                            equity_groups[item] = amount
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['利益準備', '別途積立', '任意積立', '繰越利益', '当期純損益']):
+                                            equity_groups[item] = amount
+                                            classified = True
+                                        elif not classified and any(x in item for x in ['自己株式', '評価', '換算', '新株予約権']):
+                                            equity_groups[item] = amount
+                                            classified = True
                                 
                                 # カラフルなBOX型BS図作成
                                 fig = go.Figure()
@@ -2946,9 +2978,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 }
                                 
                                 # レイアウト設定
-                                left_main_width = 0.08  # 左の大項目幅
+                                left_main_width = 0.055  # 左の大項目幅（2/3に縮小）
                                 left_detail_width = 0.32  # 左の詳細項目幅
-                                right_main_width = 0.08  # 右の大項目幅
+                                right_main_width = 0.055  # 右の大項目幅（2/3に縮小）
                                 right_detail_width = 0.32  # 右の詳細項目幅
                                 gap = 0.04  # 中央の隙間
                                 
@@ -2976,7 +3008,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 # デバッグ情報（変数定義後）
                                 with st.expander("🔧 BOX図デバッグ", expanded=True):
-                                    st.write(f"**コードバージョン:** v2.2 (デバッグ位置修正版)")
+                                    st.write(f"**コードバージョン:** v2.3 (幅2/3 + 判定改善版)")
                                     st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
                                     st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
                                     st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
@@ -2988,6 +3020,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                     st.write(f"**表示モード:** {display_mode}")
                                     st.write(f"**流動資産項目数:** {len(current_asset_groups)}")
                                     st.write(f"**固定資産項目数:** {len(fixed_asset_groups)}")
+                                    if current_asset_groups:
+                                        st.write("**流動資産項目:**", list(current_asset_groups.keys()))
+                                    if fixed_asset_groups:
+                                        st.write("**固定資産項目:**", list(fixed_asset_groups.keys()))
                                 
                                 # 左側：資産の部
                                 # 流動資産（大項目）
@@ -3001,9 +3037,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 fig.add_annotation(
                                     x=left_main_width/2, 
                                     y=(current_asset_bottom + current_asset_top)/2,
-                                    text="<b>流動<br>資産</b>",
+                                    text=f"<b>流動<br>資産</b><br><span style='font-size:9px'>¥{current_assets/10000:,.0f}万</span>",
                                     showarrow=False,
-                                    font=dict(size=11, color="white", family="Arial Black"),
+                                    font=dict(size=10, color="white", family="Arial Black"),
                                 )
                                 
                                 # 固定資産（大項目）
@@ -3017,9 +3053,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 fig.add_annotation(
                                     x=left_main_width/2, 
                                     y=(fixed_asset_bottom + fixed_asset_top)/2,
-                                    text="<b>固定<br>資産</b>",
+                                    text=f"<b>固定<br>資産</b><br><span style='font-size:9px'>¥{fixed_assets/10000:,.0f}万</span>",
                                     showarrow=False,
-                                    font=dict(size=11, color="white", family="Arial Black"),
+                                    font=dict(size=10, color="white", family="Arial Black"),
                                 )
                                 
                                 # 資産合計
@@ -3108,9 +3144,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 fig.add_annotation(
                                     x=x_right_start+right_main_width/2, 
                                     y=(liab_bottom + liab_top)/2,
-                                    text="<b>他人<br>資本</b>",
+                                    text=f"<b>他人<br>資本</b><br><span style='font-size:9px'>¥{total_liabilities/10000:,.0f}万</span>",
                                     showarrow=False,
-                                    font=dict(size=11, color="white", family="Arial Black"),
+                                    font=dict(size=10, color="white", family="Arial Black"),
                                 )
                                 
                                 # 自己資本（純資産）（大項目）
@@ -3124,9 +3160,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 fig.add_annotation(
                                     x=x_right_start+right_main_width/2, 
                                     y=(equity_bottom + equity_top)/2,
-                                    text="<b>自己<br>資本</b>",
+                                    text=f"<b>自己<br>資本</b><br><span style='font-size:9px'>¥{total_equity/10000:,.0f}万</span>",
                                     showarrow=False,
-                                    font=dict(size=11, color="white", family="Arial Black"),
+                                    font=dict(size=10, color="white", family="Arial Black"),
                                 )
                                 
                                 # 負債・純資産合計
