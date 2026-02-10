@@ -2860,18 +2860,6 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 fixed_assets = float(fixed_assets_row.iloc[0]['金額']) if not fixed_assets_row.empty else total_assets * 0.4
                                 
                                 # デバッグ情報
-                                with st.expander("🔧 BOX図デバッグ", expanded=True):  # デフォルトで展開
-                                    st.write(f"**コードバージョン:** v2.1 (Y座標動的計算版)")
-                                    st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
-                                    st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
-                                    st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
-                                    st.write(f"**流動資産比率:** {current_assets/total_assets*100:.1f}%")
-                                    st.write(f"**固定資産比率:** {fixed_assets/total_assets*100:.1f}%")
-                                    st.write(f"**Available height:** {available_height:.3f}")
-                                    st.write(f"**流動資産 Y座標:** top={current_asset_top:.3f}, bottom={current_asset_bottom:.3f}, height={current_asset_height:.3f}")
-                                    st.write(f"**固定資産 Y座標:** top={fixed_asset_top:.3f}, bottom={fixed_asset_bottom:.3f}, height={fixed_asset_height:.3f}")
-                                    st.write(f"**表示モード:** {display_mode}")
-                                
                                 # 流動負債合計と固定負債合計を取得
                                 current_liab_row = bs_df[bs_df['項目名'] == '流動負債合計']
                                 fixed_liab_row = bs_df[bs_df['項目名'] == '固定負債合計']
@@ -2985,6 +2973,21 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 fixed_asset_height = available_height * (1 - current_asset_ratio) - vertical_gap/2
                                 fixed_asset_top = current_asset_bottom - vertical_gap
                                 fixed_asset_bottom = bottom_total_height
+                                
+                                # デバッグ情報（変数定義後）
+                                with st.expander("🔧 BOX図デバッグ", expanded=True):
+                                    st.write(f"**コードバージョン:** v2.2 (デバッグ位置修正版)")
+                                    st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
+                                    st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
+                                    st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
+                                    st.write(f"**流動資産比率:** {current_assets/total_assets*100:.1f}%")
+                                    st.write(f"**固定資産比率:** {fixed_assets/total_assets*100:.1f}%")
+                                    st.write(f"**Available height:** {available_height:.3f}")
+                                    st.write(f"**流動資産 Y座標:** top={current_asset_top:.3f}, bottom={current_asset_bottom:.3f}, height={current_asset_height:.3f}")
+                                    st.write(f"**固定資産 Y座標:** top={fixed_asset_top:.3f}, bottom={fixed_asset_bottom:.3f}, height={fixed_asset_height:.3f}")
+                                    st.write(f"**表示モード:** {display_mode}")
+                                    st.write(f"**流動資産項目数:** {len(current_asset_groups)}")
+                                    st.write(f"**固定資産項目数:** {len(fixed_asset_groups)}")
                                 
                                 # 左側：資産の部
                                 # 流動資産（大項目）
