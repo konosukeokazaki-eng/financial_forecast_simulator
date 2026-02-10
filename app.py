@@ -2922,24 +2922,46 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 }
                                 
                                 # レイアウト設定
-                                left_main_width = 0.08  # 左の大項目幅（1/3に縮小）
+                                left_main_width = 0.08  # 左の大項目幅
                                 left_detail_width = 0.32  # 左の詳細項目幅
                                 right_main_width = 0.08  # 右の大項目幅
                                 right_detail_width = 0.32  # 右の詳細項目幅
                                 gap = 0.04  # 中央の隙間
                                 
-                                # 左側：資産の部
+                                # 比率計算
                                 current_asset_ratio = current_assets / total_assets if total_assets > 0 else 0.6
+                                liab_ratio = total_liabilities / (total_liabilities + total_equity) if (total_liabilities + total_equity) > 0 else 0.5
                                 
+                                # 上部の余白と下部の合計エリア
+                                top_start = 0.98
+                                bottom_total_height = 0.1
+                                available_height = top_start - bottom_total_height
+                                
+                                # 流動資産と固定資産の間のギャップ
+                                vertical_gap = 0.02
+                                
+                                # 流動資産の高さと位置
+                                current_asset_height = available_height * current_asset_ratio - vertical_gap/2
+                                current_asset_top = top_start
+                                current_asset_bottom = current_asset_top - current_asset_height
+                                
+                                # 固定資産の高さと位置
+                                fixed_asset_height = available_height * (1 - current_asset_ratio) - vertical_gap/2
+                                fixed_asset_top = current_asset_bottom - vertical_gap
+                                fixed_asset_bottom = bottom_total_height
+                                
+                                # 左側：資産の部
                                 # 流動資産（大項目）
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0, x1=left_main_width, y0=0.52, y1=1,
+                                    x0=0, x1=left_main_width, 
+                                    y0=current_asset_bottom, y1=current_asset_top,
                                     fillcolor=colors['流動資産'],
                                     line=dict(color="white", width=3)
                                 )
                                 fig.add_annotation(
-                                    x=left_main_width/2, y=0.76,
+                                    x=left_main_width/2, 
+                                    y=(current_asset_bottom + current_asset_top)/2,
                                     text="<b>流動<br>資産</b>",
                                     showarrow=False,
                                     font=dict(size=11, color="white", family="Arial Black"),
@@ -2948,12 +2970,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 # 固定資産（大項目）
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0, x1=left_main_width, y0=0.1, y1=0.5,
+                                    x0=0, x1=left_main_width, 
+                                    y0=fixed_asset_bottom, y1=fixed_asset_top,
                                     fillcolor=colors['固定資産'],
                                     line=dict(color="white", width=3)
                                 )
                                 fig.add_annotation(
-                                    x=left_main_width/2, y=0.3,
+                                    x=left_main_width/2, 
+                                    y=(fixed_asset_bottom + fixed_asset_top)/2,
                                     text="<b>固定<br>資産</b>",
                                     showarrow=False,
                                     font=dict(size=11, color="white", family="Arial Black"),
@@ -2962,12 +2986,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 # 資産合計
                                 fig.add_shape(
                                     type="rect",
-                                    x0=0, x1=left_main_width+left_detail_width, y0=0, y1=0.08,
+                                    x0=0, x1=left_main_width+left_detail_width, 
+                                    y0=0, y1=bottom_total_height,
                                     fillcolor='#37474F',
                                     line=dict(color="white", width=2)
                                 )
                                 fig.add_annotation(
-                                    x=(left_main_width+left_detail_width)/2, y=0.04,
+                                    x=(left_main_width+left_detail_width)/2, 
+                                    y=bottom_total_height/2,
                                     text=f"<b>資産合計　¥{total_assets/10000:,.0f}万</b>",
                                     showarrow=False,
                                     font=dict(size=13, color="white", family="Arial Black"),
@@ -2975,12 +3001,12 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 # 流動資産の詳細（中項目）
                                 x_start = left_main_width + 0.01
-                                y_pos = 1
+                                y_pos = current_asset_top
                                 detail_colors = ['#FFE082', '#FFCC80', '#FFB74D', '#FFA726', '#FF9800']
                                 for i, (group, amount) in enumerate(sorted(current_asset_groups.items(), key=lambda x: x[1], reverse=True)):
                                     if amount != 0:
-                                        height = (abs(amount) / abs(current_assets)) * 0.46 if current_assets != 0 else 0
-                                        if height > 0.03:
+                                        height = (abs(amount) / abs(current_assets)) * (current_asset_height - 0.02) if current_assets != 0 else 0
+                                        if height > 0.02:
                                             fig.add_shape(
                                                 type="rect",
                                                 x0=x_start, x1=x_start+left_detail_width-0.01, 
@@ -2989,7 +3015,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 line=dict(color="white", width=2)
                                             )
                                             fig.add_annotation(
-                                                x=x_start+(left_detail_width-0.01)/2, y=y_pos-height/2,
+                                                x=x_start+(left_detail_width-0.01)/2, 
+                                                y=y_pos-height/2,
                                                 text=f"<b>{group}</b><br>¥{abs(amount)/10000:,.0f}万",
                                                 showarrow=False,
                                                 font=dict(size=9, color="#333"),
@@ -2997,12 +3024,12 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                             y_pos -= height
                                 
                                 # 固定資産の詳細（中項目）
-                                y_pos = 0.5
+                                y_pos = fixed_asset_top
                                 fixed_colors = ['#EF9A9A', '#E57373', '#EF5350']
                                 for i, (group, amount) in enumerate(sorted(fixed_asset_groups.items(), key=lambda x: x[1], reverse=True)):
                                     if amount != 0:
-                                        height = (abs(amount) / abs(fixed_assets)) * 0.38 if fixed_assets != 0 else 0
-                                        if height > 0.03:
+                                        height = (abs(amount) / abs(fixed_assets)) * (fixed_asset_height - 0.02) if fixed_assets != 0 else 0
+                                        if height > 0.02:
                                             fig.add_shape(
                                                 type="rect",
                                                 x0=x_start, x1=x_start+left_detail_width-0.01, 
@@ -3011,26 +3038,37 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 line=dict(color="white", width=2)
                                             )
                                             fig.add_annotation(
-                                                x=x_start+(left_detail_width-0.01)/2, y=y_pos-height/2,
+                                                x=x_start+(left_detail_width-0.01)/2, 
+                                                y=y_pos-height/2,
                                                 text=f"<b>{group}</b><br>¥{abs(amount)/10000:,.0f}万",
                                                 showarrow=False,
                                                 font=dict(size=9, color="#333"),
                                             )
                                             y_pos -= height
                                 
+                                # 負債と純資産の高さ計算
+                                liab_height = available_height * liab_ratio - vertical_gap/2
+                                liab_top = top_start
+                                liab_bottom = liab_top - liab_height
+                                
+                                equity_height = available_height * (1 - liab_ratio) - vertical_gap/2
+                                equity_top = liab_bottom - vertical_gap
+                                equity_bottom = bottom_total_height
+                                
                                 # 右側：負債・純資産の部
-                                liab_ratio = total_liabilities / (total_liabilities + total_equity) if (total_liabilities + total_equity) > 0 else 0.5
                                 x_right_start = left_main_width + left_detail_width + gap
                                 
                                 # 他人資本（負債）（大項目）
                                 fig.add_shape(
                                     type="rect",
-                                    x0=x_right_start, x1=x_right_start+right_main_width, y0=0.52, y1=1,
+                                    x0=x_right_start, x1=x_right_start+right_main_width, 
+                                    y0=liab_bottom, y1=liab_top,
                                     fillcolor=colors['他人資本'],
                                     line=dict(color="white", width=3)
                                 )
                                 fig.add_annotation(
-                                    x=x_right_start+right_main_width/2, y=0.76,
+                                    x=x_right_start+right_main_width/2, 
+                                    y=(liab_bottom + liab_top)/2,
                                     text="<b>他人<br>資本</b>",
                                     showarrow=False,
                                     font=dict(size=11, color="white", family="Arial Black"),
@@ -3039,12 +3077,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 # 自己資本（純資産）（大項目）
                                 fig.add_shape(
                                     type="rect",
-                                    x0=x_right_start, x1=x_right_start+right_main_width, y0=0.1, y1=0.5,
+                                    x0=x_right_start, x1=x_right_start+right_main_width, 
+                                    y0=equity_bottom, y1=equity_top,
                                     fillcolor=colors['自己資本'],
                                     line=dict(color="white", width=3)
                                 )
                                 fig.add_annotation(
-                                    x=x_right_start+right_main_width/2, y=0.3,
+                                    x=x_right_start+right_main_width/2, 
+                                    y=(equity_bottom + equity_top)/2,
                                     text="<b>自己<br>資本</b>",
                                     showarrow=False,
                                     font=dict(size=11, color="white", family="Arial Black"),
@@ -3053,12 +3093,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 # 負債・純資産合計
                                 fig.add_shape(
                                     type="rect",
-                                    x0=x_right_start, x1=x_right_start+right_main_width+right_detail_width, y0=0, y1=0.08,
+                                    x0=x_right_start, x1=x_right_start+right_main_width+right_detail_width, 
+                                    y0=0, y1=bottom_total_height,
                                     fillcolor='#37474F',
                                     line=dict(color="white", width=2)
                                 )
                                 fig.add_annotation(
-                                    x=x_right_start+(right_main_width+right_detail_width)/2, y=0.04,
+                                    x=x_right_start+(right_main_width+right_detail_width)/2, 
+                                    y=bottom_total_height/2,
                                     text=f"<b>負債・純資産合計　¥{(total_liabilities+total_equity)/10000:,.0f}万</b>",
                                     showarrow=False,
                                     font=dict(size=13, color="white", family="Arial Black"),
@@ -3066,12 +3108,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 # 負債の詳細（中項目）
                                 x_detail_start = x_right_start + right_main_width + 0.01
-                                y_pos = 1
+                                y_pos = liab_top
                                 liability_colors = ['#A5D6A7', '#81C784', '#66BB6A']
+                                
+                                # 流動負債
                                 for i, (group, amount) in enumerate(sorted(current_liab_groups.items(), key=lambda x: x[1], reverse=True)):
                                     if amount != 0:
-                                        height = (abs(amount) / abs(total_liabilities)) * 0.46 if total_liabilities != 0 else 0
-                                        if height > 0.03:
+                                        height = (abs(amount) / abs(total_liabilities)) * (liab_height - 0.02) if total_liabilities != 0 else 0
+                                        if height > 0.02:
                                             fig.add_shape(
                                                 type="rect",
                                                 x0=x_detail_start, x1=x_detail_start+right_detail_width-0.01, 
@@ -3080,17 +3124,18 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 line=dict(color="white", width=2)
                                             )
                                             fig.add_annotation(
-                                                x=x_detail_start+(right_detail_width-0.01)/2, y=y_pos-height/2,
+                                                x=x_detail_start+(right_detail_width-0.01)/2, 
+                                                y=y_pos-height/2,
                                                 text=f"<b>{group}</b><br>¥{abs(amount)/10000:,.0f}万",
                                                 showarrow=False,
                                                 font=dict(size=9, color="#333"),
                                             )
                                             y_pos -= height
                                 
-                                # 固定負債の表示
+                                # 固定負債
                                 if fixed_liab != 0:
-                                    height = (abs(fixed_liab) / abs(total_liabilities)) * 0.46 if total_liabilities != 0 else 0
-                                    if height > 0.03:
+                                    height = (abs(fixed_liab) / abs(total_liabilities)) * (liab_height - 0.02) if total_liabilities != 0 else 0
+                                    if height > 0.02:
                                         fig.add_shape(
                                             type="rect",
                                             x0=x_detail_start, x1=x_detail_start+right_detail_width-0.01, 
@@ -3099,19 +3144,20 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                             line=dict(color="white", width=2)
                                         )
                                         fig.add_annotation(
-                                            x=x_detail_start+(right_detail_width-0.01)/2, y=y_pos-height/2,
+                                            x=x_detail_start+(right_detail_width-0.01)/2, 
+                                            y=y_pos-height/2,
                                             text=f"<b>固定負債</b><br>¥{abs(fixed_liab)/10000:,.0f}万",
                                             showarrow=False,
                                             font=dict(size=9, color="#333"),
                                         )
                                 
                                 # 純資産の詳細（中項目）
-                                y_pos = 0.5
+                                y_pos = equity_top
                                 equity_colors = ['#90CAF9', '#64B5F6', '#42A5F5']
                                 for i, (group, amount) in enumerate(sorted(equity_groups.items(), key=lambda x: x[1], reverse=True)):
                                     if amount != 0:
-                                        height = (abs(amount) / abs(total_equity)) * 0.38 if total_equity != 0 else 0
-                                        if height > 0.03:
+                                        height = (abs(amount) / abs(total_equity)) * (equity_height - 0.02) if total_equity != 0 else 0
+                                        if height > 0.02:
                                             fig.add_shape(
                                                 type="rect",
                                                 x0=x_detail_start, x1=x_detail_start+right_detail_width-0.01, 
@@ -3120,7 +3166,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 line=dict(color="white", width=2)
                                             )
                                             fig.add_annotation(
-                                                x=x_detail_start+(right_detail_width-0.01)/2, y=y_pos-height/2,
+                                                x=x_detail_start+(right_detail_width-0.01)/2, 
+                                                y=y_pos-height/2,
                                                 text=f"<b>{group}</b><br>¥{abs(amount)/10000:,.0f}万",
                                                 showarrow=False,
                                                 font=dict(size=9, color="#333"),
