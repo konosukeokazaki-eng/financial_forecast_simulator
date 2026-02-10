@@ -2903,7 +2903,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                             equity_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
                                 
                                 else:  # 詳細表示（全勘定科目）
-                                    # 全BS科目を分類
+                                    # 全BS科目を分類（データベースに実際に存在する項目のみ）
                                     for _, row in bs_df.iterrows():
                                         item = str(row.get('項目名', ''))
                                         amount = float(row.get('金額', 0))
@@ -2915,58 +2915,34 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                         if amount == 0:
                                             continue
                                         
-                                        # 流動資産
-                                        if item in ['現金', '小口現金', '当座預金', '普通預金', '定期預金', '通知預金', 
-                                                   '定期積金', '別段預金', '郵便貯金', '外貨預金']:
+                                        # 流動資産に分類（キーワードマッチング）
+                                        if any(x in item for x in ['現金', '預金', '小口', '当座', '普通', '定期', '外貨', '通知', '別段', '郵便貯金']):
                                             current_asset_groups[item] = amount
-                                        elif item in ['受取手形', '不渡手形', '売掛金']:
+                                        elif any(x in item for x in ['売掛', '受取手形', '不渡手形']):
                                             current_asset_groups[item] = amount
-                                        elif item in ['有価証券'] and '投資' not in item:
+                                        elif '有価証券' in item and '投資' not in item:
                                             current_asset_groups[item] = amount
-                                        elif item in ['商品', '製品', '副産物作業くず', '半製品', '原材料', '仕掛品', '貯蔵品']:
+                                        elif any(x in item for x in ['商品', '製品', '副産物', '半製品', '原材料', '仕掛', '貯蔵']):
                                             current_asset_groups[item] = amount
-                                        elif item in ['前渡金', '立替金', '前払費用', '繰延税金資産(流)', '未収収益', 
-                                                     '短期貸付金', '未収入金', '仮払金', '預け金', '仮払消費税等', 
-                                                     '仮払消費税', '仮払法人税等', '貸倒引当金(他)', '修正申告調整勘定']:
+                                        elif any(x in item for x in ['前渡金', '立替金', '前払', '未収', '仮払', '短期貸付', '預け金']) and '長期' not in item:
                                             current_asset_groups[item] = amount
                                         
-                                        # 固定資産
-                                        elif item in ['建物', '附属設備', '附属設備（定額法）', '構築物', '機械装置', 
-                                                     '車両運搬具', '工具器具備品', '一括償却資産', '減価償却累計額', 
-                                                     '土地', '建設仮勘定']:
+                                        # 固定資産に分類
+                                        elif any(x in item for x in ['建物', '附属設備', '構築', '機械', '車両', '工具', '土地', '一括償却', '建設仮勘定', '減価償却累計']):
                                             fixed_asset_groups[item] = amount
-                                        elif item in ['電話加入権', '施設利用権', '工業所有権', '営業権', '借地権', 
-                                                     'ソフトウェア']:
+                                        elif any(x in item for x in ['電話加入', '施設利用', '工業所有', '営業権', '借地権', 'ソフトウェア']):
                                             fixed_asset_groups[item] = amount
-                                        elif item in ['投資有価証券', '関係会社株式', '出資金', '関係会社出資金', '敷金', 
-                                                     '差入保証金', '長期貸付金', '長期固定性預金', '長期滞留債権', 
-                                                     '長期前払費用', '前払年金費用', '繰延税金資産(固)', '預託金', 
-                                                     '貸倒引当金(投)', '保険積立金']:
+                                        elif any(x in item for x in ['投資有価証券', '関係会社株式', '関係会社出資', '出資金', '敷金', '差入保証', '長期貸付', '長期固定性預金', '長期滞留', '長期前払', '前払年金', '繰延税金資産', '預託金', '保険積立']):
                                             fixed_asset_groups[item] = amount
                                         
-                                        # 流動負債
-                                        elif item in ['支払手形', '買掛金', '設備支払手形']:
+                                        # 流動負債に分類
+                                        elif any(x in item for x in ['支払手形', '買掛', '設備支払手形']):
                                             current_liab_groups[item] = amount
-                                        elif item in ['短期借入金', '未払金', '未払費用', '未払配当金', '未払役員賞与', 
-                                                     '未払法人税等', '未払消費税等', '繰延税金負債(流)', '前受金', 
-                                                     '預り金', '前受収益', '仮受金', '預り保証金', '割引手形', 
-                                                     '裏書手形', '仮受消費税等', '仮受消費税']:
+                                        elif any(x in item for x in ['短期借入', '未払', '預り金', '前受', '仮受', '割引手形', '裏書手形']) and '長期' not in item:
                                             current_liab_groups[item] = amount
                                         
-                                        # 純資産
-                                        elif item in ['資本金', '新株式申込証拠金']:
-                                            equity_groups[item] = amount
-                                        elif item in ['資本準備金', '資本金及び準備金減少差益', '自己株式処分差額', 
-                                                     'その他資本剰余金']:
-                                            equity_groups[item] = amount
-                                        elif item in ['利益準備金', '別途積立金', '任意積立金', '繰越利益', 
-                                                     '当期純損益金額', '繰越利益剰余金', 'その他利益剰余金']:
-                                            equity_groups[item] = amount
-                                        elif item in ['自己株式', '自己株式申込証拠金']:
-                                            equity_groups[item] = amount
-                                        elif item in ['その他有価証券評価差額金', '繰延ヘッジ損益', '土地再評価差額金']:
-                                            equity_groups[item] = amount
-                                        elif item in ['新株予約権']:
+                                        # 純資産に分類
+                                        elif any(x in item for x in ['資本金', '新株式申込証拠金', '資本準備', '資本剰余', '自己株式処分', '利益準備', '別途積立', '任意積立', '繰越利益', '当期純損益', '自己株式', '評価', '換算', '新株予約権']) and '合計' not in item:
                                             equity_groups[item] = amount
                                 
                                 # カラフルなBOX型BS図作成
@@ -3011,7 +2987,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 # デバッグ情報（変数定義後）
                                 with st.expander("🔧 BOX図デバッグ", expanded=True):
-                                    st.write(f"**コードバージョン:** v2.5 (最小高さ緩和版)")
+                                    st.write(f"**コードバージョン:** v2.6 (キーワードマッチング方式)")
                                     st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
                                     st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
                                     st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
