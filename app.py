@@ -2868,6 +2868,20 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                     """)
                                 
                                 # 詳細データの取得（グラフ用）
+                                # 流動資産合計と固定資産合計を取得
+                                current_assets_row = bs_df[bs_df['項目名'] == '流動資産合計']
+                                fixed_assets_row = bs_df[bs_df['項目名'] == '固定資産合計']
+                                
+                                current_assets = float(current_assets_row.iloc[0]['金額']) if not current_assets_row.empty else total_assets * 0.6
+                                fixed_assets = float(fixed_assets_row.iloc[0]['金額']) if not fixed_assets_row.empty else total_assets * 0.4
+                                
+                                # 流動負債合計と固定負債合計を取得
+                                current_liab_row = bs_df[bs_df['項目名'] == '流動負債合計']
+                                fixed_liab_row = bs_df[bs_df['項目名'] == '固定負債合計']
+                                
+                                current_liab = float(current_liab_row.iloc[0]['金額']) if not current_liab_row.empty else total_liabilities * 0.7
+                                fixed_liab = float(fixed_liab_row.iloc[0]['金額']) if not fixed_liab_row.empty else total_liabilities * 0.3
+                                
                                 # 流動資産の内訳
                                 current_asset_groups = {}
                                 for item in ['現金･預金合計', '売上債権合計', '有価証券合計', '棚卸資産合計', '他流動資産合計']:
