@@ -2804,6 +2804,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 with st.expander("🔍 データ確認", expanded=False):
                                     st.write("**取得データ確認:**")
                                     st.dataframe(bs_df, height=200)
+                                    st.write("**全項目名リスト:**")
+                                    all_items = bs_df['項目名'].dropna().tolist()
+                                    for i, item in enumerate(all_items):
+                                        st.write(f"{i+1}. {item}")
                                 
                                 # 資産・負債・純資産の合計行を探す
                                 total_assets_row = bs_df[bs_df['項目名'] == '資産合計']
