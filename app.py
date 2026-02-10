@@ -3007,7 +3007,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 # デバッグ情報（変数定義後）
                                 with st.expander("🔧 BOX図デバッグ", expanded=True):
-                                    st.write(f"**コードバージョン:** v2.3 (幅2/3 + 判定改善版)")
+                                    st.write(f"**コードバージョン:** v2.5 (最小高さ緩和版)")
                                     st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
                                     st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
                                     st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
@@ -3077,10 +3077,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 x_start = left_main_width + 0.01
                                 y_pos = current_asset_top
                                 detail_colors = ['#FFE082', '#FFCC80', '#FFB74D', '#FFA726', '#FF9800']
-                                for i, (group, amount) in enumerate(sorted(current_asset_groups.items(), key=lambda x: x[1], reverse=True)):
+                                for i, (group, amount) in enumerate(sorted(current_asset_groups.items(), key=lambda x: abs(x[1]), reverse=True)):
                                     if amount != 0:
                                         height = (abs(amount) / abs(current_assets)) * (current_asset_height - 0.02) if current_assets != 0 else 0
-                                        if height > 0.02:
+                                        if height > 0.01:  # 0.02から0.01に緩和
                                             fig.add_shape(
                                                 type="rect",
                                                 x0=x_start, x1=x_start+left_detail_width-0.01, 
@@ -3088,22 +3088,24 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 fillcolor=detail_colors[i % len(detail_colors)],
                                                 line=dict(color="white", width=2)
                                             )
+                                            # フォントサイズを高さに応じて調整
+                                            font_size = 9 if height > 0.05 else 7
                                             fig.add_annotation(
                                                 x=x_start+(left_detail_width-0.01)/2, 
                                                 y=y_pos-height/2,
                                                 text=f"<b>{group}</b><br>¥{abs(amount)/10000:,.0f}万",
                                                 showarrow=False,
-                                                font=dict(size=9, color="#333"),
+                                                font=dict(size=font_size, color="#333"),
                                             )
                                             y_pos -= height
                                 
                                 # 固定資産の詳細（中項目）
                                 y_pos = fixed_asset_top
                                 fixed_colors = ['#EF9A9A', '#E57373', '#EF5350']
-                                for i, (group, amount) in enumerate(sorted(fixed_asset_groups.items(), key=lambda x: x[1], reverse=True)):
+                                for i, (group, amount) in enumerate(sorted(fixed_asset_groups.items(), key=lambda x: abs(x[1]), reverse=True)):
                                     if amount != 0:
                                         height = (abs(amount) / abs(fixed_assets)) * (fixed_asset_height - 0.02) if fixed_assets != 0 else 0
-                                        if height > 0.02:
+                                        if height > 0.01:  # 0.02から0.01に緩和
                                             fig.add_shape(
                                                 type="rect",
                                                 x0=x_start, x1=x_start+left_detail_width-0.01, 
@@ -3111,12 +3113,13 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 fillcolor=fixed_colors[i % len(fixed_colors)],
                                                 line=dict(color="white", width=2)
                                             )
+                                            font_size = 9 if height > 0.05 else 7
                                             fig.add_annotation(
                                                 x=x_start+(left_detail_width-0.01)/2, 
                                                 y=y_pos-height/2,
                                                 text=f"<b>{group}</b><br>¥{abs(amount)/10000:,.0f}万",
                                                 showarrow=False,
-                                                font=dict(size=9, color="#333"),
+                                                font=dict(size=font_size, color="#333"),
                                             )
                                             y_pos -= height
                                 
@@ -3186,10 +3189,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 liability_colors = ['#A5D6A7', '#81C784', '#66BB6A']
                                 
                                 # 流動負債
-                                for i, (group, amount) in enumerate(sorted(current_liab_groups.items(), key=lambda x: x[1], reverse=True)):
+                                for i, (group, amount) in enumerate(sorted(current_liab_groups.items(), key=lambda x: abs(x[1]), reverse=True)):
                                     if amount != 0:
                                         height = (abs(amount) / abs(total_liabilities)) * (liab_height - 0.02) if total_liabilities != 0 else 0
-                                        if height > 0.02:
+                                        if height > 0.01:  # 0.02から0.01に緩和
                                             fig.add_shape(
                                                 type="rect",
                                                 x0=x_detail_start, x1=x_detail_start+right_detail_width-0.01, 
@@ -3197,19 +3200,20 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 fillcolor=liability_colors[i % len(liability_colors)],
                                                 line=dict(color="white", width=2)
                                             )
+                                            font_size = 9 if height > 0.05 else 7
                                             fig.add_annotation(
                                                 x=x_detail_start+(right_detail_width-0.01)/2, 
                                                 y=y_pos-height/2,
                                                 text=f"<b>{group}</b><br>¥{abs(amount)/10000:,.0f}万",
                                                 showarrow=False,
-                                                font=dict(size=9, color="#333"),
+                                                font=dict(size=font_size, color="#333"),
                                             )
                                             y_pos -= height
                                 
                                 # 固定負債
                                 if fixed_liab != 0:
                                     height = (abs(fixed_liab) / abs(total_liabilities)) * (liab_height - 0.02) if total_liabilities != 0 else 0
-                                    if height > 0.02:
+                                    if height > 0.01:  # 0.02から0.01に緩和
                                         fig.add_shape(
                                             type="rect",
                                             x0=x_detail_start, x1=x_detail_start+right_detail_width-0.01, 
@@ -3217,21 +3221,22 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                             fillcolor='#4CAF50',
                                             line=dict(color="white", width=2)
                                         )
+                                        font_size = 9 if height > 0.05 else 7
                                         fig.add_annotation(
                                             x=x_detail_start+(right_detail_width-0.01)/2, 
                                             y=y_pos-height/2,
                                             text=f"<b>固定負債</b><br>¥{abs(fixed_liab)/10000:,.0f}万",
                                             showarrow=False,
-                                            font=dict(size=9, color="#333"),
+                                            font=dict(size=font_size, color="#333"),
                                         )
                                 
                                 # 純資産の詳細（中項目）
                                 y_pos = equity_top
                                 equity_colors = ['#90CAF9', '#64B5F6', '#42A5F5']
-                                for i, (group, amount) in enumerate(sorted(equity_groups.items(), key=lambda x: x[1], reverse=True)):
+                                for i, (group, amount) in enumerate(sorted(equity_groups.items(), key=lambda x: abs(x[1]), reverse=True)):
                                     if amount != 0:
                                         height = (abs(amount) / abs(total_equity)) * (equity_height - 0.02) if total_equity != 0 else 0
-                                        if height > 0.02:
+                                        if height > 0.01:  # 0.02から0.01に緩和
                                             fig.add_shape(
                                                 type="rect",
                                                 x0=x_detail_start, x1=x_detail_start+right_detail_width-0.01, 
@@ -3239,12 +3244,13 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                                 fillcolor=equity_colors[i % len(equity_colors)],
                                                 line=dict(color="white", width=2)
                                             )
+                                            font_size = 9 if height > 0.05 else 7
                                             fig.add_annotation(
                                                 x=x_detail_start+(right_detail_width-0.01)/2, 
                                                 y=y_pos-height/2,
                                                 text=f"<b>{group}</b><br>¥{abs(amount)/10000:,.0f}万",
                                                 showarrow=False,
-                                                font=dict(size=9, color="#333"),
+                                                font=dict(size=font_size, color="#333"),
                                             )
                                             y_pos -= height
                                 
