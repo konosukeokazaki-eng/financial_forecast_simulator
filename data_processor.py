@@ -1311,7 +1311,7 @@ class DataProcessor:
                                         else:
                                             val = float(clean_val)
                                     
-                                    if not np.isnan(val) and val != 0:
+                                    if not np.isnan(val):
                                         imported_data[target_item][m] = val
                                 except:
                                     pass
@@ -1369,8 +1369,8 @@ class DataProcessor:
                 item_name = row['項目名']
                 for m in months:
                     val = row[m]
-                    # 0とNaNをスキップ（データ量削減）
-                    if val != 0 and not pd.isna(val):
+                    # NaNのみスキップ（0は保存する）
+                    if not pd.isna(val):
                         insert_data.append((fiscal_period_id, item_name, m, float(val)))
             
             # 一括挿入（チャンクサイズ設定で安定性向上）
