@@ -2791,6 +2791,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.markdown("---")
                             st.subheader("📊 貸借対照表（BOX型）")
                             
+                            # 表示モード選択
+                            display_mode = st.radio(
+                                "表示モード",
+                                ["要約表示（合計のみ）", "詳細表示（全勘定科目）"],
+                                horizontal=True,
+                                key="bs_box_display_mode"
+                            )
+                            
                             try:
                                 # まず全データを確認（エクスパンダーで非表示）
                                 with st.expander("🔍 データ確認", expanded=False):
@@ -2852,12 +2860,17 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 fixed_assets = float(fixed_assets_row.iloc[0]['金額']) if not fixed_assets_row.empty else total_assets * 0.4
                                 
                                 # デバッグ情報
-                                with st.expander("🔧 BOX図デバッグ", expanded=False):
+                                with st.expander("🔧 BOX図デバッグ", expanded=True):  # デフォルトで展開
+                                    st.write(f"**コードバージョン:** v2.1 (Y座標動的計算版)")
                                     st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
                                     st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
                                     st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
                                     st.write(f"**流動資産比率:** {current_assets/total_assets*100:.1f}%")
                                     st.write(f"**固定資産比率:** {fixed_assets/total_assets*100:.1f}%")
+                                    st.write(f"**Available height:** {available_height:.3f}")
+                                    st.write(f"**流動資産 Y座標:** top={current_asset_top:.3f}, bottom={current_asset_bottom:.3f}, height={current_asset_height:.3f}")
+                                    st.write(f"**固定資産 Y座標:** top={fixed_asset_top:.3f}, bottom={fixed_asset_bottom:.3f}, height={fixed_asset_height:.3f}")
+                                    st.write(f"**表示モード:** {display_mode}")
                                 
                                 # 流動負債合計と固定負債合計を取得
                                 current_liab_row = bs_df[bs_df['項目名'] == '流動負債合計']
@@ -2868,31 +2881,70 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 # 流動資産の内訳
                                 current_asset_groups = {}
-                                for item in ['現金･預金合計', '売上債権合計', '有価証券合計', '棚卸資産合計', '他流動資産合計']:
-                                    row = bs_df[bs_df['項目名'] == item]
-                                    if not row.empty:
-                                        current_asset_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
-                                
-                                # 固定資産の内訳
                                 fixed_asset_groups = {}
-                                for item in ['有形固定資産計', '無形固定資産計', '投資その他の資産合計']:
-                                    row = bs_df[bs_df['項目名'] == item]
-                                    if not row.empty:
-                                        fixed_asset_groups[item.replace('合計', '').replace('計', '')] = float(row.iloc[0]['金額'])
-                                
-                                # 流動負債の内訳
                                 current_liab_groups = {}
-                                for item in ['仕入債務合計', '他流動負債合計']:
-                                    row = bs_df[bs_df['項目名'] == item]
-                                    if not row.empty:
-                                        current_liab_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
-                                
-                                # 純資産の内訳
                                 equity_groups = {}
-                                for item in ['資本金合計', '資本剰余金合計', '利益剰余金合計']:
-                                    row = bs_df[bs_df['項目名'] == item]
-                                    if not row.empty:
-                                        equity_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
+                                
+                                if display_mode == "要約表示（合計のみ）":
+                                    # 合計行のみ表示
+                                    for item in ['現金･預金合計', '売上債権合計', '有価証券合計', '棚卸資産合計', '他流動資産合計']:
+                                        row = bs_df[bs_df['項目名'] == item]
+                                        if not row.empty:
+                                            current_asset_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
+                                    
+                                    # 固定資産の内訳
+                                    for item in ['有形固定資産計', '無形固定資産計', '投資その他の資産合計']:
+                                        row = bs_df[bs_df['項目名'] == item]
+                                        if not row.empty:
+                                            fixed_asset_groups[item.replace('合計', '').replace('計', '')] = float(row.iloc[0]['金額'])
+                                    
+                                    # 流動負債の内訳
+                                    for item in ['仕入債務合計', '他流動負債合計']:
+                                        row = bs_df[bs_df['項目名'] == item]
+                                        if not row.empty:
+                                            current_liab_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
+                                    
+                                    # 純資産の内訳
+                                    for item in ['資本金合計', '資本剰余金合計', '利益剰余金合計']:
+                                        row = bs_df[bs_df['項目名'] == item]
+                                        if not row.empty:
+                                            equity_groups[item.replace('合計', '')] = float(row.iloc[0]['金額'])
+                                
+                                else:  # 詳細表示（全勘定科目）
+                                    # 全BS科目を分類
+                                    for _, row in bs_df.iterrows():
+                                        item = str(row.get('項目名', ''))
+                                        amount = float(row.get('金額', 0))
+                                        
+                                        if '合計' in item or '計' in item:
+                                            continue  # 合計行はスキップ
+                                        
+                                        if amount == 0:
+                                            continue
+                                        
+                                        # 流動資産
+                                        if any(x in item for x in ['現金', '預金', '小口', '当座', '普通', '定期']):
+                                            current_asset_groups[item] = amount
+                                        elif any(x in item for x in ['売掛', '受取手形', '不渡手形']):
+                                            current_asset_groups[item] = amount
+                                        elif any(x in item for x in ['商品', '製品', '原材料', '仕掛', '貯蔵']):
+                                            current_asset_groups[item] = amount
+                                        elif any(x in item for x in ['前渡', '立替', '前払', '未収', '仮払', '短期貸付']):
+                                            current_asset_groups[item] = amount
+                                        # 固定資産
+                                        elif any(x in item for x in ['建物', '附属設備', '構築', '機械', '車両', '工具', '土地', '一括償却']):
+                                            fixed_asset_groups[item] = amount
+                                        elif any(x in item for x in ['電話加入', '施設利用', '工業所有', '営業権', '借地権', 'ソフトウェア']):
+                                            fixed_asset_groups[item] = amount
+                                        elif any(x in item for x in ['投資有価証券', '関係会社株式', '出資金', '敷金', '差入保証', '長期貸付', '長期前払', '保険積立']):
+                                            fixed_asset_groups[item] = amount
+                                        # 流動負債
+                                        elif any(x in item for x in ['支払手形', '買掛', '短期借入', '未払', '預り金', '前受', '仮受']):
+                                            current_liab_groups[item] = amount
+                                        # 固定負債は別途処理
+                                        # 純資産
+                                        elif any(x in item for x in ['資本金', '資本準備', '利益準備', '別途積立', '繰越利益']):
+                                            equity_groups[item] = amount
                                 
                                 # カラフルなBOX型BS図作成
                                 fig = go.Figure()
