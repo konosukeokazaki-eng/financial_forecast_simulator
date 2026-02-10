@@ -2792,80 +2792,56 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.subheader("📊 貸借対照表（BOX型）")
                             
                             try:
-                                # まず全データを確認
-                                st.write("**取得データ確認:**")
-                                st.dataframe(bs_df, height=200)
+                                # まず全データを確認（エクスパンダーで非表示）
+                                with st.expander("🔍 データ確認", expanded=False):
+                                    st.write("**取得データ確認:**")
+                                    st.dataframe(bs_df, height=200)
                                 
                                 # 資産・負債・純資産の合計行を探す
                                 total_assets_row = bs_df[bs_df['項目名'] == '資産合計']
                                 total_liabilities_row = bs_df[bs_df['項目名'] == '負債合計']
                                 total_equity_row = bs_df[bs_df['項目名'] == '純資産合計']
-                                total_liab_equity_row = bs_df[bs_df['項目名'] == '負債･純資産合計']
                                 
-                                # 合計値を取得（合計行がある場合はそれを使用）
+                                # 合計値を取得
                                 if not total_assets_row.empty:
                                     total_assets = float(total_assets_row.iloc[0]['金額'])
-                                    st.success(f"資産合計（合計行から）: ¥{total_assets/10000:,.0f}万")
                                 else:
-                                    # 流動資産合計 + 固定資産合計
                                     current_assets_row = bs_df[bs_df['項目名'] == '流動資産合計']
                                     fixed_assets_row = bs_df[bs_df['項目名'] == '固定資産合計']
-                                    current_assets = float(current_assets_row.iloc[0]['金額']) if not current_assets_row.empty else 0
-                                    fixed_assets = float(fixed_assets_row.iloc[0]['金額']) if not fixed_assets_row.empty else 0
-                                    total_assets = current_assets + fixed_assets
-                                    st.warning(f"資産合計（計算）: 流動¥{current_assets/10000:,.0f}万 + 固定¥{fixed_assets/10000:,.0f}万 = ¥{total_assets/10000:,.0f}万")
+                                    current_assets_val = float(current_assets_row.iloc[0]['金額']) if not current_assets_row.empty else 0
+                                    fixed_assets_val = float(fixed_assets_row.iloc[0]['金額']) if not fixed_assets_row.empty else 0
+                                    total_assets = current_assets_val + fixed_assets_val
                                 
                                 if not total_liabilities_row.empty:
                                     total_liabilities = float(total_liabilities_row.iloc[0]['金額'])
-                                    st.success(f"負債合計（合計行から）: ¥{total_liabilities/10000:,.0f}万")
                                 else:
-                                    # 流動負債合計 + 固定負債合計
                                     current_liab_row = bs_df[bs_df['項目名'] == '流動負債合計']
                                     fixed_liab_row = bs_df[bs_df['項目名'] == '固定負債合計']
-                                    current_liab = float(current_liab_row.iloc[0]['金額']) if not current_liab_row.empty else 0
-                                    fixed_liab = float(fixed_liab_row.iloc[0]['金額']) if not fixed_liab_row.empty else 0
-                                    total_liabilities = current_liab + fixed_liab
-                                    st.warning(f"負債合計（計算）: 流動¥{current_liab/10000:,.0f}万 + 固定¥{fixed_liab/10000:,.0f}万 = ¥{total_liabilities/10000:,.0f}万")
+                                    current_liab_val = float(current_liab_row.iloc[0]['金額']) if not current_liab_row.empty else 0
+                                    fixed_liab_val = float(fixed_liab_row.iloc[0]['金額']) if not fixed_liab_row.empty else 0
+                                    total_liabilities = current_liab_val + fixed_liab_val
                                 
                                 if not total_equity_row.empty:
                                     total_equity = float(total_equity_row.iloc[0]['金額'])
-                                    st.success(f"純資産合計（合計行から）: ¥{total_equity/10000:,.0f}万")
                                 else:
-                                    # 株主資本合計を探す
                                     shareholders_equity_row = bs_df[bs_df['項目名'] == '株主資本合計']
                                     total_equity = float(shareholders_equity_row.iloc[0]['金額']) if not shareholders_equity_row.empty else 0
-                                    st.warning(f"純資産合計（計算）: ¥{total_equity/10000:,.0f}万")
                                 
-                                # 貸借チェック
+                                # 貸借チェック（エクスパンダーで非表示）
                                 total_liab_equity = total_liabilities + total_equity
                                 difference = total_assets - total_liab_equity
                                 
-                                st.markdown("---")
-                                st.write("**貸借対照表等式チェック:**")
-                                col1, col2, col3 = st.columns(3)
-                                with col1:
-                                    st.metric("資産合計", f"¥{total_assets/10000:,.0f}万")
-                                with col2:
-                                    st.metric("負債+純資産", f"¥{total_liab_equity/10000:,.0f}万")
-                                with col3:
-                                    if abs(difference) < 1:  # 1円未満の誤差
-                                        st.metric("差額", "✅ 一致", delta=None)
-                                    else:
-                                        st.metric("差額", f"⚠️ ¥{difference/10000:,.0f}万", delta=None)
-                                
-                                if abs(difference) >= 1:
-                                    st.error(f"""
-                                    **貸借が一致していません！**
-                                    
-                                    資産合計: ¥{total_assets/10000:,.2f}万
-                                    負債合計: ¥{total_liabilities/10000:,.2f}万
-                                    純資産合計: ¥{total_equity/10000:,.2f}万
-                                    負債+純資産: ¥{total_liab_equity/10000:,.2f}万
-                                    
-                                    差額: ¥{difference/10000:,.2f}万
-                                    
-                                    データに問題がある可能性があります。
-                                    """)
+                                with st.expander("🔍 貸借対照表等式チェック", expanded=False):
+                                    col1, col2, col3 = st.columns(3)
+                                    with col1:
+                                        st.metric("資産合計", f"¥{total_assets/10000:,.0f}万")
+                                    with col2:
+                                        st.metric("負債+純資産", f"¥{total_liab_equity/10000:,.0f}万")
+                                    with col3:
+                                        if abs(difference) < 1:
+                                            st.metric("差額", "✅ 一致")
+                                        else:
+                                            st.metric("差額", f"⚠️ ¥{difference/10000:,.0f}万")
                                 
                                 # 詳細データの取得（グラフ用）
                                 # 流動資産合計と固定資産合計を取得
@@ -2874,6 +2850,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 current_assets = float(current_assets_row.iloc[0]['金額']) if not current_assets_row.empty else total_assets * 0.6
                                 fixed_assets = float(fixed_assets_row.iloc[0]['金額']) if not fixed_assets_row.empty else total_assets * 0.4
+                                
+                                # デバッグ情報
+                                with st.expander("🔧 BOX図デバッグ", expanded=False):
+                                    st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
+                                    st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
+                                    st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
+                                    st.write(f"**流動資産比率:** {current_assets/total_assets*100:.1f}%")
+                                    st.write(f"**固定資産比率:** {fixed_assets/total_assets*100:.1f}%")
                                 
                                 # 流動負債合計と固定負債合計を取得
                                 current_liab_row = bs_df[bs_df['項目名'] == '流動負債合計']
