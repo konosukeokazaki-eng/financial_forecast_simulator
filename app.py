@@ -1707,147 +1707,136 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             hasattr(st.session_state, 'current_month') and
             hasattr(st.session_state, 'scenario')):
             
+            # カスタムCSS
             st.markdown("""
             <style>
-            .status-header {
-                background: #F8F9FA;
-                padding: 1.2rem;
-                border-radius: 10px;
+            .status-container {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                padding: 1.5rem;
+                border-radius: 12px;
                 margin-bottom: 1.5rem;
-                border: 1px solid #E0E0E0;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             }
-            .status-card {
+            .metric-card {
                 background: white;
                 padding: 1rem;
-                border-radius: 8px;
-                text-align: center;
-                border: 1px solid #E0E0E0;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-            }
-            .status-label {
-                color: #666666;
-                font-size: 0.7rem;
-                font-weight: 600;
-                text-transform: uppercase;
-                margin-bottom: 0.4rem;
-                letter-spacing: 0.5px;
-            }
-            .status-value {
-                color: #1a1a1a;
-                font-size: 1.1rem;
-                font-weight: 700;
+                border-radius: 10px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                border-left: 4px solid #667eea;
             }
             </style>
             """, unsafe_allow_html=True)
             
-            # ステータスヘッダー
-            with st.container():
-                st.markdown('<div class="status-header">', unsafe_allow_html=True)
-                
-                col1, col2, col3, col4, col5 = st.columns(5)
-                
-                # 1. 分析モード
-                with col1:
-                    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-                    mode_icon = "📊" if st.session_state.analysis_mode == "📊 簡易モード" else "🔬"
-                    mode_text = "簡易" if st.session_state.analysis_mode == "📊 簡易モード" else "高度"
-                    st.markdown(f'<div class="status-label">分析モード</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="status-value">{mode_icon} {mode_text}</div>', unsafe_allow_html=True)
-                    
-                    # クリックで変更可能
-                    if st.button("変更", key="change_mode_header", use_container_width=True):
-                        new_mode = "🔬 高度モード" if st.session_state.analysis_mode == "📊 簡易モード" else "📊 簡易モード"
-                        st.session_state.analysis_mode = new_mode
-                        st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                # 2. 会社名
-                with col2:
-                    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-                    st.markdown(f'<div class="status-label">会社名</div>', unsafe_allow_html=True)
-                    company_short = st.session_state.selected_comp_name[:8] + "..." if len(st.session_state.selected_comp_name) > 8 else st.session_state.selected_comp_name
-                    st.markdown(f'<div class="status-value">🏢 {company_short}</div>', unsafe_allow_html=True)
-                    
-                    # クリックで変更可能
-                    with st.popover("変更", use_container_width=True):
-                        companies = get_companies_cached(processor)
-                        if not companies.empty:
-                            comp_names = companies['name'].tolist()
-                            current_idx = comp_names.index(st.session_state.selected_comp_name) if st.session_state.selected_comp_name in comp_names else 0
-                            new_company = st.selectbox("会社選択", comp_names, index=current_idx, key="change_company_header")
-                            if st.button("適用", key="apply_company_header"):
-                                selected_row = companies[companies['name'] == new_company].iloc[0]
-                                st.session_state.selected_company = selected_row['id']
-                                st.session_state.selected_comp_name = new_company
-                                st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                # 3. 会計期
-                with col3:
-                    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-                    st.markdown(f'<div class="status-label">会計期</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="status-value">📅 第{st.session_state.selected_period_num}期</div>', unsafe_allow_html=True)
-                    
-                    # クリックで変更可能
-                    with st.popover("変更", use_container_width=True):
-                        periods = get_company_periods_cached(st.session_state.selected_company, processor)
-                        if not periods.empty:
-                            period_options = [f"第{row['period_num']}期 ({row['start_date']}〜{row['end_date']})" 
-                                            for _, row in periods.iterrows()]
-                            period_nums = periods['period_num'].tolist()
-                            current_idx = period_nums.index(st.session_state.selected_period_num) if st.session_state.selected_period_num in period_nums else 0
-                            selected_period_str = st.selectbox("会計期選択", period_options, index=current_idx, key="change_period_header")
-                            if st.button("適用", key="apply_period_header"):
-                                selected_num = int(selected_period_str.split('第')[1].split('期')[0])
-                                selected_row = periods[periods['period_num'] == selected_num].iloc[0]
-                                st.session_state.selected_period = selected_row['id']
-                                st.session_state.selected_period_num = selected_num
-                                st.session_state.start_date = selected_row['start_date']
-                                st.session_state.end_date = selected_row['end_date']
-                                st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                # 4. 実績締月
-                with col4:
-                    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-                    st.markdown(f'<div class="status-label">実績締月</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="status-value">📊 {st.session_state.current_month}</div>', unsafe_allow_html=True)
-                    
-                    # クリックで変更可能
-                    with st.popover("変更", use_container_width=True):
-                        months = processor.get_fiscal_months(st.session_state.selected_period)
-                        if months:
-                            current_idx = months.index(st.session_state.current_month) if st.session_state.current_month in months else 0
-                            new_month = st.selectbox("実績締月選択", months, index=current_idx, key="change_month_header")
-                            if st.button("適用", key="apply_month_header"):
-                                st.session_state.current_month = new_month
-                                st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                # 5. シナリオ
-                with col5:
-                    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-                    st.markdown(f'<div class="status-label">シナリオ</div>', unsafe_allow_html=True)
-                    scenario_icons = {"現実": "📈", "楽観": "🌟", "悲観": "⚠️"}
-                    scenario_icon = scenario_icons.get(st.session_state.scenario, "📈")
-                    st.markdown(f'<div class="status-value">{scenario_icon} {st.session_state.scenario}</div>', unsafe_allow_html=True)
-                    
-                    # クリックで変更可能
-                    with st.popover("変更", use_container_width=True):
-                        scenario_options = ["現実", "楽観", "悲観"]
-                        current_idx = scenario_options.index(st.session_state.scenario) if st.session_state.scenario in scenario_options else 0
-                        new_scenario = st.selectbox("シナリオ選択", scenario_options, index=current_idx, key="change_scenario_header")
-                        if st.button("適用", key="apply_scenario_header"):
-                            st.session_state.scenario = new_scenario
-                            # キャッシュをクリア
-                            for key in ['pl_df', 'forecast_data_cache', 'sub_account_aggregation_cache']:
-                                if key in st.session_state:
-                                    del st.session_state[key]
-                            st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div class="status-container">', unsafe_allow_html=True)
             
+            # メトリクスカード（5列）
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            # 1️⃣ 分析モード
+            with col1:
+                mode_icon = "📊" if st.session_state.analysis_mode == "📊 簡易モード" else "🔬"
+                mode_text = "簡易" if "簡易" in st.session_state.analysis_mode else "高度"
+                st.metric("🎛️ 分析モード", f"{mode_icon} {mode_text}")
+                
+                # トグルボタン
+                if st.button("🔄 切替", key="toggle_mode", use_container_width=True, type="secondary"):
+                    new_mode = "🔬 高度モード" if st.session_state.analysis_mode == "📊 簡易モード" else "📊 簡易モード"
+                    st.session_state.analysis_mode = new_mode
+                    st.rerun()
+            
+            # 2️⃣ 会社名
+            with col2:
+                company_short = st.session_state.selected_comp_name[:10] + "..." if len(st.session_state.selected_comp_name) > 10 else st.session_state.selected_comp_name
+                st.metric("🏢 会社名", company_short)
+                
+                # 会社選択
+                companies = get_companies_cached(processor)
+                if not companies.empty:
+                    comp_names = companies['name'].tolist()
+                    current_idx = comp_names.index(st.session_state.selected_comp_name) if st.session_state.selected_comp_name in comp_names else 0
+                    new_company = st.selectbox(
+                        "会社選択", 
+                        comp_names, 
+                        index=current_idx, 
+                        key="header_company_select",
+                        label_visibility="collapsed"
+                    )
+                    if new_company != st.session_state.selected_comp_name:
+                        selected_row = companies[companies['name'] == new_company].iloc[0]
+                        st.session_state.selected_company = selected_row['id']
+                        st.session_state.selected_comp_name = new_company
+                        st.rerun()
+            
+            # 3️⃣ 会計期
+            with col3:
+                st.metric("📅 会計期", f"第{st.session_state.selected_period_num}期")
+                
+                # 会計期選択
+                periods = get_company_periods_cached(st.session_state.selected_company, processor)
+                if not periods.empty:
+                    period_options = [f"第{row['period_num']}期" for _, row in periods.iterrows()]
+                    period_nums = periods['period_num'].tolist()
+                    current_idx = period_nums.index(st.session_state.selected_period_num) if st.session_state.selected_period_num in period_nums else 0
+                    selected_period_idx = st.selectbox(
+                        "会計期選択",
+                        range(len(period_options)),
+                        format_func=lambda i: period_options[i],
+                        index=current_idx,
+                        key="header_period_select",
+                        label_visibility="collapsed"
+                    )
+                    if period_nums[selected_period_idx] != st.session_state.selected_period_num:
+                        selected_row = periods.iloc[selected_period_idx]
+                        st.session_state.selected_period = selected_row['id']
+                        st.session_state.selected_period_num = selected_row['period_num']
+                        st.session_state.start_date = selected_row['start_date']
+                        st.session_state.end_date = selected_row['end_date']
+                        st.rerun()
+            
+            # 4️⃣ 実績締月
+            with col4:
+                st.metric("📊 実績締月", st.session_state.current_month)
+                
+                # 実績締月選択
+                months = processor.get_fiscal_months(st.session_state.selected_period)
+                if months:
+                    current_idx = months.index(st.session_state.current_month) if st.session_state.current_month in months else 0
+                    new_month = st.selectbox(
+                        "実績締月選択",
+                        months,
+                        index=current_idx,
+                        key="header_month_select",
+                        label_visibility="collapsed"
+                    )
+                    if new_month != st.session_state.current_month:
+                        st.session_state.current_month = new_month
+                        st.rerun()
+            
+            # 5️⃣ シナリオ
+            with col5:
+                scenario_icons = {"現実": "📈", "楽観": "🌟", "悲観": "⚠️"}
+                scenario_icon = scenario_icons.get(st.session_state.scenario, "📈")
+                st.metric("🎭 シナリオ", f"{scenario_icon} {st.session_state.scenario}")
+                
+                # シナリオ選択
+                scenario_options = ["現実", "楽観", "悲観"]
+                current_idx = scenario_options.index(st.session_state.scenario) if st.session_state.scenario in scenario_options else 0
+                new_scenario = st.selectbox(
+                    "シナリオ選択",
+                    scenario_options,
+                    index=current_idx,
+                    key="header_scenario_select",
+                    label_visibility="collapsed"
+                )
+                if new_scenario != st.session_state.scenario:
+                    st.session_state.scenario = new_scenario
+                    # キャッシュをクリア
+                    for key in ['pl_df', 'forecast_data_cache', 'sub_account_aggregation_cache']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.rerun()
+            
+            st.markdown('</div>', unsafe_allow_html=True)
             st.markdown("---")
         
         # --------------------------------------------------------------------------------
