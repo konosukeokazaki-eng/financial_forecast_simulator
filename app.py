@@ -3003,8 +3003,6 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 # デバッグ情報（変数定義後）
                                 with st.expander("🔧 BOX図デバッグ", expanded=True):
                                     st.write(f"**コードバージョン:** v2.8 (動的高さ調整版)")
-                                    st.write(f"**表示項目総数:** {total_items}項目")
-                                    st.write(f"**図の高さ:** {dynamic_height}px")
                                     st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
                                     st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
                                     st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
@@ -3016,6 +3014,10 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                     st.write(f"**表示モード:** {display_mode}")
                                     st.write(f"**流動資産項目数:** {len(current_asset_groups)}")
                                     st.write(f"**固定資産項目数:** {len(fixed_asset_groups)}")
+                                    st.write(f"**流動負債項目数:** {len(current_liab_groups)}")
+                                    st.write(f"**純資産項目数:** {len(equity_groups)}")
+                                    total_display_items = len(current_asset_groups) + len(fixed_asset_groups) + len(current_liab_groups) + len(equity_groups)
+                                    st.write(f"**表示項目総数:** {total_display_items}項目")
                                     if current_asset_groups:
                                         st.write("**流動資産項目:**", list(current_asset_groups.keys()))
                                     if fixed_asset_groups:
