@@ -2768,7 +2768,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             # 棚卸・在庫
                             '棚卸', '在庫', '商品', '製品', '原材料', '仕掛', '貯蔵',
                             # 固定資産
-                            '固定', '建物', '附属設備', '構築', '機械', '車両', '工具', '土地', '減価償却',
+                            '固定', '建物', '附属設備', '構築', '機械', '車両運搬具', '工具', '土地', '減価償却',
                             # 投資
                             '投資', '有価証券', '関係会社株式', '出資金',
                             # その他資産
@@ -2943,7 +2943,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                             current_asset_groups[item] = amount
                                         
                                         # 固定資産に分類
-                                        elif any(x in item for x in ['建物', '附属設備', '構築', '機械', '車両', '工具', '土地', '一括償却', '建設仮勘定', '減価償却累計']):
+                                        elif any(x in item for x in ['建物', '附属設備', '構築', '機械', '車両運搬具', '工具', '土地', '一括償却', '建設仮勘定', '減価償却累計']):
                                             fixed_asset_groups[item] = amount
                                         elif any(x in item for x in ['電話加入', '施設利用', '工業所有', '営業権', '借地権', 'ソフトウェア']):
                                             fixed_asset_groups[item] = amount
@@ -3002,7 +3002,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 
                                 # デバッグ情報（変数定義後）
                                 with st.expander("🔧 BOX図デバッグ", expanded=True):
-                                    st.write(f"**コードバージョン:** v2.7 (BS科目キーワード拡充版)")
+                                    st.write(f"**コードバージョン:** v2.8 (動的高さ調整版)")
+                                    st.write(f"**表示項目総数:** {total_items}項目")
+                                    st.write(f"**図の高さ:** {dynamic_height}px")
                                     st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
                                     st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
                                     st.write(f"**資産合計:** ¥{total_assets/10000:,.0f}万")
@@ -3249,12 +3251,16 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                             )
                                             y_pos -= height
                                 
+                                # 項目数に応じて高さを動的調整
+                                total_items = len(current_asset_groups) + len(fixed_asset_groups) + len(current_liab_groups) + len(equity_groups)
+                                dynamic_height = max(800, total_items * 25 + 300)  # 1項目あたり25px + 余白300px
+                                
                                 fig.update_layout(
                                     xaxis=dict(visible=False, range=[0, 1]),
                                     yaxis=dict(visible=False, range=[0, 1]),
                                     plot_bgcolor='white',
                                     paper_bgcolor='white',
-                                    height=600,
+                                    height=dynamic_height,
                                     showlegend=False,
                                     margin=dict(l=10, r=10, t=10, b=10)
                                 )
