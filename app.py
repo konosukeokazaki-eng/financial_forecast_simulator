@@ -1365,6 +1365,13 @@ else:
         # ========== 簡易モード ==========
         st.sidebar.markdown("### 📊 基本メニュー")
         
+        # ダッシュボード
+        st.sidebar.markdown("#### ダッシュボード")
+        if st.sidebar.button("📊 CFO意思決定支援", width="stretch", key="nav_cfo_dashboard"):
+            st.session_state.page = "CFO意思決定支援ダッシュボード"
+        if st.sidebar.button("着地予測（PL）", width="stretch", key="nav_dashboard"):
+            st.session_state.page = "着地予測ダッシュボード"
+        
         # データ入力
         st.sidebar.markdown("#### データ入力")
         if st.sidebar.button("データ取込", width="stretch", key="nav_import"):
