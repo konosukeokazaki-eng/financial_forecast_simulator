@@ -5648,18 +5648,247 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         # AI自動予測ページ
         elif st.session_state.page == "AI自動予測":
             st.title("🔮 AI自動予測")
-            st.write("✅ ページに到達しました！")
             
-            # デバッグ情報
-            with st.expander("🔍 デバッグ情報", expanded=True):
-                st.write("**Page:**", st.session_state.page)
-                st.write("**selected_period:**", st.session_state.get('selected_period'))
-                st.write("**selected_period_id:**", st.session_state.get('selected_period_id'))
-                st.write("**selected_company:**", st.session_state.get('selected_company'))
+            # 実績データの確認
+            try:
+                period_id = st.session_state.selected_period_id
+                actuals = processor.load_actual_data(period_id)
+                
+                if actuals is None or actuals.empty:
+                    st.warning("⚠️ 実績データが登録されていません")
+                    st.info("""
+                    **AI予測を使用するには:**
+                    1. 左サイドバーから「実績データ入力」または「データ取込」を選択
+                    2. 実績データを登録してください
+                    3. 最低3ヶ月分の実績データが必要です
+                    """)
+                    st.stop()
+                
+                # 実績月数チェック
+                latest_month = int(actuals['fiscal_month'].max())
+                unique_months = actuals['fiscal_month'].nunique()
+                
+                if unique_months < 3:
+                    st.warning(f"⚠️ 実績データが不足しています（現在: {unique_months}ヶ月）")
+                    st.info("AI予測には最低3ヶ月分の実績データが必要です")
+                    st.stop()
+                
+                st.success(f"✅ 実績データ: {unique_months}ヶ月分（最新: {latest_month}月）")
+                
+            except Exception as e:
+                st.error(f"❌ データ取得エラー: {e}")
+                with st.expander("詳細エラー"):
+                    import traceback
+                    st.code(traceback.format_exc())
+                st.stop()
             
-            st.markdown("---")
-            st.info("✅ AI予測ページが正常に表示されています")
-            st.success("次回のアップデートで予測機能を実装します")
+            # 予測設定
+            st.markdown("### ⚙️ 予測設定")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                forecast_method = st.selectbox(
+                    "予測手法",
+                    ["auto", "linear", "average", "exponential"],
+                    format_func=lambda x: {
+                        "auto": "🤖 自動選択（推奨）",
+                        "linear": "📈 線形回帰",
+                        "average": "📊 移動平均",
+                        "exponential": "📉 指数平滑"
+                    }[x]
+                )
+            
+            with col2:
+                forecast_months = list(range(latest_month + 1, 13))
+                if not forecast_months:
+                    st.info("✅ すべての月の実績が登録済みです")
+                    forecast_months = [12]
+            
+            # 予測実行ボタン
+            if st.button("🚀 予測を実行", type="primary", use_container_width=True):
+                with st.spinner("AI予測を実行中..."):
+                    
+                    # 勘定科目ごとに予測
+                    predictions_list = []
+                    
+                    # 実績データから勘定科目リスト取得
+                    accounts = actuals['account_name'].unique()
+                    
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    for idx, account in enumerate(accounts):
+                        status_text.text(f"予測中: {account} ({idx+1}/{len(accounts)})")
+                        progress_bar.progress((idx + 1) / len(accounts))
+                        
+                        # 該当勘定科目の実績データ
+                        account_data = actuals[actuals['account_name'] == account].copy()
+                        account_data = account_data.sort_values('fiscal_month')
+                        
+                        if len(account_data) < 2:
+                            continue
+                        
+                        # 時系列データ準備
+                        months = account_data['fiscal_month'].values
+                        amounts = account_data['amount'].values
+                        
+                        # 予測実行
+                        if forecast_method == 'auto':
+                            # R²で最適手法を選択
+                            if len(months) >= 3:
+                                from sklearn.linear_model import LinearRegression
+                                X = months.reshape(-1, 1)
+                                y = amounts
+                                model = LinearRegression()
+                                model.fit(X, y)
+                                r2 = model.score(X, y)
+                                method = 'linear' if r2 > 0.7 else 'exponential'
+                            else:
+                                method = 'average'
+                        else:
+                            method = forecast_method
+                        
+                        # 予測値計算
+                        for target_month in forecast_months:
+                            if method == 'linear':
+                                # 線形回帰
+                                from sklearn.linear_model import LinearRegression
+                                X = months.reshape(-1, 1)
+                                y = amounts
+                                model = LinearRegression()
+                                model.fit(X, y)
+                                pred_value = model.predict([[target_month]])[0]
+                            
+                            elif method == 'exponential':
+                                # 指数平滑（alpha=0.3）
+                                alpha = 0.3
+                                s = amounts[0]
+                                for v in amounts[1:]:
+                                    s = alpha * v + (1 - alpha) * s
+                                pred_value = s
+                            
+                            elif method == 'average':
+                                # 移動平均（直近3ヶ月）
+                                window = min(3, len(amounts))
+                                pred_value = np.mean(amounts[-window:])
+                            
+                            else:
+                                pred_value = np.mean(amounts)
+                            
+                            predictions_list.append({
+                                'account_name': account,
+                                'fiscal_month': target_month,
+                                'amount': pred_value,
+                                'method': method
+                            })
+                    
+                    progress_bar.empty()
+                    status_text.empty()
+                    
+                    if not predictions_list:
+                        st.error("❌ 予測データを生成できませんでした")
+                        st.stop()
+                    
+                    predictions_df = pd.DataFrame(predictions_list)
+                    
+                    # 結果表示
+                    st.markdown("---")
+                    st.markdown("### 📊 予測結果")
+                    
+                    # サマリー
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric(
+                            "予測勘定科目数",
+                            f"{predictions_df['account_name'].nunique()} 科目"
+                        )
+                    
+                    with col2:
+                        st.metric(
+                            "予測期間",
+                            f"{min(forecast_months)}月 〜 {max(forecast_months)}月"
+                        )
+                    
+                    with col3:
+                        st.metric(
+                            "使用手法",
+                            predictions_df['method'].mode()[0].upper()
+                        )
+                    
+                    # タブで表示
+                    tab1, tab2 = st.tabs(["📈 グラフ表示", "📋 データ一覧"])
+                    
+                    with tab1:
+                        # 主要科目のグラフ
+                        st.markdown("#### 主要科目の予測推移")
+                        
+                        # 売上高
+                        if '売上高' in predictions_df['account_name'].values:
+                            sales_actual = actuals[actuals['account_name'] == '売上高'].copy()
+                            sales_pred = predictions_df[predictions_df['account_name'] == '売上高'].copy()
+                            
+                            fig = go.Figure()
+                            
+                            # 実績
+                            fig.add_trace(go.Scatter(
+                                x=sales_actual['fiscal_month'],
+                                y=sales_actual['amount'],
+                                mode='lines+markers',
+                                name='実績',
+                                line=dict(color='#1f77b4', width=3),
+                                marker=dict(size=8)
+                            ))
+                            
+                            # 予測
+                            fig.add_trace(go.Scatter(
+                                x=sales_pred['fiscal_month'],
+                                y=sales_pred['amount'],
+                                mode='lines+markers',
+                                name='予測',
+                                line=dict(color='#ff7f0e', width=3, dash='dash'),
+                                marker=dict(size=8, symbol='diamond')
+                            ))
+                            
+                            fig.update_layout(
+                                title='売上高の予測',
+                                xaxis_title='会計月',
+                                yaxis_title='金額（円）',
+                                hovermode='x unified',
+                                height=400
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                    
+                    with tab2:
+                        # データテーブル
+                        st.markdown("#### 予測データ一覧")
+                        
+                        # ピボットテーブル
+                        pivot_df = predictions_df.pivot(
+                            index='account_name',
+                            columns='fiscal_month',
+                            values='amount'
+                        )
+                        
+                        # フォーマット
+                        st.dataframe(
+                            pivot_df.style.format("{:,.0f}"),
+                            use_container_width=True,
+                            height=400
+                        )
+                        
+                        # CSV出力用
+                        csv = predictions_df.to_csv(index=False, encoding='utf-8-sig')
+                        from datetime import datetime
+                        st.download_button(
+                            label="📥 CSVダウンロード",
+                            data=csv,
+                            file_name=f"ai_forecast_{datetime.now().strftime('%Y%m%d')}.csv",
+                            mime="text/csv"
+                        )
+
 
 else:
     # 会社または期が未登録の場合
