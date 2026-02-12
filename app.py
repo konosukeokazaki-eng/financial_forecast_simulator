@@ -1189,6 +1189,43 @@ if st.sidebar.button("ログアウト", type="secondary"):
 
 st.sidebar.markdown("---")
 
+# 🎛️ 分析モード切替
+st.sidebar.markdown("### 🎛️ 分析モード")
+if 'analysis_mode' not in st.session_state:
+    st.session_state.analysis_mode = "📊 簡易モード"
+
+# カスタムCSS（ラジオボタンを見やすく）
+st.sidebar.markdown("""
+<style>
+div[data-testid="stRadio"] > label {
+    color: #000000 !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+}
+div[data-testid="stRadio"] label[data-baseweb="radio"] {
+    color: #000000 !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.session_state.analysis_mode = st.sidebar.radio(
+    "",
+    ["📊 簡易モード", "🔬 高度モード"],
+    index=0 if st.session_state.analysis_mode == "📊 簡易モード" else 1,
+    horizontal=True,
+    key="analysis_mode_radio"
+)
+
+# モード説明
+if st.session_state.analysis_mode == "📊 簡易モード":
+    st.sidebar.caption("💡 基本的な分析のみ表示")
+else:
+    st.sidebar.caption("🔬 全ての分析機能を表示")
+
+st.sidebar.markdown("---")
+
 # データベース接続状態の表示
 if processor.use_postgres:
     st.sidebar.success("🌐 Supabase接続中")
@@ -1323,61 +1360,82 @@ else:
     # メニュー
     st.sidebar.markdown("---")
     
-    # 階層型ナビゲーション（アイコンなし）
-    st.sidebar.markdown("### ダッシュボード")
-    if st.sidebar.button("📊 CFO意思決定支援", width="stretch", key="nav_cfo_dashboard"):
-        st.session_state.page = "CFO意思決定支援ダッシュボード"
-    if st.sidebar.button("着地予測（PL）", width="stretch", key="nav_dashboard"):
-        st.session_state.page = "着地予測ダッシュボード"
-    
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### データ入力")
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        if st.button("実績", width="stretch", key="nav_actual"):
-            st.session_state.page = "実績データ入力"
-    with col2:
-        if st.button("予測", width="stretch", key="nav_forecast"):
-            st.session_state.page = "予測データ入力"
-    
-    if st.sidebar.button("データ取込", width="stretch", key="nav_import"):
-        st.session_state.page = "データインポート"
-    
-    if st.sidebar.button("シナリオ一括設定", width="stretch", key="nav_scenario"):
-        st.session_state.page = "シナリオ一括設定"
-    
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 財務諸表")
-    if st.sidebar.button("損益計算書 (PL)", width="stretch", key="nav_pl"):
-        st.session_state.page = "損益計算書 (PL)"
-    if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
-        st.session_state.page = "貸借対照表 (BS)"
-    if st.sidebar.button("CF計算書", width="stretch", key="nav_cf"):
-        st.session_state.page = "キャッシュフロー計算書 (CF)"
-    if st.sidebar.button("CF詳細分析", width="stretch", key="nav_cf_detail"):
-        st.session_state.page = "CF詳細分析"
-    
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 分析レポート")
-    if st.sidebar.button("予実比較", width="stretch", key="nav_comparison"):
-        st.session_state.page = "予測 VS 実績比較"
-    if st.sidebar.button("シナリオ比較", width="stretch", key="nav_scenario_comp"):
-        st.session_state.page = "シナリオ比較"
-    if st.sidebar.button("期間比較", width="stretch", key="nav_period"):
-        st.session_state.page = "期間比較分析"
-    if st.sidebar.button("経営指標", width="stretch", key="nav_metrics"):
-        st.session_state.page = "経営指標ダッシュボード"
-    if st.sidebar.button("損益分岐点", width="stretch", key="nav_breakeven"):
-        st.session_state.page = "損益分岐点分析"
-    if st.sidebar.button("運転資本分析", width="stretch", key="nav_working_capital"):
-        st.session_state.page = "運転資本分析"
-    if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
-        st.session_state.page = "収益構造分析"
-    
-    # AI自動予測
-    if ADVANCED_FORECAST_AVAILABLE:
-        if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_ai_forecast"):
-            st.session_state.page = "AI自動予測"
+    # 🎛️ モードによってメニューを切り替え
+    if st.session_state.analysis_mode == "📊 簡易モード":
+        # ========== 簡易モード ==========
+        st.sidebar.markdown("### 📊 基本メニュー")
+        
+        # データ入力
+        st.sidebar.markdown("#### データ入力")
+        if st.sidebar.button("データ取込", width="stretch", key="nav_import"):
+            st.session_state.page = "データインポート"
+        
+        # 財務諸表（基本のみ）
+        st.sidebar.markdown("#### 財務諸表")
+        if st.sidebar.button("損益計算書 (PL)", width="stretch", key="nav_pl"):
+            st.session_state.page = "損益計算書 (PL)"
+        if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
+            st.session_state.page = "貸借対照表 (BS)"
+        if st.sidebar.button("CF計算書", width="stretch", key="nav_cf"):
+            st.session_state.page = "キャッシュフロー計算書 (CF)"
+        
+    else:
+        # ========== 高度モード（全機能） ==========
+        # 階層型ナビゲーション（アイコンなし）
+        st.sidebar.markdown("### ダッシュボード")
+        if st.sidebar.button("📊 CFO意思決定支援", width="stretch", key="nav_cfo_dashboard"):
+            st.session_state.page = "CFO意思決定支援ダッシュボード"
+        if st.sidebar.button("着地予測（PL）", width="stretch", key="nav_dashboard"):
+            st.session_state.page = "着地予測ダッシュボード"
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### データ入力")
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            if st.button("実績", width="stretch", key="nav_actual"):
+                st.session_state.page = "実績データ入力"
+        with col2:
+            if st.button("予測", width="stretch", key="nav_forecast"):
+                st.session_state.page = "予測データ入力"
+        
+        if st.sidebar.button("データ取込", width="stretch", key="nav_import"):
+            st.session_state.page = "データインポート"
+        
+        if st.sidebar.button("シナリオ一括設定", width="stretch", key="nav_scenario"):
+            st.session_state.page = "シナリオ一括設定"
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 財務諸表")
+        if st.sidebar.button("損益計算書 (PL)", width="stretch", key="nav_pl"):
+            st.session_state.page = "損益計算書 (PL)"
+        if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
+            st.session_state.page = "貸借対照表 (BS)"
+        if st.sidebar.button("CF計算書", width="stretch", key="nav_cf"):
+            st.session_state.page = "キャッシュフロー計算書 (CF)"
+        if st.sidebar.button("CF詳細分析", width="stretch", key="nav_cf_detail"):
+            st.session_state.page = "CF詳細分析"
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 分析レポート")
+        if st.sidebar.button("予実比較", width="stretch", key="nav_comparison"):
+            st.session_state.page = "予測 VS 実績比較"
+        if st.sidebar.button("シナリオ比較", width="stretch", key="nav_scenario_comp"):
+            st.session_state.page = "シナリオ比較"
+        if st.sidebar.button("期間比較", width="stretch", key="nav_period"):
+            st.session_state.page = "期間比較分析"
+        if st.sidebar.button("経営指標", width="stretch", key="nav_metrics"):
+            st.session_state.page = "経営指標ダッシュボード"
+        if st.sidebar.button("損益分岐点", width="stretch", key="nav_breakeven"):
+            st.session_state.page = "損益分岐点分析"
+        if st.sidebar.button("運転資本分析", width="stretch", key="nav_working_capital"):
+            st.session_state.page = "運転資本分析"
+        if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
+            st.session_state.page = "収益構造分析"
+        
+        # AI自動予測
+        if ADVANCED_FORECAST_AVAILABLE:
+            if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_ai_forecast"):
+                st.session_state.page = "AI自動予測"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 設定")
