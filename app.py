@@ -2689,11 +2689,6 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             </div>
             """, unsafe_allow_html=True)
             
-            # デバッグ情報
-            with st.expander("🔍 BSデバッグ情報", expanded=False):
-                st.write("**データ取得確認:**")
-                st.write("selected_period_id:", selected_period_id)
-            
             # BSデータ取得 - actual_dataから直接全データを取得
             try:
                 # データベースから直接全項目を取得（all_itemsフィルタなし）
@@ -2706,20 +2701,27 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 
                 all_data_df = processor._read_sql_query(query, params=(selected_period_id,))
                 
-                st.write("**データベース直接取得:**")
-                st.write("all_data_df loaded:", all_data_df is not None)
+                # デバッグ情報（非表示）
+                with st.expander("🔍 BSデバッグ情報", expanded=False):
+                    st.write("**データ取得確認:**")
+                    st.write("selected_period_id:", selected_period_id)
+                    st.write("**データベース直接取得:**")
+                    st.write("all_data_df loaded:", all_data_df is not None)
                 
                 if all_data_df is not None and not all_data_df.empty:
-                    st.write("Shape:", all_data_df.shape)
-                    st.write("Unique items:", all_data_df['項目名'].nunique())
+                    with st.expander("🔍 BSデバッグ情報", expanded=False):
+                        st.write("Shape:", all_data_df.shape)
+                        st.write("Unique items:", all_data_df['項目名'].nunique())
                     
                     # 横持ち変換
                     pivot_df = all_data_df.pivot(index='項目名', columns='month', values='amount').reset_index()
-                    st.write("Pivot shape:", pivot_df.shape)
+                    with st.expander("🔍 BSデバッグ情報", expanded=False):
+                        st.write("Pivot shape:", pivot_df.shape)
                     
                     # 縦持ちに変換
                     actuals_df = convert_wide_to_long(pivot_df)
-                    st.write("After long conversion:", actuals_df.shape)
+                    with st.expander("🔍 BSデバッグ情報", expanded=False):
+                        st.write("After long conversion:", actuals_df.shape)
                     
                     # カラム名正規化
                     actuals_df.columns = actuals_df.columns.str.lower()
@@ -2739,7 +2741,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     
                     if month_col:
                         actuals_df = actuals_df[actuals_df[month_col] == current_month_num]
-                        st.write(f"Current month {current_month_num} data:", actuals_df.shape)
+                        with st.expander("🔍 BSデバッグ情報", expanded=False):
+                            st.write(f"Current month {current_month_num} data:", actuals_df.shape)
                     
                     # カラム検出
                     account_col = None
@@ -2754,7 +2757,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             amount_col = col
                             break
                     
-                    st.write(f"Detected: account={account_col}, amount={amount_col}")
+                    with st.expander("🔍 BSデバッグ情報", expanded=False):
+                        st.write(f"Detected: account={account_col}, amount={amount_col}")
                     
                     if account_col and amount_col:
                         # BS科目キーワード（完全版）
@@ -2788,7 +2792,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             )
                         ].copy()
                         
-                        st.write(f"**BS items found: {len(bs_df)}**")
+                        with st.expander("🔍 BSデバッグ情報", expanded=False):
+                            st.write(f"**BS items found: {len(bs_df)}**")
                         
                         if not bs_df.empty:
                             bs_df = bs_df.rename(columns={account_col: '項目名', amount_col: '金額'})
@@ -2806,7 +2811,25 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.markdown("---")
                             st.subheader("📊 貸借対照表（BOX型）")
                             
-                            # 表示モード選択
+                            # 表示モード選択（ラベルを見やすく）
+                            st.markdown("""
+                            <style>
+                            .stRadio > label {
+                                color: #262730 !important;
+                                font-weight: 600 !important;
+                            }
+                            .stRadio > div {
+                                background-color: #F0F2F6 !important;
+                                padding: 10px !important;
+                                border-radius: 5px !important;
+                            }
+                            .stRadio > div > label {
+                                color: #262730 !important;
+                                font-weight: 500 !important;
+                            }
+                            </style>
+                            """, unsafe_allow_html=True)
+                            
                             display_mode = st.radio(
                                 "表示モード",
                                 ["要約表示（合計のみ）", "詳細表示（全勘定科目）"],
