@@ -1701,29 +1701,31 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         st.markdown("""
         <style>
         .status-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 1rem;
+            background: #F8F9FA;
+            padding: 1.2rem;
             border-radius: 10px;
             margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 1px solid #E0E0E0;
         }
         .status-card {
             background: white;
-            padding: 0.8rem;
+            padding: 1rem;
             border-radius: 8px;
             text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid #E0E0E0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
         }
         .status-label {
-            color: #666;
-            font-size: 0.75rem;
+            color: #666666;
+            font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.4rem;
+            letter-spacing: 0.5px;
         }
         .status-value {
             color: #1a1a1a;
-            font-size: 1rem;
+            font-size: 1.1rem;
             font-weight: 700;
         }
         </style>
@@ -1779,7 +1781,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 
                 # クリックで変更可能
                 with st.popover("変更", use_container_width=True):
-                    periods = get_periods_cached(processor, st.session_state.selected_company)
+                    periods = get_company_periods_cached(st.session_state.selected_company, processor)
                     if not periods.empty:
                         period_options = [f"第{row['period_num']}期 ({row['start_date']}〜{row['end_date']})" 
                                         for _, row in periods.iterrows()]
