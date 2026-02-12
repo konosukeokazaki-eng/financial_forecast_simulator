@@ -5645,22 +5645,21 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             st.table(pd.DataFrame(summary_data))
         
-
-# AI自動予測ページ
-elif st.session_state.page == "AI自動予測":
-    st.title("🔮 AI自動予測")
-    st.write("✅ ページに到達しました！")
-    
-    # デバッグ情報
-    with st.expander("🔍 デバッグ情報", expanded=True):
-        st.write("**Page:**", st.session_state.page)
-        st.write("**selected_period:**", st.session_state.get('selected_period'))
-        st.write("**selected_period_id:**", st.session_state.get('selected_period_id'))
-        st.write("**selected_company:**", st.session_state.get('selected_company'))
-    
-    st.markdown("---")
-    st.info("✅ AI予測ページが正常に表示されています")
-    st.success("次回のアップデートで予測機能を実装します")
+        # AI自動予測ページ
+        elif st.session_state.page == "AI自動予測":
+            st.title("🔮 AI自動予測")
+            st.write("✅ ページに到達しました！")
+            
+            # デバッグ情報
+            with st.expander("🔍 デバッグ情報", expanded=True):
+                st.write("**Page:**", st.session_state.page)
+                st.write("**selected_period:**", st.session_state.get('selected_period'))
+                st.write("**selected_period_id:**", st.session_state.get('selected_period_id'))
+                st.write("**selected_company:**", st.session_state.get('selected_company'))
+            
+            st.markdown("---")
+            st.info("✅ AI予測ページが正常に表示されています")
+            st.success("次回のアップデートで予測機能を実装します")
 
 else:
     # 会社または期が未登録の場合
