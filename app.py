@@ -443,13 +443,7 @@ def create_pl_waterfall(pl_data):
         return None
 
 
-# AI Forecast import
-try:
-    from advanced_forecast_engine import get_advanced_forecast_engine
-    from advanced_forecast_ui import show_advanced_forecast_page
-    ADVANCED_FORECAST_AVAILABLE = True
-except ImportError:
-    ADVANCED_FORECAST_AVAILABLE = False
+# AI Forecast は組み込み実装のため外部モジュール不要
 
 
 # ページ設定 - 完全ライトモード
@@ -1445,9 +1439,10 @@ else:
             st.session_state.page = "収益構造分析"
         
         # AI自動予測
-        if ADVANCED_FORECAST_AVAILABLE:
-            if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_ai_forecast"):
-                st.session_state.page = "AI自動予測"
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### AI予測")
+        if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_ai_forecast"):
+            st.session_state.page = "AI自動予測"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 設定")
