@@ -5656,6 +5656,30 @@ elif st.session_state.page == "AI自動予測":
     st.title("🔮 AI自動予測")
     st.markdown("---")
     
+    # デバッグ情報
+    with st.expander("🔍 デバッグ情報", expanded=True):
+        st.write("**Page:**", st.session_state.page)
+        st.write("**selected_period:**", st.session_state.get('selected_period'))
+        st.write("**selected_period_id:**", st.session_state.get('selected_period_id'))
+        st.write("**selected_company:**", st.session_state.get('selected_company'))
+        st.write("**selected_comp_name:**", st.session_state.get('selected_comp_name'))
+        
+        # processorの存在確認
+        try:
+            st.write("**processor exists:**", processor is not None)
+            if 'selected_period' in st.session_state:
+                test_actuals = processor.load_actual_data(st.session_state.selected_period)
+                st.write("**actuals loaded:**", test_actuals is not None)
+                if test_actuals is not None:
+                    st.write("**actuals shape:**", test_actuals.shape)
+                    st.write("**actuals columns:**", list(test_actuals.columns))
+                    st.write("**actuals head:**")
+                    st.dataframe(test_actuals.head())
+        except Exception as e:
+            st.error(f"Debug error: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+    
     # selected_period_idの設定
     if 'selected_period' in st.session_state:
         st.session_state.selected_period_id = st.session_state.selected_period
