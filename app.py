@@ -2814,18 +2814,23 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             # 表示モード選択（ラベルを見やすく）
                             st.markdown("""
                             <style>
-                            .stRadio > label {
+                            /* ラジオボタンのメインラベル */
+                            div[data-testid="stRadio"] > label {
                                 color: #000000 !important;
                                 font-weight: 600 !important;
+                                font-size: 16px !important;
                             }
-                            .stRadio > div {
+                            /* ラジオボタンの選択肢 */
+                            div[data-testid="stRadio"] label[data-baseweb="radio"] {
+                                color: #000000 !important;
+                                font-weight: 500 !important;
+                                cursor: pointer !important;
+                            }
+                            /* ラジオボタンのコンテナ */
+                            div[data-testid="stRadio"] > div {
                                 background-color: #F0F2F6 !important;
                                 padding: 10px !important;
                                 border-radius: 5px !important;
-                            }
-                            .stRadio > div > label {
-                                color: #000000 !important;
-                                font-weight: 500 !important;
                             }
                             </style>
                             """, unsafe_allow_html=True)
