@@ -2815,7 +2815,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             st.markdown("""
                             <style>
                             .stRadio > label {
-                                color: #262730 !important;
+                                color: #000000 !important;
                                 font-weight: 600 !important;
                             }
                             .stRadio > div {
@@ -2824,7 +2824,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 border-radius: 5px !important;
                             }
                             .stRadio > div > label {
-                                color: #262730 !important;
+                                color: #000000 !important;
                                 font-weight: 500 !important;
                             }
                             </style>
@@ -3024,7 +3024,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 fixed_asset_bottom = bottom_total_height
                                 
                                 # デバッグ情報（変数定義後）
-                                with st.expander("🔧 BOX図デバッグ", expanded=True):
+                                with st.expander("🔧 BOX図デバッグ", expanded=False):
                                     st.write(f"**コードバージョン:** v2.8 (動的高さ調整版)")
                                     st.write(f"**流動資産合計:** ¥{current_assets/10000:,.0f}万")
                                     st.write(f"**固定資産合計:** ¥{fixed_assets/10000:,.0f}万")
