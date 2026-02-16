@@ -5652,9 +5652,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # 実績データの確認
             try:
                 period_id = st.session_state.selected_period_id
-                actuals = processor.load_actual_data(period_id)
+                actuals_raw = processor.load_actual_data(period_id)
                 
-                if actuals is None or actuals.empty:
+                if actuals_raw is None or actuals_raw.empty:
                     st.warning("⚠️ 実績データが登録されていません")
                     st.info("""
                     **AI予測を使用するには:**
@@ -5665,49 +5665,58 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     st.stop()
                 
                 # カラム名を確認
-                st.info(f"📋 実績データ: {len(actuals)}行")
-                with st.expander("🔍 データ構造確認"):
-                    st.write("**カラム名:**", list(actuals.columns))
+                st.info(f"📋 実績データ: {len(actuals_raw)}行")
+                with st.expander("🔍 データ構造確認（元データ）"):
+                    st.write("**カラム名:**", list(actuals_raw.columns))
                     st.write("**データサンプル:**")
-                    st.dataframe(actuals.head(10))
+                    st.dataframe(actuals_raw.head(10))
                 
-                # カラム名の正規化
-                month_col = None
-                for col in actuals.columns:
-                    if 'month' in col.lower():
-                        month_col = col
-                        break
+                # ワイド形式→ロング形式への変換
+                # カラム: ['項目名', '2025-04', '2025-05', ...]
+                # → ['account_name', 'month', 'amount']
                 
-                if month_col is None:
+                account_col = actuals_raw.columns[0]  # '項目名'
+                month_cols = [col for col in actuals_raw.columns if col != account_col]
+                
+                if not month_cols:
                     st.error("❌ 月カラムが見つかりません")
-                    st.write("利用可能なカラム:", list(actuals.columns))
                     st.stop()
                 
-                account_col = None
-                for col in actuals.columns:
-                    if 'account' in col.lower() or '科目' in col or '項目' in col:
-                        account_col = col
-                        break
+                st.success(f"✅ ワイド形式検出: 科目列={account_col}, 月列数={len(month_cols)}")
                 
-                if account_col is None:
-                    st.error("❌ 勘定科目カラムが見つかりません")
+                # ロング形式に変換
+                actuals_list = []
+                for _, row in actuals_raw.iterrows():
+                    account = row[account_col]
+                    for month_col in month_cols:
+                        value = row[month_col]
+                        if pd.notna(value) and value != 0:
+                            # 月を数値に変換 (2025-04 → 4)
+                            try:
+                                month_num = int(month_col.split('-')[1])
+                            except:
+                                continue
+                            
+                            actuals_list.append({
+                                'account_name': account,
+                                'fiscal_month': month_num,
+                                'amount': float(value),
+                                'month_str': month_col
+                            })
+                
+                if not actuals_list:
+                    st.error("❌ 変換できるデータがありません")
                     st.stop()
                 
-                amount_col = None
-                for col in actuals.columns:
-                    if 'amount' in col.lower() or '金額' in col:
-                        amount_col = col
-                        break
+                actuals = pd.DataFrame(actuals_list)
                 
-                if amount_col is None:
-                    st.error("❌ 金額カラムが見つかりません")
-                    st.stop()
-                
-                st.success(f"✅ カラム検出: 月={month_col}, 科目={account_col}, 金額={amount_col}")
+                st.success(f"✅ ロング形式に変換: {len(actuals)}行")
+                with st.expander("🔍 変換後データ確認"):
+                    st.dataframe(actuals.head(20))
                 
                 # 実績月数チェック
-                latest_month = int(actuals[month_col].max())
-                unique_months = actuals[month_col].nunique()
+                latest_month = int(actuals['fiscal_month'].max())
+                unique_months = actuals['fiscal_month'].nunique()
                 
                 if unique_months < 3:
                     st.warning(f"⚠️ 実績データが不足しています（現在: {unique_months}ヶ月）")
@@ -5754,7 +5763,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     predictions_list = []
                     
                     # 実績データから勘定科目リスト取得
-                    accounts = actuals[account_col].unique()
+                    accounts = actuals['account_name'].unique()
                     
                     progress_bar = st.progress(0)
                     status_text = st.empty()
@@ -5764,15 +5773,15 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         progress_bar.progress((idx + 1) / len(accounts))
                         
                         # 該当勘定科目の実績データ
-                        account_data = actuals[actuals[account_col] == account].copy()
-                        account_data = account_data.sort_values(month_col)
+                        account_data = actuals[actuals['account_name'] == account].copy()
+                        account_data = account_data.sort_values('fiscal_month')
                         
                         if len(account_data) < 2:
                             continue
                         
                         # 時系列データ準備
-                        months = account_data[month_col].values
-                        amounts = account_data[amount_col].values
+                        months = account_data['fiscal_month'].values
+                        amounts = account_data['amount'].values
                         
                         # 予測実行
                         if forecast_method == 'auto':
@@ -5867,15 +5876,15 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         
                         # 売上高
                         if '売上高' in predictions_df['account_name'].values:
-                            sales_actual = actuals[actuals[account_col] == '売上高'].copy()
+                            sales_actual = actuals[actuals['account_name'] == '売上高'].copy()
                             sales_pred = predictions_df[predictions_df['account_name'] == '売上高'].copy()
                             
                             fig = go.Figure()
                             
                             # 実績
                             fig.add_trace(go.Scatter(
-                                x=sales_actual[month_col],
-                                y=sales_actual[amount_col],
+                                x=sales_actual['fiscal_month'],
+                                y=sales_actual['amount'],
                                 mode='lines+markers',
                                 name='実績',
                                 line=dict(color='#1f77b4', width=3),
