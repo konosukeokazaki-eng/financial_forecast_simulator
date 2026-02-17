@@ -1950,13 +1950,13 @@ class DataProcessor:
     # AI予測関連メソッド（新規追加）
     # =====================================================
     
-    def save_forecast_with_metadata(self, period_id, fiscal_month, account_name, amount, 
+    def save_forecast_with_metadata(self, period_id, month, account_name, amount, 
                                      scenario='現実', source='manual', auto_generated=False,
                                      manual_override=False, prediction_method=None,
                                      ai_predicted_value=None, adjustment_reason_type=None,
                                      adjustment_reason_detail=None):
         """
-        予測データを詳細メタデータとともに保存
+        予測データを詳細メタデータとともに保存（forecast_dataテーブル使用）
         """
         try:
             if self.use_postgres:
@@ -1965,30 +1965,30 @@ class DataProcessor:
                 conn = psycopg2.connect(self.conn_string)
                 cursor = conn.cursor()
                 
+                # forecast_dataテーブルに保存（item_name形式）
                 # 既存データを削除（UPSERT）
                 delete_query = """
-                    DELETE FROM forecasts 
-                    WHERE period_id = %s 
-                      AND fiscal_month = %s 
-                      AND account_name = %s 
+                    DELETE FROM forecast_data 
+                    WHERE fiscal_period_id = %s 
+                      AND month = %s 
+                      AND item_name = %s 
                       AND scenario = %s
                 """
-                cursor.execute(delete_query, (period_id, fiscal_month, account_name, scenario))
+                cursor.execute(delete_query, (period_id, month, account_name, scenario))
                 
                 # 新規挿入
                 insert_query = """
-                    INSERT INTO forecasts (
-                        period_id, fiscal_month, account_name, amount, scenario,
-                        source, auto_generated, manual_override, prediction_method,
-                        ai_predicted_value, adjustment_reason_type, adjustment_reason_detail,
-                        created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                    INSERT INTO forecast_data (
+                        fiscal_period_id, month, item_name, amount, scenario,
+                        created_at
+                    ) VALUES (%s, %s, %s, %s, %s, NOW())
                 """
                 cursor.execute(insert_query, (
-                    period_id, fiscal_month, account_name, amount, scenario,
-                    source, auto_generated, manual_override, prediction_method,
-                    ai_predicted_value, adjustment_reason_type, adjustment_reason_detail
+                    period_id, month, account_name, amount, scenario
                 ))
+                
+                # TODO: メタデータは別テーブルに保存（将来実装）
+                # 現時点ではforecast_dataテーブルに基本情報のみ保存
                 
                 conn.commit()
                 cursor.close()
@@ -2004,46 +2004,73 @@ class DataProcessor:
         実績データに基づいてAI予測を自動生成
         """
         try:
+            # 会計期間情報を取得
+            period_info = self.get_period_info(period_id)
+            if not period_info:
+                return {'success': False, 'error': '会計期間情報が見つかりません'}
+            
+            # 会計期間の全月リストを取得
+            all_months = self.get_fiscal_months(period_id)
+            if not all_months:
+                return {'success': False, 'error': '会計期間の月リストを取得できません'}
+            
             # 実績データ取得
             actuals = self.load_actual_data(period_id)
             
             if actuals is None or actuals.empty:
                 return {'success': False, 'error': '実績データがありません'}
             
-            # ワイド形式→ロング形式変換
-            if '項目名' in actuals.columns:
-                actuals = self._convert_wide_to_long(actuals)
+            # 実績が存在する月を特定
+            actual_months = [col for col in actuals.columns if col != '項目名' and actuals[col].sum() != 0]
             
-            latest_month = int(actuals['fiscal_month'].max())
-            forecast_months = list(range(latest_month + 1, 13))
+            if len(actual_months) < 2:
+                return {'success': False, 'error': '実績データが不足しています（最低2ヶ月必要）'}
+            
+            # 予測対象月を特定（実績がない月）
+            forecast_months = [m for m in all_months if m not in actual_months]
             
             if not forecast_months:
                 return {'success': False, 'error': '予測対象月がありません（全月実績済み）'}
             
+            # 月→インデックスのマッピング作成
+            month_to_index = {month: idx + 1 for idx, month in enumerate(all_months)}
+            
             # 予測実行
             predictions_list = []
-            accounts = actuals['account_name'].unique()
+            accounts = actuals['項目名'].values
             
             for account in accounts:
-                account_data = actuals[actuals['account_name'] == account].copy()
-                account_data = account_data.sort_values('fiscal_month')
+                # 該当勘定科目の実績データ
+                account_row = actuals[actuals['項目名'] == account].iloc[0]
                 
-                if len(account_data) < 2:
+                # 実績月のデータを抽出
+                actual_data = []
+                actual_indices = []
+                for month in actual_months:
+                    if month in account_row.index:
+                        value = account_row[month]
+                        if pd.notna(value) and value != 0:
+                            actual_data.append(float(value))
+                            actual_indices.append(month_to_index[month])
+                
+                if len(actual_data) < 2:
                     continue
                 
-                months = account_data['fiscal_month'].values
-                amounts = account_data['amount'].values
+                # numpy配列に変換
+                months_array = np.array(actual_indices)
+                amounts_array = np.array(actual_data)
                 
                 # 予測手法の自動選択
-                method = self._select_prediction_method(months, amounts)
+                method = self._select_prediction_method(months_array, amounts_array)
                 
                 # 予測値計算
-                for target_month in forecast_months:
-                    pred_value = self._predict_value(months, amounts, target_month, method)
+                for forecast_month in forecast_months:
+                    target_index = month_to_index[forecast_month]
+                    pred_value = self._predict_value(months_array, amounts_array, target_index, method)
                     
                     predictions_list.append({
                         'account_name': account,
-                        'fiscal_month': target_month,
+                        'month': forecast_month,
                         'amount': pred_value,
                         'method': method
                     })
@@ -2056,7 +2083,7 @@ class DataProcessor:
             for pred in predictions_list:
                 result = self.save_forecast_with_metadata(
                     period_id=period_id,
-                    fiscal_month=pred['fiscal_month'],
+                    month=pred['month'],
                     account_name=pred['account_name'],
                     amount=pred['amount'],
                     scenario='現実',
@@ -2073,11 +2100,13 @@ class DataProcessor:
                 'success': True,
                 'generated_count': saved_count,
                 'accounts': len(accounts),
-                'months': forecast_months
+                'months': forecast_months,
+                'actual_months': actual_months
             }
             
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            import traceback
+            return {'success': False, 'error': str(e), 'traceback': traceback.format_exc()}
     
     def _convert_wide_to_long(self, df):
         """
@@ -2153,26 +2182,12 @@ class DataProcessor:
     def _delete_auto_forecasts(self, period_id):
         """
         既存のAI自動生成予測を削除
+        注: 現在はforecast_dataテーブルを使用しているため、
+        sourceフィールドがないため、全削除は行わない
+        個別にUPSERTで上書きする方式を採用
         """
-        try:
-            if self.use_postgres:
-                import psycopg2
-                conn = psycopg2.connect(self.conn_string)
-                cursor = conn.cursor()
-                
-                query = """
-                    DELETE FROM forecasts 
-                    WHERE period_id = %s 
-                      AND source = 'AI' 
-                      AND auto_generated = TRUE
-                      AND manual_override = FALSE
-                """
-                cursor.execute(query, (period_id,))
-                conn.commit()
-                cursor.close()
-                conn.close()
-        except Exception as e:
-            print(f"削除エラー: {e}")
+        # 将来的にメタデータテーブルを実装した際に使用
+        pass
     
     def load_forecast_with_metadata(self, period_id, scenario='現実'):
         """
