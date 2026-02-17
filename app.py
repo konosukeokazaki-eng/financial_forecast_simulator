@@ -5688,50 +5688,51 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.info("予測対象月がありません（会計期間終了）")
                 st.stop()
             
-            # 実績データの確認
+            # 実績データの確認（当期 + 前期）
             try:
-                actuals_raw = processor.load_actual_data(period_id)
+                combined = processor.load_combined_actual_data(period_id, current_month)
+                current_months_with_data = combined['current_months']
+                has_prev = combined['has_prev']
                 
-                if actuals_raw is None or actuals_raw.empty:
-                    st.warning("⚠️ 実績データが登録されていません")
-                    st.info("""
-                    **AI予測を使用するには:**
-                    1. 左サイドバーから「実績データ入力」または「データ取込」を選択
-                    2. 実績データを登録してください
-                    3. 最低2ヶ月分の実績データが必要です
-                    """)
-                    st.stop()
-                
-                # 実績月範囲内でデータが存在する月をチェック
-                actual_months_with_data = []
-                for month in actual_months_range:
-                    if month in actuals_raw.columns and actuals_raw[month].sum() != 0:
-                        actual_months_with_data.append(month)
-                
-                if len(actual_months_with_data) < 2:
-                    st.warning(f"⚠️ 実績データが不足しています（現在: {len(actual_months_with_data)}ヶ月）")
-                    st.info("AI予測には最低2ヶ月分の実績データが必要です")
-                    st.stop()
+                # 学習に使えるデータ月数を判定
+                total_data_months = len(current_months_with_data)
+                if has_prev:
+                    prev_records = [r for r in combined['records'] if r['source'] == 'prev']
+                    prev_month_count = len(set(r['month_label'] for r in prev_records))
+                    total_data_months += prev_month_count
                 
                 # ステータス表示
                 col1, col2, col3 = st.columns(3)
-                
                 with col1:
-                    st.metric("📅 実績月数", f"{len(actual_months_with_data)}ヶ月")
-                
+                    st.metric("📅 当期実績月数", f"{len(current_months_with_data)}ヶ月")
                 with col2:
                     st.metric("🎯 予測対象月", f"{len(forecast_months)}ヶ月")
-                
                 with col3:
                     st.metric("📊 実績締月", current_month)
                 
-                st.markdown("---")
+                # 前期情報
+                if has_prev:
+                    st.success(f"✅ 前期実績データも参照して予測します（合計: {total_data_months}ヶ月分のデータ）")
+                elif len(current_months_with_data) < 2:
+                    st.warning("⚠️ 当期の実績データが不足しており、前期データもありません")
+                    st.info("""
+                    **AI予測を使用するには以下のいずれかが必要です:**
+                    - 当期の実績データが2ヶ月以上
+                    - または、前期データが登録されていること
+                    """)
+                    st.stop()
                 
                 # 詳細情報
                 with st.expander("📋 詳細情報"):
                     st.write(f"**会計期間:** {all_months[0]} 〜 {all_months[-1]}")
                     st.write(f"**実績締月:** {current_month}")
-                    st.write(f"**実績月:** {', '.join(actual_months_with_data)}")
+                    st.write(f"**当期実績月:** {', '.join(current_months_with_data) if current_months_with_data else 'なし'}")
+                    if has_prev:
+                        prev_months = sorted(set(
+                            r['month_label'].replace('prev_', '')
+                            for r in combined['records'] if r['source'] == 'prev'
+                        ))
+                        st.write(f"**前期実績月:** {', '.join(prev_months)}")
                     st.write(f"**予測月:** {', '.join(forecast_months)}")
                 
             except Exception as e:
@@ -5759,13 +5760,35 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             if st.button("🚀 予測を実行", type="primary", use_container_width=True):
                 with st.spinner("AI予測を実行中..."):
                     
-                    # 月→インデックスのマッピング
-                    month_to_index = {month: idx + 1 for idx, month in enumerate(all_months)}
+                    # 全勘定科目リスト
+                    records_df = pd.DataFrame(combined['records'])
+                    if records_df.empty:
+                        st.error("❌ 学習データがありません")
+                        st.stop()
                     
-                    # 勘定科目ごとに予測
+                    accounts = records_df['item_name'].unique()
+                    
+                    # 月→インデックスのマッピング（前期含む）
+                    # 前期月を負のインデックス、当期月を正のインデックスとして扱う
+                    prev_months_sorted = sorted(set(
+                        r['month_label'] for r in combined['records'] if r['source'] == 'prev'
+                    ))
+                    current_months_sorted = sorted(set(
+                        r['month_label'] for r in combined['records'] if r['source'] == 'current'
+                    ))
+                    
+                    # 全学習月を時系列順にインデックス化
+                    all_training_months = prev_months_sorted + current_months_sorted
+                    month_to_index = {m: i + 1 for i, m in enumerate(all_training_months)}
+                    
+                    # 予測月のインデックス（当期の続き）
+                    offset = len(all_training_months)
+                    forecast_month_to_index = {
+                        m: offset + i + 1
+                        for i, m in enumerate(forecast_months)
+                    }
+                    
                     predictions_list = []
-                    accounts = actuals_raw['項目名'].values
-                    
                     progress_bar = st.progress(0)
                     status_text = st.empty()
                     
@@ -5773,35 +5796,25 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         status_text.text(f"予測中: {account} ({idx+1}/{len(accounts)})")
                         progress_bar.progress((idx + 1) / len(accounts))
                         
-                        # 該当勘定科目の実績データ
-                        account_row = actuals_raw[actuals_raw['項目名'] == account].iloc[0]
+                        # 該当科目の学習データ
+                        account_records = [
+                            r for r in combined['records']
+                            if r['item_name'] == account and r['amount'] != 0
+                        ]
                         
-                        # 実績月のデータを抽出
-                        actual_data = []
-                        actual_indices = []
-                        for month in actual_months_with_data:
-                            if month in account_row.index:
-                                value = account_row[month]
-                                if pd.notna(value) and value != 0:
-                                    actual_data.append(float(value))
-                                    actual_indices.append(month_to_index[month])
-                        
-                        if len(actual_data) < 2:
+                        if len(account_records) < 2:
                             continue
                         
-                        # numpy配列に変換
-                        months_array = np.array(actual_indices)
-                        amounts_array = np.array(actual_data)
+                        months_array = np.array([month_to_index[r['month_label']] for r in account_records])
+                        amounts_array = np.array([r['amount'] for r in account_records])
                         
                         # 予測手法の選択
                         if forecast_method == 'auto':
                             if len(months_array) >= 3:
                                 from sklearn.linear_model import LinearRegression
                                 X = months_array.reshape(-1, 1)
-                                y = amounts_array
-                                model = LinearRegression()
-                                model.fit(X, y)
-                                r2 = model.score(X, y)
+                                model = LinearRegression().fit(X, amounts_array)
+                                r2 = model.score(X, amounts_array)
                                 method = 'linear' if r2 > 0.7 else 'exponential'
                             else:
                                 method = 'average'
@@ -5810,29 +5823,8 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         
                         # 予測値計算
                         for forecast_month in forecast_months:
-                            target_index = month_to_index[forecast_month]
-                            
-                            if method == 'linear':
-                                from sklearn.linear_model import LinearRegression
-                                X = months_array.reshape(-1, 1)
-                                y = amounts_array
-                                model = LinearRegression()
-                                model.fit(X, y)
-                                pred_value = model.predict([[target_index]])[0]
-                            
-                            elif method == 'exponential':
-                                alpha = 0.3
-                                s = amounts_array[0]
-                                for v in amounts_array[1:]:
-                                    s = alpha * v + (1 - alpha) * s
-                                pred_value = s
-                            
-                            elif method == 'average':
-                                window = min(3, len(amounts_array))
-                                pred_value = np.mean(amounts_array[-window:])
-                            
-                            else:
-                                pred_value = np.mean(amounts_array)
+                            target_index = forecast_month_to_index[forecast_month]
+                            pred_value = processor._predict_value(months_array, amounts_array, target_index, method)
                             
                             predictions_list.append({
                                 'account_name': account,
@@ -5854,68 +5846,64 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     st.markdown("---")
                     st.markdown("### 📊 予測結果")
                     
-                    # サマリー
                     col1, col2, col3 = st.columns(3)
-                    
                     with col1:
-                        st.metric(
-                            "予測勘定科目数",
-                            f"{predictions_df['account_name'].nunique()} 科目"
-                        )
-                    
+                        st.metric("予測勘定科目数", f"{predictions_df['account_name'].nunique()} 科目")
                     with col2:
-                        st.metric(
-                            "予測期間",
-                            f"{forecast_months[0]} 〜 {forecast_months[-1]}"
-                        )
-                    
+                        st.metric("予測期間", f"{forecast_months[0]} 〜 {forecast_months[-1]}")
                     with col3:
-                        st.metric(
-                            "使用手法",
-                            predictions_df['method'].mode()[0].upper()
-                        )
+                        data_source = f"当期{len(current_months_with_data)}ヶ月" + ("＋前期" if has_prev else "")
+                        st.metric("学習データ", data_source)
                     
                     # タブで表示
                     tab1, tab2 = st.tabs(["📈 グラフ表示", "📋 データ一覧"])
                     
                     with tab1:
-                        # 主要科目のグラフ
-                        st.markdown("#### 主要科目の予測推移")
+                        st.markdown("#### 売上高の予測推移（実績＋予測）")
                         
-                        # 売上高
                         if '売上高' in predictions_df['account_name'].values:
-                            # 実績データ
-                            sales_row = actuals_raw[actuals_raw['項目名'] == '売上高'].iloc[0]
-                            sales_actual_data = []
-                            sales_actual_months = []
-                            for month in actual_months_with_data:
-                                if month in sales_row.index:
-                                    value = sales_row[month]
-                                    if pd.notna(value):
-                                        sales_actual_data.append(value)
-                                        sales_actual_months.append(month)
-                            
-                            # 予測データ
-                            sales_pred = predictions_df[predictions_df['account_name'] == '売上高'].copy()
-                            
                             fig = go.Figure()
                             
-                            # 実績
-                            fig.add_trace(go.Scatter(
-                                x=sales_actual_months,
-                                y=sales_actual_data,
-                                mode='lines+markers',
-                                name='実績',
-                                line=dict(color='#1f77b4', width=3),
-                                marker=dict(size=8)
-                            ))
+                            # 前期実績（参考）
+                            if has_prev:
+                                prev_sales = [
+                                    r for r in combined['records']
+                                    if r['item_name'] == '売上高' and r['source'] == 'prev'
+                                ]
+                                if prev_sales:
+                                    prev_sales_sorted = sorted(prev_sales, key=lambda x: x['month_label'])
+                                    fig.add_trace(go.Scatter(
+                                        x=[r['month_label'].replace('prev_', '前期:') for r in prev_sales_sorted],
+                                        y=[r['amount'] for r in prev_sales_sorted],
+                                        mode='lines+markers',
+                                        name='前期実績',
+                                        line=dict(color='#aec7e8', width=2, dash='dot'),
+                                        marker=dict(size=6)
+                                    ))
                             
-                            # 予測
+                            # 当期実績
+                            curr_sales = [
+                                r for r in combined['records']
+                                if r['item_name'] == '売上高' and r['source'] == 'current'
+                            ]
+                            if curr_sales:
+                                curr_sales_sorted = sorted(curr_sales, key=lambda x: x['month_label'])
+                                fig.add_trace(go.Scatter(
+                                    x=[r['month_label'] for r in curr_sales_sorted],
+                                    y=[r['amount'] for r in curr_sales_sorted],
+                                    mode='lines+markers',
+                                    name='当期実績',
+                                    line=dict(color='#1f77b4', width=3),
+                                    marker=dict(size=8)
+                                ))
+                            
+                            # AI予測
+                            pred_sales = predictions_df[predictions_df['account_name'] == '売上高']
                             fig.add_trace(go.Scatter(
-                                x=sales_pred['month'],
-                                y=sales_pred['amount'],
+                                x=pred_sales['month'],
+                                y=pred_sales['amount'],
                                 mode='lines+markers',
-                                name='予測',
+                                name='AI予測',
                                 line=dict(color='#ff7f0e', width=3, dash='dash'),
                                 marker=dict(size=8, symbol='diamond')
                             ))
@@ -5925,41 +5913,33 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                 xaxis_title='月',
                                 yaxis_title='金額（円）',
                                 hovermode='x unified',
-                                height=400
+                                height=420
                             )
-                            
                             st.plotly_chart(fig, use_container_width=True)
                         else:
                             st.info("ℹ️ 売上高のデータがありません")
                     
                     with tab2:
-                        # データテーブル
                         st.markdown("#### 予測データ一覧")
                         
-                        # ピボットテーブル
                         pivot_df = predictions_df.pivot(
                             index='account_name',
                             columns='month',
                             values='amount'
-                        )
+                        )[forecast_months]
                         
-                        # 月の順序を保持
-                        pivot_df = pivot_df[forecast_months]
-                        
-                        # フォーマット
                         st.dataframe(
                             pivot_df.style.format("{:,.0f}"),
                             use_container_width=True,
                             height=400
                         )
                         
-                        # CSV出力用
                         csv = predictions_df.to_csv(index=False, encoding='utf-8-sig')
-                        from datetime import datetime
+                        from datetime import datetime as dt
                         st.download_button(
                             label="📥 CSVダウンロード",
                             data=csv,
-                            file_name=f"ai_forecast_{datetime.now().strftime('%Y%m%d')}.csv",
+                            file_name=f"ai_forecast_{dt.now().strftime('%Y%m%d')}.csv",
                             mime="text/csv"
                         )
 
