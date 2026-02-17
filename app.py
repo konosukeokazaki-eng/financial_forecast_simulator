@@ -5363,9 +5363,19 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                         if success_cf:
                                             st.success("✅ CFデータも保存されました")
                                         
+                                        # AI予測の自動生成（新規追加）
+                                        st.info("🤖 AI予測を自動生成中...")
+                                        ai_result = processor.auto_generate_forecasts(st.session_state.selected_period_id)
+                                        
+                                        if ai_result['success']:
+                                            st.success(f"✅ AI予測を自動生成しました（{ai_result['generated_count']}件）")
+                                            st.caption(f"📊 対象科目: {ai_result['accounts']}科目、予測月: {min(ai_result['months'])}月〜{max(ai_result['months'])}月")
+                                        else:
+                                            st.warning(f"⚠️ AI予測の生成をスキップしました: {ai_result.get('error', '不明')}")
+                                        
                                         # キャッシュクリア
                                         for key in ['bs_data', 'pl_data', 'cf_data', 'file_metadata', 'show_actual_import', 
-                                                   'actuals_df', 'imported_df', 'pl_df', 'forecast_data_cache']:
+                                                   'actuals_df', 'imported_df', 'pl_df', 'forecast_data_cache', 'forecasts_df']:
                                             if key in st.session_state:
                                                 del st.session_state[key]
                                         
@@ -5373,7 +5383,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                                         
                                         # リロード
                                         import time
-                                        time.sleep(1)
+                                        time.sleep(2)  # AI予測メッセージを見せるため少し長めに
                                         st.rerun()
                                     else:
                                         progress_bar.empty()
