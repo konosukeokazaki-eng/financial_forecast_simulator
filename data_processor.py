@@ -1051,22 +1051,44 @@ class DataProcessor:
             return False, str(e)
 
     def calculate_pl(self, actuals_df, forecasts_df, split_idx, months):
-        """損益計算書(PL)を計算"""
+        """損益計算書(PL)を計算
+        
+        split_idxまで: 実績データを使用
+        split_idx以降: 予測データを使用
+        
+        ※実績データが0で予測データに値がある場合は予測を優先
+        """
         pl_df = pd.DataFrame(columns=['項目名'] + months + ['合計'])
         
-        # 実績と予測を結合
         combined_data = []
         for item in self.all_items:
             row_data = {'項目名': item}
-            actual_row = actuals_df[actuals_df['項目名'] == item]
+            actual_row   = actuals_df[actuals_df['項目名'] == item]
             forecast_row = forecasts_df[forecasts_df['項目名'] == item]
             
             total = 0
             for i, month in enumerate(months):
                 if i < split_idx:
-                    val = actual_row[month].iloc[0] if not actual_row.empty and month in actual_row.columns else 0
+                    # 実績期間: 実績を使用（実績が0かつ予測がある場合は予測を使用）
+                    actual_val = actual_row[month].iloc[0] if (
+                        not actual_row.empty and month in actual_row.columns
+                    ) else 0
+                    actual_val = float(actual_val) if pd.notna(actual_val) else 0.0
+                    
+                    if actual_val == 0 and not forecast_row.empty and month in forecast_row.columns:
+                        # 実績が未入力 → 予測で補完（着地予測の精度向上）
+                        forecast_val = forecast_row[month].iloc[0]
+                        forecast_val = float(forecast_val) if pd.notna(forecast_val) else 0.0
+                        val = forecast_val if forecast_val != 0 else 0.0
+                    else:
+                        val = actual_val
                 else:
-                    val = forecast_row[month].iloc[0] if not forecast_row.empty and month in forecast_row.columns else 0
+                    # 予測期間: 予測データを使用
+                    forecast_val = forecast_row[month].iloc[0] if (
+                        not forecast_row.empty and month in forecast_row.columns
+                    ) else 0
+                    val = float(forecast_val) if pd.notna(forecast_val) else 0.0
+                
                 row_data[month] = val
                 total += val
             
