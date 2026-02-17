@@ -5668,6 +5668,26 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 st.error("❌ 会計期間情報を取得できません")
                 st.stop()
             
+            # 実績締月を取得
+            current_month = st.session_state.get('current_month')
+            
+            if not current_month or current_month not in all_months:
+                st.warning("⚠️ 実績締月が設定されていません")
+                st.info("左サイドバーで実績締月を選択してください")
+                st.stop()
+            
+            # 実績締月のインデックスを取得
+            split_idx = all_months.index(current_month) + 1
+            
+            # 実績月と予測月を分割
+            actual_months_range = all_months[:split_idx]  # 実績締月まで
+            forecast_months = all_months[split_idx:]      # 実績締月の次月以降
+            
+            if not forecast_months:
+                st.info("✅ すべての月が実績締月までです")
+                st.info("予測対象月がありません（会計期間終了）")
+                st.stop()
+            
             # 実績データの確認
             try:
                 actuals_raw = processor.load_actual_data(period_id)
@@ -5682,64 +5702,15 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     """)
                     st.stop()
                 
-                # 実績が存在する月を特定
-                actual_months = [col for col in actuals_raw.columns if col != '項目名' and col in all_months]
-                
-                # データが存在する月をチェック
+                # 実績月範囲内でデータが存在する月をチェック
                 actual_months_with_data = []
-                for month in actual_months:
-                    if actuals_raw[month].sum() != 0:
+                for month in actual_months_range:
+                    if month in actuals_raw.columns and actuals_raw[month].sum() != 0:
                         actual_months_with_data.append(month)
-                
-                # === デバッグ情報 ===
-                with st.expander("🔍 デバッグ情報", expanded=True):
-                    st.write("**会計期間の全月:**", all_months)
-                    st.write("**全月数:**", len(all_months))
-                    st.write("")
-                    
-                    st.write("**実績データのカラム:**", list(actuals_raw.columns))
-                    st.write("")
-                    
-                    st.write("**カラムに含まれる月:**")
-                    month_cols = [col for col in actuals_raw.columns if col != '項目名']
-                    st.write(month_cols)
-                    st.write(f"カラム月数: {len(month_cols)}")
-                    st.write("")
-                    
-                    st.write("**all_monthsに含まれる月カラム:**", actual_months)
-                    st.write(f"該当月数: {len(actual_months)}")
-                    st.write("")
-                    
-                    st.write("**データが存在する月（合計≠0）:**")
-                    for month in actual_months:
-                        total = actuals_raw[month].sum()
-                        st.write(f"  {month}: {total:,.0f}円")
-                    
-                    st.write("")
-                    st.write("**データが存在する月リスト:**", actual_months_with_data)
-                    st.write(f"実績月数: {len(actual_months_with_data)}")
-                    st.write("")
-                    
-                    st.write("**予測対象月の計算:**")
-                    st.write(f"全月 - 実績月 = 予測月")
-                    st.write(f"{len(all_months)} - {len(actual_months_with_data)} = {len(all_months) - len(actual_months_with_data)}")
-                    
-                    forecast_months_debug = [m for m in all_months if m not in actual_months_with_data]
-                    st.write("**予測対象月:**", forecast_months_debug)
-                    st.write(f"予測月数: {len(forecast_months_debug)}")
-                # === デバッグ情報終了 ===
                 
                 if len(actual_months_with_data) < 2:
                     st.warning(f"⚠️ 実績データが不足しています（現在: {len(actual_months_with_data)}ヶ月）")
                     st.info("AI予測には最低2ヶ月分の実績データが必要です")
-                    st.stop()
-                
-                # 予測対象月を特定
-                forecast_months = [m for m in all_months if m not in actual_months_with_data]
-                
-                if not forecast_months:
-                    st.info("✅ すべての月の実績が登録済みです")
-                    st.info("予測対象月がありません")
                     st.stop()
                 
                 # ステータス表示
@@ -5752,14 +5723,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     st.metric("🎯 予測対象月", f"{len(forecast_months)}ヶ月")
                 
                 with col3:
-                    latest_actual = actual_months_with_data[-1] if actual_months_with_data else "なし"
-                    st.metric("📊 最新実績", latest_actual)
+                    st.metric("📊 実績締月", current_month)
                 
                 st.markdown("---")
                 
                 # 詳細情報
                 with st.expander("📋 詳細情報"):
                     st.write(f"**会計期間:** {all_months[0]} 〜 {all_months[-1]}")
+                    st.write(f"**実績締月:** {current_month}")
                     st.write(f"**実績月:** {', '.join(actual_months_with_data)}")
                     st.write(f"**予測月:** {', '.join(forecast_months)}")
                 
