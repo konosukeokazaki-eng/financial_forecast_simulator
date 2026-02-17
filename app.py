@@ -1620,7 +1620,7 @@ if st.session_state.page == "システム設定":
                     st.error(f"❌ 接続失敗: {str(e)}")
 
 # ============================================================
-# 📌 ステータスバー（スクロールしても固定表示）
+# 📌 ステータスバー（全幅固定・スクロールしても常時表示）
 # ============================================================
 def render_status_bar():
     has_period = (
@@ -1635,9 +1635,9 @@ def render_status_bar():
     current_month = st.session_state.get('current_month', '―')
     analysis_mode = st.session_state.get('analysis_mode', '📊 簡易モード')
     
-    is_simple   = '簡易' in analysis_mode
-    mode_label  = '簡易モード' if is_simple else '高度モード'
-    mode_color  = '#3498db' if is_simple else '#8e44ad'
+    is_simple  = '簡易' in analysis_mode
+    mode_label = '簡易モード' if is_simple else '高度モード'
+    mode_color = '#3498db' if is_simple else '#8e44ad'
     
     if has_period:
         period_text = f"第{period_num}期　{start_date} 〜 {end_date}"
@@ -1649,25 +1649,24 @@ def render_status_bar():
 
     st.markdown(f"""
     <style>
-    /* Streamlitの実際のスクロールコンテナを特定してfixedを確実に動作させる */
-    
-    /* メインコンテンツ上部の余白を確保 */
+    /* Streamlit標準ヘッダーを完全に非表示 */
+    header[data-testid="stHeader"] {{
+        display: none !important;
+    }}
+
+    /* メインとサイドバーの上余白を確保 */
     .main .block-container {{
-        padding-top: 3.5rem !important;
-        margin-top: 0 !important;
+        padding-top: 3rem !important;
     }}
-    
-    /* Streamlitヘッダーの下に配置 */
-    [data-testid="stAppViewContainer"] > section:first-child {{
-        padding-top: 0 !important;
+    [data-testid="stSidebar"] > div:first-child {{
+        padding-top: 48px !important;
     }}
-    
-    /* ステータスバー本体 */
+
+    /* ステータスバー本体：left:0 で画面全幅に固定 */
     #status-bar-fixed {{
         position: fixed;
         top: 0;
-        /* サイドバーが展開時は244px、縮小時は0 */
-        left: 244px;
+        left: 0;
         right: 0;
         height: 38px;
         z-index: 9999999;
@@ -1676,9 +1675,26 @@ def render_status_bar():
         display: flex;
         align-items: stretch;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     }}
-    
+
+    /* 左端タイトルエリア */
+    .sb-logo {{
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        min-width: 200px;
+        background: #141828;
+        border-right: 1px solid #2d3561;
+        color: #6b7a9e;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }}
+
+    /* 各項目：クリックでサイドバーへ誘導 */
     .sb-item {{
         display: flex;
         align-items: center;
@@ -1686,83 +1702,103 @@ def render_status_bar():
         padding: 0 22px;
         border-right: 1px solid #2a3050;
         white-space: nowrap;
-        height: 100%;
+        cursor: pointer;
+        transition: background 0.15s;
+        position: relative;
+    }}
+    .sb-item:hover {{
+        background: #242b42;
     }}
     .sb-item:last-child {{ border-right: none; }}
-    
+
+    /* ホバー時のツールチップ */
+    .sb-item::after {{
+        content: attr(data-tip);
+        position: absolute;
+        top: 42px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #0d1117;
+        color: #8a96b0;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        border: 1px solid #2d3561;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s;
+    }}
+    .sb-item:hover::after {{
+        opacity: 1;
+    }}
+
     .sb-label {{
         color: #5a6688;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 1px;
         text-transform: uppercase;
+        pointer-events: none;
     }}
-    
     .sb-value {{
         color: #cdd5e0;
         font-weight: 600;
         font-size: 12.5px;
+        pointer-events: none;
     }}
-    
     .sb-badge {{
         display: inline-block;
         padding: 2px 12px;
         border-radius: 20px;
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.3px;
         background: {mode_color}20;
         color: {mode_color};
         border: 1px solid {mode_color}50;
-    }}
-    
-    /* Streamlitのデフォルトヘッダーを非表示にして被りを防ぐ */
-    header[data-testid="stHeader"] {{
-        background: transparent !important;
-        height: 0 !important;
-        min-height: 0 !important;
+        pointer-events: none;
     }}
     </style>
 
     <div id="status-bar-fixed">
-        <div class="sb-item">
+        <div class="sb-logo">財務予測シミュレーター</div>
+
+        <div class="sb-item" data-tip="クリックでサイドバーに移動"
+            onclick="(function(){{
+                var sb = window.parent.document.querySelector('[data-testid=stSidebar]');
+                if(sb){{ sb.scrollTop=0; }}
+            }})()">
             <span class="sb-label">会社</span>
             <span class="sb-value">{comp_name}</span>
         </div>
-        <div class="sb-item">
+
+        <div class="sb-item" data-tip="クリックでサイドバーに移動"
+            onclick="(function(){{
+                var sb = window.parent.document.querySelector('[data-testid=stSidebar]');
+                if(sb){{ sb.scrollTop=0; }}
+            }})()">
             <span class="sb-label">期間</span>
             <span class="sb-value">{period_text}</span>
         </div>
-        <div class="sb-item">
+
+        <div class="sb-item" data-tip="クリックでサイドバーに移動"
+            onclick="(function(){{
+                var sb = window.parent.document.querySelector('[data-testid=stSidebar]');
+                if(sb){{ sb.scrollTop=300; }}
+            }})()">
             <span class="sb-label">実績締月</span>
-            <span class="sb-value" style="color:{month_color}; font-size:13px; font-weight:800;">{current_month}</span>
+            <span class="sb-value" style="color:{month_color}; font-weight:800; font-size:13px;">{current_month}</span>
         </div>
-        <div class="sb-item">
+
+        <div class="sb-item" data-tip="クリックでサイドバーに移動"
+            onclick="(function(){{
+                var sb = window.parent.document.querySelector('[data-testid=stSidebar]');
+                if(sb){{ sb.scrollTop=500; }}
+            }})()">
             <span class="sb-label">モード</span>
             <span class="sb-badge">{mode_label}</span>
         </div>
     </div>
-    
-    <script>
-    // サイドバーの展開/縮小に合わせてバーの左位置を動的調整
-    (function() {{
-        function adjustBar() {{
-            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-            const bar = window.parent.document.getElementById('status-bar-fixed');
-            if (!bar) return;
-            if (sidebar) {{
-                const w = sidebar.offsetWidth;
-                bar.style.left = (w > 50 ? w : 0) + 'px';
-            }}
-        }}
-        // 初回＋変化時に実行
-        adjustBar();
-        const obs = new MutationObserver(adjustBar);
-        const target = window.parent.document.querySelector('[data-testid="stSidebar"]');
-        if (target) obs.observe(target, {{ attributes: true, childList: true, subtree: true }});
-        window.parent.addEventListener('resize', adjustBar);
-    }})();
-    </script>
     """, unsafe_allow_html=True)
 
 render_status_bar()
