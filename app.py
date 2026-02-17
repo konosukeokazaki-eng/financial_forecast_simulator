@@ -1630,66 +1630,75 @@ def render_status_bar():
         and st.session_state.selected_period_id is not None
     )
     
-    # 各情報を取得
-    comp_name    = st.session_state.get('selected_comp_name', '未選択')
-    period_num   = st.session_state.get('selected_period_num', '-')
-    start_date   = st.session_state.get('start_date', '')
-    end_date     = st.session_state.get('end_date', '')
-    current_month= st.session_state.get('current_month', '未設定')
-    analysis_mode= st.session_state.get('analysis_mode', '📊 簡易モード')
+    comp_name     = st.session_state.get('selected_comp_name', '未選択')
+    period_num    = st.session_state.get('selected_period_num', '-')
+    start_date    = st.session_state.get('start_date', '')
+    end_date      = st.session_state.get('end_date', '')
+    current_month = st.session_state.get('current_month', '未設定')
+    analysis_mode = st.session_state.get('analysis_mode', '📊 簡易モード')
     
-    is_simple    = '簡易' in analysis_mode
-    mode_label   = '簡易モード' if is_simple else '高度モード'
-    mode_color   = '#3498db' if is_simple else '#8e44ad'
-    mode_icon    = '📊' if is_simple else '🔬'
+    is_simple   = '簡易' in analysis_mode
+    mode_label  = '簡易モード' if is_simple else '高度モード'
+    mode_color  = '#3498db' if is_simple else '#8e44ad'
     
     if has_period:
         period_text = f"第{period_num}期　{start_date} 〜 {end_date}"
-        締月_color  = '#27ae60'
-        締月_text   = current_month
+        month_color = '#2ecc71'
     else:
         period_text = '期間未選択'
-        締月_color  = '#95a5a6'
-        締月_text   = '―'
-    
+        month_color = '#7f8c8d'
+        current_month = '―'
+
     st.markdown(f"""
     <style>
+    /* メインコンテンツを下げてバーと重ならないようにする */
+    .main .block-container {{
+        padding-top: 3.2rem !important;
+    }}
+    
+    /* fixed ステータスバー本体 */
     .status-bar {{
-        position: sticky;
+        position: fixed;
         top: 0;
-        z-index: 999;
+        left: 0;
+        right: 0;
+        z-index: 99999;
         background: #1a1f2e;
-        border-bottom: 2px solid #2d3561;
-        padding: 8px 20px;
+        border-bottom: 1px solid #2d3561;
+        height: 40px;
         display: flex;
         align-items: center;
+        padding: 0 20px 0 240px;   /* サイドバー幅分だけ左をオフセット */
         gap: 0;
-        flex-wrap: wrap;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        margin: -1rem -1rem 1.2rem -1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }}
+    
     .sb-item {{
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 0 18px;
-        border-right: 1px solid #3d4466;
-        font-size: 13px;
+        gap: 8px;
+        padding: 0 20px;
+        border-right: 1px solid #2d3561;
+        height: 100%;
         white-space: nowrap;
     }}
     .sb-item:last-child {{ border-right: none; }}
+    
     .sb-label {{
-        color: #8a96b0;
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
+        color: #6b7799;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
         text-transform: uppercase;
     }}
+    
     .sb-value {{
-        color: #e8ecf0;
+        color: #dde3f0;
         font-weight: 600;
-        font-size: 13px;
+        font-size: 12.5px;
     }}
+    
     .sb-badge {{
         display: inline-block;
         padding: 2px 10px;
@@ -1697,27 +1706,28 @@ def render_status_bar():
         font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.3px;
+        background: {mode_color}22;
+        color: {mode_color};
+        border: 1px solid {mode_color}66;
     }}
     </style>
-    
+
     <div class="status-bar">
         <div class="sb-item">
-            <span class="sb-label">🏢 会社</span>
+            <span class="sb-label">会社</span>
             <span class="sb-value">{comp_name}</span>
         </div>
         <div class="sb-item">
-            <span class="sb-label">📅 期間</span>
+            <span class="sb-label">期間</span>
             <span class="sb-value">{period_text}</span>
         </div>
         <div class="sb-item">
-            <span class="sb-label">📊 実績締月</span>
-            <span class="sb-value" style="color: {締月_color}; font-size:14px;">{締月_text}</span>
+            <span class="sb-label">実績締月</span>
+            <span class="sb-value" style="color:{month_color}; font-size:13px; font-weight:700;">{current_month}</span>
         </div>
         <div class="sb-item">
             <span class="sb-label">モード</span>
-            <span class="sb-badge" style="background:{mode_color}22; color:{mode_color}; border:1px solid {mode_color}55;">
-                {mode_icon} {mode_label}
-            </span>
+            <span class="sb-badge">{mode_label}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
