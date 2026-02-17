@@ -1620,11 +1620,9 @@ if st.session_state.page == "システム設定":
                     st.error(f"❌ 接続失敗: {str(e)}")
 
 # ============================================================
-# 📌 ステータスバー（常時表示）
+# 📌 ステータスバー（スクロールしても固定表示）
 # ============================================================
 def render_status_bar():
-    """画面上部に現在の選択状態を常時表示するバー"""
-    
     has_period = (
         'selected_period_id' in st.session_state
         and st.session_state.selected_period_id is not None
@@ -1634,7 +1632,7 @@ def render_status_bar():
     period_num    = st.session_state.get('selected_period_num', '-')
     start_date    = st.session_state.get('start_date', '')
     end_date      = st.session_state.get('end_date', '')
-    current_month = st.session_state.get('current_month', '未設定')
+    current_month = st.session_state.get('current_month', '―')
     analysis_mode = st.session_state.get('analysis_mode', '📊 簡易モード')
     
     is_simple   = '簡易' in analysis_mode
@@ -1651,68 +1649,82 @@ def render_status_bar():
 
     st.markdown(f"""
     <style>
-    /* メインコンテンツを下げてバーと重ならないようにする */
+    /* Streamlitの実際のスクロールコンテナを特定してfixedを確実に動作させる */
+    
+    /* メインコンテンツ上部の余白を確保 */
     .main .block-container {{
-        padding-top: 3.2rem !important;
+        padding-top: 3.5rem !important;
+        margin-top: 0 !important;
     }}
     
-    /* fixed ステータスバー本体 */
-    .status-bar {{
+    /* Streamlitヘッダーの下に配置 */
+    [data-testid="stAppViewContainer"] > section:first-child {{
+        padding-top: 0 !important;
+    }}
+    
+    /* ステータスバー本体 */
+    #status-bar-fixed {{
         position: fixed;
         top: 0;
-        left: 0;
+        /* サイドバーが展開時は244px、縮小時は0 */
+        left: 244px;
         right: 0;
-        z-index: 99999;
+        height: 38px;
+        z-index: 9999999;
         background: #1a1f2e;
         border-bottom: 1px solid #2d3561;
-        height: 40px;
         display: flex;
-        align-items: center;
-        padding: 0 20px 0 240px;   /* サイドバー幅分だけ左をオフセット */
-        gap: 0;
+        align-items: stretch;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
     }}
     
     .sb-item {{
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 0 20px;
-        border-right: 1px solid #2d3561;
-        height: 100%;
+        padding: 0 22px;
+        border-right: 1px solid #2a3050;
         white-space: nowrap;
+        height: 100%;
     }}
     .sb-item:last-child {{ border-right: none; }}
     
     .sb-label {{
-        color: #6b7799;
+        color: #5a6688;
         font-size: 10px;
         font-weight: 700;
-        letter-spacing: 0.8px;
+        letter-spacing: 1px;
         text-transform: uppercase;
     }}
     
     .sb-value {{
-        color: #dde3f0;
+        color: #cdd5e0;
         font-weight: 600;
         font-size: 12.5px;
     }}
     
     .sb-badge {{
         display: inline-block;
-        padding: 2px 10px;
+        padding: 2px 12px;
         border-radius: 20px;
         font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.3px;
-        background: {mode_color}22;
+        background: {mode_color}20;
         color: {mode_color};
-        border: 1px solid {mode_color}66;
+        border: 1px solid {mode_color}50;
+    }}
+    
+    /* Streamlitのデフォルトヘッダーを非表示にして被りを防ぐ */
+    header[data-testid="stHeader"] {{
+        background: transparent !important;
+        height: 0 !important;
+        min-height: 0 !important;
     }}
     </style>
 
-    <div class="status-bar">
+    <div id="status-bar-fixed">
         <div class="sb-item">
             <span class="sb-label">会社</span>
             <span class="sb-value">{comp_name}</span>
@@ -1723,13 +1735,34 @@ def render_status_bar():
         </div>
         <div class="sb-item">
             <span class="sb-label">実績締月</span>
-            <span class="sb-value" style="color:{month_color}; font-size:13px; font-weight:700;">{current_month}</span>
+            <span class="sb-value" style="color:{month_color}; font-size:13px; font-weight:800;">{current_month}</span>
         </div>
         <div class="sb-item">
             <span class="sb-label">モード</span>
             <span class="sb-badge">{mode_label}</span>
         </div>
     </div>
+    
+    <script>
+    // サイドバーの展開/縮小に合わせてバーの左位置を動的調整
+    (function() {{
+        function adjustBar() {{
+            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+            const bar = window.parent.document.getElementById('status-bar-fixed');
+            if (!bar) return;
+            if (sidebar) {{
+                const w = sidebar.offsetWidth;
+                bar.style.left = (w > 50 ? w : 0) + 'px';
+            }}
+        }}
+        // 初回＋変化時に実行
+        adjustBar();
+        const obs = new MutationObserver(adjustBar);
+        const target = window.parent.document.querySelector('[data-testid="stSidebar"]');
+        if (target) obs.observe(target, {{ attributes: true, childList: true, subtree: true }});
+        window.parent.addEventListener('resize', adjustBar);
+    }})();
+    </script>
     """, unsafe_allow_html=True)
 
 render_status_bar()
