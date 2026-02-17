@@ -6,7 +6,39 @@ from datetime import datetime, timedelta
 import streamlit as st
 import sys
 
-class DataProcessor:
+# ──────────────────────────────────────────────
+# モジュールレベルのシングルトンキャッシュ
+# ──────────────────────────────────────────────
+_pg_pool = None
+_sa_engine = None   # SQLAlchemyエンジン（毎回作成しない）
+
+def _get_pg_pool(conn_string: str):
+    """psycopg2の接続プールをシングルトンで返す"""
+    global _pg_pool
+    if _pg_pool is None:
+        try:
+            from psycopg2 import pool as pg_pool
+            _pg_pool = pg_pool.ThreadedConnectionPool(
+                minconn=1, maxconn=5, dsn=conn_string
+            )
+        except Exception:
+            _pg_pool = None
+    return _pg_pool
+
+def _get_sa_engine(conn_string: str):
+    """SQLAlchemyエンジンをシングルトンで返す（毎回作成しない）"""
+    global _sa_engine
+    if _sa_engine is None:
+        from sqlalchemy import create_engine
+        _sa_engine = create_engine(
+            conn_string,
+            pool_size=3,
+            max_overflow=2,
+            pool_pre_ping=True,   # 切断検知
+            pool_recycle=300,     # 5分で接続再利用
+        )
+    return _sa_engine
+
     def __init__(self, db_path=None):
         # データベース接続の設定
         self.use_postgres = False
@@ -367,11 +399,17 @@ class DataProcessor:
             return False
     
     def _get_connection(self):
-        """データベース接続を取得"""
+        """データベース接続を取得（プール使用）"""
         if self.use_postgres:
+            pool = _get_pg_pool(self.conn_string)
+            if pool:
+                try:
+                    return pool.getconn()
+                except Exception:
+                    pass
+            # フォールバック：都度接続
             import psycopg2
             from urllib.parse import urlparse
-            
             result = urlparse(self.conn_string)
             return psycopg2.connect(
                 database=result.path[1:],
@@ -383,6 +421,22 @@ class DataProcessor:
         else:
             import sqlite3
             return sqlite3.connect(self.db_path)
+
+    def _release_connection(self, conn):
+        """接続をプールに返却（PostgreSQLのみ）"""
+        if self.use_postgres:
+            pool = _get_pg_pool(self.conn_string)
+            if pool:
+                try:
+                    pool.putconn(conn)
+                    return
+                except Exception:
+                    pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
     
     def _execute_query(self, query, params=None):
         """クエリを実行（PostgreSQLとSQLiteの互換性対応）"""
@@ -566,44 +620,35 @@ class DataProcessor:
         conn.close()
 
     def _read_sql_query(self, query, params=None):
-        """SQLクエリを実行してDataFrameを返す（PostgreSQLとSQLiteの互換性対応）"""
+        """SQLクエリを実行してDataFrameを返す（高速版）"""
         if self.use_postgres:
-            # PostgreSQL用にプレースホルダーを変換 (? → %s)
             query = query.replace('?', '%s')
-        
-        # IDの型変換（SQLiteでバイナリになる問題への対策）
-        if params:
-            new_params = []
-            for p in params:
-                if isinstance(p, bytes):
-                    try:
-                        new_params.append(int.from_bytes(p, 'little'))
-                    except:
-                        new_params.append(p)
-                else:
-                    new_params.append(p)
-            params = tuple(new_params)
 
-        conn = self._get_connection()
-        try:
-            # PostgreSQLの場合はSQLAlchemyエンジンを使用（警告回避）
-            if self.use_postgres:
-                from sqlalchemy import create_engine
-                engine = create_engine(self.conn_string)
-                df = pd.read_sql_query(query, engine, params=params)
-                engine.dispose()
-            else:
+        if params:
+            params = tuple(
+                int.from_bytes(p, 'little') if isinstance(p, bytes) else p
+                for p in params
+            )
+
+        if self.use_postgres:
+            # SQLAlchemyエンジンをシングルトンで使い回す（毎回create_engineしない）
+            engine = _get_sa_engine(self.conn_string)
+            with engine.connect() as conn:
                 df = pd.read_sql_query(query, conn, params=params)
-            
-            # SQLiteでIDがバイナリ形式で返ってくる場合の対策
-            for col in df.columns:
-                if col.endswith('_id') or col == 'id':
-                    df[col] = df[col].apply(lambda x: int.from_bytes(x, 'little') if isinstance(x, bytes) else x)
-            
-            return df
-        finally:
-            if not self.use_postgres:
-                conn.close()
+        else:
+            conn = self._get_connection()
+            try:
+                df = pd.read_sql_query(query, conn, params=params)
+            finally:
+                self._release_connection(conn)
+
+        # SQLiteのバイナリID対策
+        for col in df.columns:
+            if col.endswith('_id') or col == 'id':
+                df[col] = df[col].apply(
+                    lambda x: int.from_bytes(x, 'little') if isinstance(x, bytes) else x
+                )
+        return df
 
     def _sort_months(self, df, fiscal_period_id):
         """月を会計期間の順序でソート"""
@@ -800,8 +845,7 @@ class DataProcessor:
             return 0
 
     def load_actual_data(self, fiscal_period_id):
-        """実績データを読み込み"""
-        # IDの型変換
+        """実績データを読み込み（高速版）"""
         if isinstance(fiscal_period_id, bytes):
             fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
 
@@ -809,24 +853,10 @@ class DataProcessor:
             "SELECT item_name as 項目名, month, amount FROM actual_data WHERE fiscal_period_id = ?",
             params=(fiscal_period_id,)
         )
-        
-        if df.empty:
-            return pd.DataFrame({'項目名': self.all_items}).fillna(0)
-        
-        df = df.drop_duplicates(subset=['項目名', 'month'], keep='last')
-        
-        # 月を正しくソート（会計期順）
-        df = self._sort_months(df, fiscal_period_id)
-        
-        pivot_df = df.pivot(index='項目名', columns='month', values='amount').reset_index()
-        
-        all_items_df = pd.DataFrame({'項目名': self.all_items})
-        pivot_df = pd.merge(all_items_df, pivot_df, on='項目名', how='left').fillna(0)
-        return pivot_df
+        return self._to_pivot(df, fiscal_period_id)
 
     def load_forecast_data(self, fiscal_period_id, scenario):
-        """予測データを読み込み"""
-        # IDの型変換
+        """予測データを読み込み（高速版）"""
         if isinstance(fiscal_period_id, bytes):
             fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
 
@@ -834,20 +864,37 @@ class DataProcessor:
             "SELECT item_name as 項目名, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?",
             params=(fiscal_period_id, scenario)
         )
-        
+        return self._to_pivot(df, fiscal_period_id)
+
+    def load_all_data(self, fiscal_period_id, scenario="現実"):
+        """実績・予測を1回のDB接続で一括取得（高速版）"""
+        if isinstance(fiscal_period_id, bytes):
+            fiscal_period_id = int.from_bytes(fiscal_period_id, 'little')
+
+        # 実績・予測を1クエリで取得
+        actual_df = self._read_sql_query(
+            "SELECT item_name as 項目名, month, amount FROM actual_data WHERE fiscal_period_id = ?",
+            params=(fiscal_period_id,)
+        )
+        forecast_df = self._read_sql_query(
+            "SELECT item_name as 項目名, month, amount FROM forecast_data WHERE fiscal_period_id = ? AND scenario = ?",
+            params=(fiscal_period_id, scenario)
+        )
+        return (
+            self._to_pivot(actual_df, fiscal_period_id),
+            self._to_pivot(forecast_df, fiscal_period_id)
+        )
+
+    def _to_pivot(self, df, fiscal_period_id):
+        """ロング形式→ワイド形式（ピボット）変換（共通処理）"""
         if df.empty:
             return pd.DataFrame({'項目名': self.all_items}).fillna(0)
-        
+
         df = df.drop_duplicates(subset=['項目名', 'month'], keep='last')
-        
-        # 月を正しくソート（会計期順）
         df = self._sort_months(df, fiscal_period_id)
-        
         pivot_df = df.pivot(index='項目名', columns='month', values='amount').reset_index()
-        
         all_items_df = pd.DataFrame({'項目名': self.all_items})
-        pivot_df = pd.merge(all_items_df, pivot_df, on='項目名', how='left').fillna(0)
-        return pivot_df
+        return pd.merge(all_items_df, pivot_df, on='項目名', how='left').fillna(0)
 
     def save_actual_item(self, fiscal_period_id, item_name, values_dict):
         """実績データを保存"""
