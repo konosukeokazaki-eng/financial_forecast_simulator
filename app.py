@@ -1312,16 +1312,10 @@ else:
             st.error("選択された期が見つかりません")
             selected_period_id = None
 
-    # 予測シナリオ
-    st.sidebar.markdown("### 🎯 予測シナリオ")
-    st.session_state.scenario = st.sidebar.radio(
-        "シナリオを選択",
-        ["現実", "楽観", "悲観"],
-        horizontal=True,
-        label_visibility="collapsed"
-    )
-    
-    # シナリオ設定
+
+    # シナリオはデフォルト「現実」（着地予測ページ内で切替）
+    if 'scenario' not in st.session_state:
+        st.session_state.scenario = "現実"
     if 'scenario_rates' not in st.session_state:
         st.session_state.scenario_rates = {
             "現実": 0.0,
@@ -2004,29 +1998,82 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         if st.session_state.page == "着地予測ダッシュボード":
             st.title("財務予測シミュレーター")
             
-            # ヘッダー（3列）
-            col1, col2, col3 = st.columns([3, 2, 2])
-            with col1:
-                st.markdown(f"**{st.session_state.selected_comp_name}** | 第{st.session_state.selected_period_num}期")
-            with col2:
-                st.markdown(f"実績: {st.session_state.start_date} 〜 {st.session_state.current_month}")
-            with col3:
-                scenario_options = ["現実", "楽観", "悲観"]
-                current_idx = scenario_options.index(st.session_state.scenario) if st.session_state.scenario in scenario_options else 0
-                selected_scenario = st.selectbox(
-                    "シナリオ切替", 
-                    scenario_options,
-                    index=current_idx,
-                    key="dashboard_scenario_selector",
-                    label_visibility="collapsed"
+            # ─── シナリオ切替バー ───────────────────────────────
+            st.markdown("""
+            <style>
+            .scenario-bar {
+                background: #f8f9fb;
+                border: 1px solid #e1e8ed;
+                border-radius: 8px;
+                padding: 12px 20px;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                margin-bottom: 16px;
+            }
+            .scenario-label {
+                font-size: 12px;
+                font-weight: 700;
+                color: #7f8c8d;
+                letter-spacing: 0.5px;
+                white-space: nowrap;
+            }
+            .scenario-desc {
+                font-size: 12px;
+                color: #95a5a6;
+                margin-left: auto;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
+            col_label, col_btns, col_desc = st.columns([1, 3, 4])
+            with col_label:
+                st.markdown("<p style='margin-top:6px; font-size:13px; font-weight:700; color:#5a6c7d;'>シナリオ</p>", unsafe_allow_html=True)
+            with col_btns:
+                btn_col1, btn_col2, btn_col3 = st.columns(3)
+                current = st.session_state.get('scenario', '現実')
+                with btn_col1:
+                    if st.button(
+                        "現実" if current != "現実" else "✓ 現実",
+                        use_container_width=True,
+                        type="primary" if current == "現実" else "secondary"
+                    ):
+                        st.session_state.scenario = "現実"
+                        for k in ['pl_df', 'forecast_data_cache', 'forecasts_df', 'sub_account_aggregation_cache']:
+                            if k in st.session_state: del st.session_state[k]
+                        st.rerun()
+                with btn_col2:
+                    if st.button(
+                        "楽観" if current != "楽観" else "✓ 楽観",
+                        use_container_width=True,
+                        type="primary" if current == "楽観" else "secondary"
+                    ):
+                        st.session_state.scenario = "楽観"
+                        for k in ['pl_df', 'forecast_data_cache', 'forecasts_df', 'sub_account_aggregation_cache']:
+                            if k in st.session_state: del st.session_state[k]
+                        st.rerun()
+                with btn_col3:
+                    if st.button(
+                        "悲観" if current != "悲観" else "✓ 悲観",
+                        use_container_width=True,
+                        type="primary" if current == "悲観" else "secondary"
+                    ):
+                        st.session_state.scenario = "悲観"
+                        for k in ['pl_df', 'forecast_data_cache', 'forecasts_df', 'sub_account_aggregation_cache']:
+                            if k in st.session_state: del st.session_state[k]
+                        st.rerun()
+            with col_desc:
+                scenario = st.session_state.get('scenario', '現実')
+                desc_map = {
+                    "現実": "📊 AI予測・手動入力の予測値をそのまま使用",
+                    "楽観": "📈 売上 +10%　売上原価 -10%　販管費 -5%",
+                    "悲観": "📉 売上 -10%　売上原価 +10%　販管費 +10%"
+                }
+                color_map = {"現実": "#3498db", "楽観": "#27ae60", "悲観": "#e74c3c"}
+                st.markdown(
+                    f"<p style='margin-top:6px; font-size:12px; color:{color_map[scenario]};'>{desc_map[scenario]}</p>",
+                    unsafe_allow_html=True
                 )
-                if selected_scenario != st.session_state.scenario:
-                    st.session_state.scenario = selected_scenario
-                    # キャッシュをクリア
-                    for key in ['pl_df', 'forecast_data_cache', 'sub_account_aggregation_cache']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    st.rerun()
             
             st.markdown("---")
             
