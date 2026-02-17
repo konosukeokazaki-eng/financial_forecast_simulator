@@ -6035,16 +6035,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         months_array = np.array([month_to_index[r['month_label']] for r in account_records])
                         amounts_array = np.array([r['amount'] for r in account_records])
                         
-                        # 予測手法の選択
+                        # 予測手法の選択（data_processorのメソッドを使用）
                         if forecast_method == 'auto':
-                            if len(months_array) >= 3:
-                                from sklearn.linear_model import LinearRegression
-                                X = months_array.reshape(-1, 1)
-                                model = LinearRegression().fit(X, amounts_array)
-                                r2 = model.score(X, amounts_array)
-                                method = 'linear' if r2 > 0.7 else 'exponential'
-                            else:
-                                method = 'average'
+                            method = processor._select_prediction_method(months_array, amounts_array)
                         else:
                             method = forecast_method
                         
