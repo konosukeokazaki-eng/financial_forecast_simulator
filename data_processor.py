@@ -39,6 +39,8 @@ def _get_sa_engine(conn_string: str):
         )
     return _sa_engine
 
+
+class DataProcessor:
     def __init__(self, db_path=None):
         # データベース接続の設定
         self.use_postgres = False
