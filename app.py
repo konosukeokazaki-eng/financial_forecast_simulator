@@ -1619,6 +1619,111 @@ if st.session_state.page == "システム設定":
                 except Exception as e:
                     st.error(f"❌ 接続失敗: {str(e)}")
 
+# ============================================================
+# 📌 ステータスバー（常時表示）
+# ============================================================
+def render_status_bar():
+    """画面上部に現在の選択状態を常時表示するバー"""
+    
+    has_period = (
+        'selected_period_id' in st.session_state
+        and st.session_state.selected_period_id is not None
+    )
+    
+    # 各情報を取得
+    comp_name    = st.session_state.get('selected_comp_name', '未選択')
+    period_num   = st.session_state.get('selected_period_num', '-')
+    start_date   = st.session_state.get('start_date', '')
+    end_date     = st.session_state.get('end_date', '')
+    current_month= st.session_state.get('current_month', '未設定')
+    analysis_mode= st.session_state.get('analysis_mode', '📊 簡易モード')
+    
+    is_simple    = '簡易' in analysis_mode
+    mode_label   = '簡易モード' if is_simple else '高度モード'
+    mode_color   = '#3498db' if is_simple else '#8e44ad'
+    mode_icon    = '📊' if is_simple else '🔬'
+    
+    if has_period:
+        period_text = f"第{period_num}期　{start_date} 〜 {end_date}"
+        締月_color  = '#27ae60'
+        締月_text   = current_month
+    else:
+        period_text = '期間未選択'
+        締月_color  = '#95a5a6'
+        締月_text   = '―'
+    
+    st.markdown(f"""
+    <style>
+    .status-bar {{
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background: #1a1f2e;
+        border-bottom: 2px solid #2d3561;
+        padding: 8px 20px;
+        display: flex;
+        align-items: center;
+        gap: 0;
+        flex-wrap: wrap;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        margin: -1rem -1rem 1.2rem -1rem;
+    }}
+    .sb-item {{
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 18px;
+        border-right: 1px solid #3d4466;
+        font-size: 13px;
+        white-space: nowrap;
+    }}
+    .sb-item:last-child {{ border-right: none; }}
+    .sb-label {{
+        color: #8a96b0;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }}
+    .sb-value {{
+        color: #e8ecf0;
+        font-weight: 600;
+        font-size: 13px;
+    }}
+    .sb-badge {{
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+    }}
+    </style>
+    
+    <div class="status-bar">
+        <div class="sb-item">
+            <span class="sb-label">🏢 会社</span>
+            <span class="sb-value">{comp_name}</span>
+        </div>
+        <div class="sb-item">
+            <span class="sb-label">📅 期間</span>
+            <span class="sb-value">{period_text}</span>
+        </div>
+        <div class="sb-item">
+            <span class="sb-label">📊 実績締月</span>
+            <span class="sb-value" style="color: {締月_color}; font-size:14px;">{締月_text}</span>
+        </div>
+        <div class="sb-item">
+            <span class="sb-label">モード</span>
+            <span class="sb-badge" style="background:{mode_color}22; color:{mode_color}; border:1px solid {mode_color}55;">
+                {mode_icon} {mode_label}
+            </span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+render_status_bar()
+
 # データの読み込み（期が選択されている場合のみ）
 if 'selected_period_id' in st.session_state and st.session_state.selected_period_id is not None:
         # キャッシュされたデータを使用
