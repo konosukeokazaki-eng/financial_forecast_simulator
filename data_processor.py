@@ -1945,3 +1945,263 @@ class DataProcessor:
             indicators[month] = month_indicators
         
         return indicators
+
+    # =====================================================
+    # AI予測関連メソッド（新規追加）
+    # =====================================================
+    
+    def save_forecast_with_metadata(self, period_id, fiscal_month, account_name, amount, 
+                                     scenario='現実', source='manual', auto_generated=False,
+                                     manual_override=False, prediction_method=None,
+                                     ai_predicted_value=None, adjustment_reason_type=None,
+                                     adjustment_reason_detail=None):
+        """
+        予測データを詳細メタデータとともに保存
+        """
+        try:
+            if self.use_postgres:
+                # PostgreSQL（Supabase）
+                import psycopg2
+                conn = psycopg2.connect(self.conn_string)
+                cursor = conn.cursor()
+                
+                # 既存データを削除（UPSERT）
+                delete_query = """
+                    DELETE FROM forecasts 
+                    WHERE period_id = %s 
+                      AND fiscal_month = %s 
+                      AND account_name = %s 
+                      AND scenario = %s
+                """
+                cursor.execute(delete_query, (period_id, fiscal_month, account_name, scenario))
+                
+                # 新規挿入
+                insert_query = """
+                    INSERT INTO forecasts (
+                        period_id, fiscal_month, account_name, amount, scenario,
+                        source, auto_generated, manual_override, prediction_method,
+                        ai_predicted_value, adjustment_reason_type, adjustment_reason_detail,
+                        created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                """
+                cursor.execute(insert_query, (
+                    period_id, fiscal_month, account_name, amount, scenario,
+                    source, auto_generated, manual_override, prediction_method,
+                    ai_predicted_value, adjustment_reason_type, adjustment_reason_detail
+                ))
+                
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
+            return {'success': True}
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def auto_generate_forecasts(self, period_id):
+        """
+        実績データに基づいてAI予測を自動生成
+        """
+        try:
+            # 実績データ取得
+            actuals = self.load_actual_data(period_id)
+            
+            if actuals is None or actuals.empty:
+                return {'success': False, 'error': '実績データがありません'}
+            
+            # ワイド形式→ロング形式変換
+            if '項目名' in actuals.columns:
+                actuals = self._convert_wide_to_long(actuals)
+            
+            latest_month = int(actuals['fiscal_month'].max())
+            forecast_months = list(range(latest_month + 1, 13))
+            
+            if not forecast_months:
+                return {'success': False, 'error': '予測対象月がありません（全月実績済み）'}
+            
+            # 予測実行
+            predictions_list = []
+            accounts = actuals['account_name'].unique()
+            
+            for account in accounts:
+                account_data = actuals[actuals['account_name'] == account].copy()
+                account_data = account_data.sort_values('fiscal_month')
+                
+                if len(account_data) < 2:
+                    continue
+                
+                months = account_data['fiscal_month'].values
+                amounts = account_data['amount'].values
+                
+                # 予測手法の自動選択
+                method = self._select_prediction_method(months, amounts)
+                
+                # 予測値計算
+                for target_month in forecast_months:
+                    pred_value = self._predict_value(months, amounts, target_month, method)
+                    
+                    predictions_list.append({
+                        'account_name': account,
+                        'fiscal_month': target_month,
+                        'amount': pred_value,
+                        'method': method
+                    })
+            
+            # 既存のAI自動生成予測を削除
+            self._delete_auto_forecasts(period_id)
+            
+            # 新しいAI予測を保存
+            saved_count = 0
+            for pred in predictions_list:
+                result = self.save_forecast_with_metadata(
+                    period_id=period_id,
+                    fiscal_month=pred['fiscal_month'],
+                    account_name=pred['account_name'],
+                    amount=pred['amount'],
+                    scenario='現実',
+                    source='AI',
+                    auto_generated=True,
+                    manual_override=False,
+                    prediction_method=pred['method'],
+                    ai_predicted_value=pred['amount']
+                )
+                if result['success']:
+                    saved_count += 1
+            
+            return {
+                'success': True,
+                'generated_count': saved_count,
+                'accounts': len(accounts),
+                'months': forecast_months
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def _convert_wide_to_long(self, df):
+        """
+        ワイド形式をロング形式に変換
+        """
+        account_col = df.columns[0]
+        month_cols = [col for col in df.columns if col != account_col]
+        
+        long_list = []
+        for _, row in df.iterrows():
+            account = row[account_col]
+            for month_col in month_cols:
+                value = row[month_col]
+                if pd.notna(value) and value != 0:
+                    try:
+                        month_num = int(month_col.split('-')[1])
+                    except:
+                        continue
+                    
+                    long_list.append({
+                        'account_name': account,
+                        'fiscal_month': month_num,
+                        'amount': float(value)
+                    })
+        
+        return pd.DataFrame(long_list)
+    
+    def _select_prediction_method(self, months, amounts):
+        """
+        最適な予測手法を自動選択
+        """
+        if len(months) < 3:
+            return 'average'
+        
+        try:
+            from sklearn.linear_model import LinearRegression
+            X = months.reshape(-1, 1)
+            y = amounts
+            model = LinearRegression()
+            model.fit(X, y)
+            r2 = model.score(X, y)
+            
+            return 'linear' if r2 > 0.7 else 'exponential'
+        except:
+            return 'average'
+    
+    def _predict_value(self, months, amounts, target_month, method):
+        """
+        予測値を計算
+        """
+        if method == 'linear':
+            from sklearn.linear_model import LinearRegression
+            X = months.reshape(-1, 1)
+            y = amounts
+            model = LinearRegression()
+            model.fit(X, y)
+            return float(model.predict([[target_month]])[0])
+        
+        elif method == 'exponential':
+            alpha = 0.3
+            s = amounts[0]
+            for v in amounts[1:]:
+                s = alpha * v + (1 - alpha) * s
+            return float(s)
+        
+        elif method == 'average':
+            window = min(3, len(amounts))
+            return float(np.mean(amounts[-window:]))
+        
+        else:
+            return float(np.mean(amounts))
+    
+    def _delete_auto_forecasts(self, period_id):
+        """
+        既存のAI自動生成予測を削除
+        """
+        try:
+            if self.use_postgres:
+                import psycopg2
+                conn = psycopg2.connect(self.conn_string)
+                cursor = conn.cursor()
+                
+                query = """
+                    DELETE FROM forecasts 
+                    WHERE period_id = %s 
+                      AND source = 'AI' 
+                      AND auto_generated = TRUE
+                      AND manual_override = FALSE
+                """
+                cursor.execute(query, (period_id,))
+                conn.commit()
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            print(f"削除エラー: {e}")
+    
+    def load_forecast_with_metadata(self, period_id, scenario='現実'):
+        """
+        予測データをメタデータとともに読み込み
+        """
+        try:
+            if self.use_postgres:
+                import psycopg2
+                conn = psycopg2.connect(self.conn_string)
+                
+                query = """
+                    SELECT 
+                        fiscal_month, account_name, amount, scenario,
+                        source, auto_generated, manual_override, 
+                        prediction_method, ai_predicted_value,
+                        adjustment_reason_type, adjustment_reason_detail,
+                        created_at, updated_at
+                    FROM forecasts
+                    WHERE period_id = %s AND scenario = %s
+                    ORDER BY account_name, fiscal_month
+                """
+                
+                df = pd.read_sql(query, conn, params=(period_id, scenario))
+                conn.close()
+                
+                return df
+            
+            return pd.DataFrame()
+            
+        except Exception as e:
+            print(f"読み込みエラー: {e}")
+            return pd.DataFrame()
