@@ -2207,10 +2207,15 @@ class DataProcessor:
     
     def _select_prediction_method(self, months, amounts):
         """
-        最適な予測手法を自動選択
+        最適な予測手法を自動選択（改善版）
+        
+        判定ロジック:
+        - データ数 < 3        → 直近平均
+        - R² > 0.8 かつ正のトレンド → 線形回帰（成長トレンドが明確）
+        - それ以外            → 直近加重平均（季節変動・不規則変動に対応）
         """
         if len(months) < 3:
-            return 'average'
+            return 'recent_avg'
         
         try:
             from sklearn.linear_model import LinearRegression
@@ -2219,25 +2224,49 @@ class DataProcessor:
             model = LinearRegression()
             model.fit(X, y)
             r2 = model.score(X, y)
+            slope = model.coef_[0]
             
-            return 'linear' if r2 > 0.7 else 'exponential'
-        except:
-            return 'average'
+            # R²が高くかつ正のトレンド → 線形回帰
+            if r2 > 0.8 and slope > 0:
+                return 'linear'
+            # R²が高いが負のトレンド → 直近平均（急落予測を避ける）
+            elif r2 > 0.8 and slope < 0:
+                return 'recent_avg'
+            else:
+                return 'recent_avg'
+        except Exception:
+            return 'recent_avg'
     
     def _predict_value(self, months, amounts, target_month, method):
         """
-        予測値を計算
+        予測値を計算（改善版）
+        
+        - linear    : 線形回帰（明確な成長トレンド時のみ）
+        - recent_avg: 直近3〜6ヶ月の加重平均（最新月ほど重みが大きい）
+        - average   : 単純移動平均（後方互換）
+        - exponential: 指数平滑（後方互換）
         """
         if method == 'linear':
             from sklearn.linear_model import LinearRegression
             X = months.reshape(-1, 1)
-            y = amounts
             model = LinearRegression()
-            model.fit(X, y)
-            return float(model.predict([[target_month]])[0])
+            model.fit(X, amounts)
+            pred = float(model.predict([[target_month]])[0])
+            # 直近3ヶ月平均の50%を下限保証（過度な外挿を防ぐ）
+            recent_avg = float(np.mean(amounts[-3:]))
+            return max(pred, recent_avg * 0.5)
+        
+        elif method == 'recent_avg':
+            # 直近6ヶ月を使い、最新月ほど重みを大きくする加重平均
+            n = min(6, len(amounts))
+            recent = amounts[-n:]
+            # 重み: 直近が最大 (n, n-1, ..., 1)
+            weights = np.arange(1, n + 1, dtype=float)
+            return float(np.average(recent, weights=weights))
         
         elif method == 'exponential':
-            alpha = 0.3
+            # α=0.6（直近重視）
+            alpha = 0.6
             s = amounts[0]
             for v in amounts[1:]:
                 s = alpha * v + (1 - alpha) * s
@@ -2248,7 +2277,7 @@ class DataProcessor:
             return float(np.mean(amounts[-window:]))
         
         else:
-            return float(np.mean(amounts))
+            return float(np.mean(amounts[-3:] if len(amounts) >= 3 else amounts))
     
     def _delete_auto_forecasts(self, period_id):
         """
