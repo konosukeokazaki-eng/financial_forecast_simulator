@@ -1753,6 +1753,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         with st.spinner('データを読み込んでいます...'):
             if 'actuals_df' not in st.session_state:
                 st.session_state.actuals_df = load_actual_data_cached(st.session_state.selected_period_id, processor)
+            # forecasts_dfは常に「現実」シナリオで読み込み（楽観/悲観は後段で調整）
             if 'forecasts_df' not in st.session_state:
                 st.session_state.forecasts_df = load_forecast_data_cached(st.session_state.selected_period_id, "現実", processor)
             if 'sub_accounts_df' not in st.session_state:
@@ -2077,7 +2078,46 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             st.markdown("---")
             
-            # ダッシュボードヘッダー
+            # ─── データ検証情報 ───────────────────────────────
+            with st.expander("🔍 データ検証（着地予測の内訳確認）", expanded=False):
+                current_month = st.session_state.current_month
+                split_idx_check = months.index(current_month) + 1 if current_month in months else 0
+                actual_months_check  = months[:split_idx_check]
+                forecast_months_check = months[split_idx_check:]
+                
+                st.write(f"**実績締月:** {current_month}　|　**split_idx:** {split_idx_check}")
+                st.write(f"**実績期間（{len(actual_months_check)}ヶ月）:** {', '.join(actual_months_check)}")
+                st.write(f"**予測期間（{len(forecast_months_check)}ヶ月）:** {', '.join(forecast_months_check)}")
+                st.write("")
+                
+                # forecasts_dfに予測月のデータがあるか確認
+                st.write("**forecast_dataの状況（売上高）:**")
+                sales_forecast_row = forecasts_df[forecasts_df['項目名'] == '売上高']
+                if not sales_forecast_row.empty:
+                    for m in forecast_months_check:
+                        if m in sales_forecast_row.columns:
+                            val = sales_forecast_row[m].iloc[0]
+                            status = "✅" if val != 0 else "⚠️ 0円"
+                            st.write(f"  {m}: {status} {val:,.0f}円")
+                        else:
+                            st.write(f"  {m}: ❌ カラムなし")
+                else:
+                    st.write("  ❌ 売上高の予測データなし")
+                
+                st.write("")
+                st.write("**actuals_dfの状況（売上高・実績月）:**")
+                sales_actual_row = actuals_df[actuals_df['項目名'] == '売上高']
+                if not sales_actual_row.empty:
+                    for m in actual_months_check:
+                        if m in sales_actual_row.columns:
+                            val = sales_actual_row[m].iloc[0]
+                            status = "✅" if val != 0 else "⚠️ 0円"
+                            st.write(f"  {m}: {status} {val:,.0f}円")
+                        else:
+                            st.write(f"  {m}: ❌ カラムなし")
+                else:
+                    st.write("  ❌ 売上高の実績データなし")
+
             st.markdown(f"""
             <div class="dashboard-header fade-in">
                 <h1 class="dashboard-title">📊 財務予測ダッシュボード</h1>
