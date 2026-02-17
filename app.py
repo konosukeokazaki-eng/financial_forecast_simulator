@@ -1647,159 +1647,109 @@ def render_status_bar():
         month_color = '#7f8c8d'
         current_month = '―'
 
-    st.markdown(f"""
+    # CSS: Streamlit標準ヘッダー非表示 + 余白確保（st.markdownで先に適用）
+    st.markdown("""
     <style>
-    /* Streamlit標準ヘッダーを完全に非表示 */
-    header[data-testid="stHeader"] {{
-        display: none !important;
-    }}
+    header[data-testid="stHeader"] { display: none !important; }
+    .main .block-container { padding-top: 3rem !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 48px !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
-    /* メインとサイドバーの上余白を確保 */
-    .main .block-container {{
-        padding-top: 3rem !important;
-    }}
-    [data-testid="stSidebar"] > div:first-child {{
-        padding-top: 48px !important;
-    }}
-
-    /* ステータスバー本体：left:0 で画面全幅に固定 */
-    #status-bar-fixed {{
+    # バー本体：st.components.v1.htmlで確実にレンダリング
+    import streamlit.components.v1 as components
+    components.html(f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+    * {{ margin:0; padding:0; box-sizing:border-box; }}
+    body {{ overflow: hidden; }}
+    #bar {{
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
+        top: 0; left: 0; right: 0;
         height: 38px;
-        z-index: 9999999;
         background: #1a1f2e;
         border-bottom: 1px solid #2d3561;
         display: flex;
         align-items: stretch;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        z-index: 9999;
     }}
-
-    /* 左端タイトルエリア */
-    .sb-logo {{
-        display: flex;
-        align-items: center;
+    .logo {{
+        display: flex; align-items: center;
         padding: 0 20px;
         min-width: 200px;
         background: #141828;
         border-right: 1px solid #2d3561;
         color: #6b7a9e;
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 11px; font-weight: 700;
         letter-spacing: 0.5px;
-        white-space: nowrap;
-        flex-shrink: 0;
+        white-space: nowrap; flex-shrink: 0;
     }}
-
-    /* 各項目：クリックでサイドバーへ誘導 */
-    .sb-item {{
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 22px;
+    .item {{
+        display: flex; align-items: center;
+        gap: 8px; padding: 0 22px;
         border-right: 1px solid #2a3050;
         white-space: nowrap;
         cursor: pointer;
         transition: background 0.15s;
-        position: relative;
     }}
-    .sb-item:hover {{
-        background: #242b42;
-    }}
-    .sb-item:last-child {{ border-right: none; }}
-
-    /* ホバー時のツールチップ */
-    .sb-item::after {{
-        content: attr(data-tip);
-        position: absolute;
-        top: 42px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #0d1117;
-        color: #8a96b0;
-        padding: 4px 10px;
-        border-radius: 4px;
-        font-size: 11px;
-        border: 1px solid #2d3561;
-        white-space: nowrap;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.15s;
-    }}
-    .sb-item:hover::after {{
-        opacity: 1;
-    }}
-
-    .sb-label {{
+    .item:hover {{ background: #242b42; }}
+    .item:last-child {{ border-right: none; }}
+    .lbl {{
         color: #5a6688;
-        font-size: 10px;
-        font-weight: 700;
+        font-size: 10px; font-weight: 700;
         letter-spacing: 1px;
         text-transform: uppercase;
-        pointer-events: none;
     }}
-    .sb-value {{
+    .val {{
         color: #cdd5e0;
-        font-weight: 600;
-        font-size: 12.5px;
-        pointer-events: none;
+        font-weight: 600; font-size: 12.5px;
     }}
-    .sb-badge {{
+    .badge {{
         display: inline-block;
-        padding: 2px 12px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 700;
+        padding: 2px 12px; border-radius: 20px;
+        font-size: 11px; font-weight: 700;
         background: {mode_color}20;
         color: {mode_color};
         border: 1px solid {mode_color}50;
-        pointer-events: none;
     }}
     </style>
-
-    <div id="status-bar-fixed">
-        <div class="sb-logo">財務予測シミュレーター</div>
-
-        <div class="sb-item" data-tip="クリックでサイドバーに移動"
-            onclick="(function(){{
-                var sb = window.parent.document.querySelector('[data-testid=stSidebar]');
-                if(sb){{ sb.scrollTop=0; }}
-            }})()">
-            <span class="sb-label">会社</span>
-            <span class="sb-value">{comp_name}</span>
+    </head>
+    <body>
+    <div id="bar">
+        <div class="logo">財務予測シミュレーター</div>
+        <div class="item" onclick="scrollSidebar(0)">
+            <span class="lbl">会社</span>
+            <span class="val">{comp_name}</span>
         </div>
-
-        <div class="sb-item" data-tip="クリックでサイドバーに移動"
-            onclick="(function(){{
-                var sb = window.parent.document.querySelector('[data-testid=stSidebar]');
-                if(sb){{ sb.scrollTop=0; }}
-            }})()">
-            <span class="sb-label">期間</span>
-            <span class="sb-value">{period_text}</span>
+        <div class="item" onclick="scrollSidebar(0)">
+            <span class="lbl">期間</span>
+            <span class="val">{period_text}</span>
         </div>
-
-        <div class="sb-item" data-tip="クリックでサイドバーに移動"
-            onclick="(function(){{
-                var sb = window.parent.document.querySelector('[data-testid=stSidebar]');
-                if(sb){{ sb.scrollTop=300; }}
-            }})()">
-            <span class="sb-label">実績締月</span>
-            <span class="sb-value" style="color:{month_color}; font-weight:800; font-size:13px;">{current_month}</span>
+        <div class="item" onclick="scrollSidebar(300)">
+            <span class="lbl">実績締月</span>
+            <span class="val" style="color:{month_color}; font-weight:800; font-size:13px;">{current_month}</span>
         </div>
-
-        <div class="sb-item" data-tip="クリックでサイドバーに移動"
-            onclick="(function(){{
-                var sb = window.parent.document.querySelector('[data-testid=stSidebar]');
-                if(sb){{ sb.scrollTop=500; }}
-            }})()">
-            <span class="sb-label">モード</span>
-            <span class="sb-badge">{mode_label}</span>
+        <div class="item" onclick="scrollSidebar(500)">
+            <span class="lbl">モード</span>
+            <span class="badge">{mode_label}</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    <script>
+    function scrollSidebar(pos) {{
+        var sb = window.parent.document.querySelector('[data-testid="stSidebar"]');
+        if (sb) sb.scrollTop = pos;
+    }}
+    // このiframeを画面全幅・高さ0の透過レイヤーにする
+    window.frameElement.style.cssText =
+        'position:fixed;top:0;left:0;width:100%;height:40px;border:none;z-index:9999999;background:transparent;';
+    </script>
+    </body>
+    </html>
+    """, height=0)
 
 render_status_bar()
 
