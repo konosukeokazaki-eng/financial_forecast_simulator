@@ -5659,9 +5659,17 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         elif st.session_state.page == "AI自動予測":
             st.title("🔮 AI自動予測")
             
+            period_id = st.session_state.selected_period_id
+            
+            # 会計期間の全月リストを取得
+            all_months = processor.get_fiscal_months(period_id)
+            
+            if not all_months:
+                st.error("❌ 会計期間情報を取得できません")
+                st.stop()
+            
             # 実績データの確認
             try:
-                period_id = st.session_state.selected_period_id
                 actuals_raw = processor.load_actual_data(period_id)
                 
                 if actuals_raw is None or actuals_raw.empty:
@@ -5670,70 +5678,52 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     **AI予測を使用するには:**
                     1. 左サイドバーから「実績データ入力」または「データ取込」を選択
                     2. 実績データを登録してください
-                    3. 最低3ヶ月分の実績データが必要です
+                    3. 最低2ヶ月分の実績データが必要です
                     """)
                     st.stop()
                 
-                # カラム名を確認
-                st.info(f"📋 実績データ: {len(actuals_raw)}行")
-                with st.expander("🔍 データ構造確認（元データ）"):
-                    st.write("**カラム名:**", list(actuals_raw.columns))
-                    st.write("**データサンプル:**")
-                    st.dataframe(actuals_raw.head(10))
+                # 実績が存在する月を特定
+                actual_months = [col for col in actuals_raw.columns if col != '項目名' and col in all_months]
                 
-                # ワイド形式→ロング形式への変換
-                # カラム: ['項目名', '2025-04', '2025-05', ...]
-                # → ['account_name', 'month', 'amount']
+                # データが存在する月をチェック
+                actual_months_with_data = []
+                for month in actual_months:
+                    if actuals_raw[month].sum() != 0:
+                        actual_months_with_data.append(month)
                 
-                account_col = actuals_raw.columns[0]  # '項目名'
-                month_cols = [col for col in actuals_raw.columns if col != account_col]
-                
-                if not month_cols:
-                    st.error("❌ 月カラムが見つかりません")
+                if len(actual_months_with_data) < 2:
+                    st.warning(f"⚠️ 実績データが不足しています（現在: {len(actual_months_with_data)}ヶ月）")
+                    st.info("AI予測には最低2ヶ月分の実績データが必要です")
                     st.stop()
                 
-                st.success(f"✅ ワイド形式検出: 科目列={account_col}, 月列数={len(month_cols)}")
+                # 予測対象月を特定
+                forecast_months = [m for m in all_months if m not in actual_months_with_data]
                 
-                # ロング形式に変換
-                actuals_list = []
-                for _, row in actuals_raw.iterrows():
-                    account = row[account_col]
-                    for month_col in month_cols:
-                        value = row[month_col]
-                        if pd.notna(value) and value != 0:
-                            # 月を数値に変換 (2025-04 → 4)
-                            try:
-                                month_num = int(month_col.split('-')[1])
-                            except:
-                                continue
-                            
-                            actuals_list.append({
-                                'account_name': account,
-                                'fiscal_month': month_num,
-                                'amount': float(value),
-                                'month_str': month_col
-                            })
-                
-                if not actuals_list:
-                    st.error("❌ 変換できるデータがありません")
+                if not forecast_months:
+                    st.info("✅ すべての月の実績が登録済みです")
+                    st.info("予測対象月がありません")
                     st.stop()
                 
-                actuals = pd.DataFrame(actuals_list)
+                # ステータス表示
+                col1, col2, col3 = st.columns(3)
                 
-                st.success(f"✅ ロング形式に変換: {len(actuals)}行")
-                with st.expander("🔍 変換後データ確認"):
-                    st.dataframe(actuals.head(20))
+                with col1:
+                    st.metric("📅 実績月数", f"{len(actual_months_with_data)}ヶ月")
                 
-                # 実績月数チェック
-                latest_month = int(actuals['fiscal_month'].max())
-                unique_months = actuals['fiscal_month'].nunique()
+                with col2:
+                    st.metric("🎯 予測対象月", f"{len(forecast_months)}ヶ月")
                 
-                if unique_months < 3:
-                    st.warning(f"⚠️ 実績データが不足しています（現在: {unique_months}ヶ月）")
-                    st.info("AI予測には最低3ヶ月分の実績データが必要です")
-                    st.stop()
+                with col3:
+                    latest_actual = actual_months_with_data[-1] if actual_months_with_data else "なし"
+                    st.metric("📊 最新実績", latest_actual)
                 
-                st.success(f"✅ 実績データ: {unique_months}ヶ月分（最新: {latest_month}月）")
+                st.markdown("---")
+                
+                # 詳細情報
+                with st.expander("📋 詳細情報"):
+                    st.write(f"**会計期間:** {all_months[0]} 〜 {all_months[-1]}")
+                    st.write(f"**実績月:** {', '.join(actual_months_with_data)}")
+                    st.write(f"**予測月:** {', '.join(forecast_months)}")
                 
             except Exception as e:
                 st.error(f"❌ データ取得エラー: {e}")
@@ -5745,35 +5735,27 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             # 予測設定
             st.markdown("### ⚙️ 予測設定")
             
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                forecast_method = st.selectbox(
-                    "予測手法",
-                    ["auto", "linear", "average", "exponential"],
-                    format_func=lambda x: {
-                        "auto": "🤖 自動選択（推奨）",
-                        "linear": "📈 線形回帰",
-                        "average": "📊 移動平均",
-                        "exponential": "📉 指数平滑"
-                    }[x]
-                )
-            
-            with col2:
-                forecast_months = list(range(latest_month + 1, 13))
-                if not forecast_months:
-                    st.info("✅ すべての月の実績が登録済みです")
-                    forecast_months = [12]
+            forecast_method = st.selectbox(
+                "予測手法",
+                ["auto", "linear", "average", "exponential"],
+                format_func=lambda x: {
+                    "auto": "🤖 自動選択（推奨）",
+                    "linear": "📈 線形回帰",
+                    "average": "📊 移動平均",
+                    "exponential": "📉 指数平滑"
+                }[x]
+            )
             
             # 予測実行ボタン
             if st.button("🚀 予測を実行", type="primary", use_container_width=True):
                 with st.spinner("AI予測を実行中..."):
                     
+                    # 月→インデックスのマッピング
+                    month_to_index = {month: idx + 1 for idx, month in enumerate(all_months)}
+                    
                     # 勘定科目ごとに予測
                     predictions_list = []
-                    
-                    # 実績データから勘定科目リスト取得
-                    accounts = actuals['account_name'].unique()
+                    accounts = actuals_raw['項目名'].values
                     
                     progress_bar = st.progress(0)
                     status_text = st.empty()
@@ -5783,23 +5765,31 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         progress_bar.progress((idx + 1) / len(accounts))
                         
                         # 該当勘定科目の実績データ
-                        account_data = actuals[actuals['account_name'] == account].copy()
-                        account_data = account_data.sort_values('fiscal_month')
+                        account_row = actuals_raw[actuals_raw['項目名'] == account].iloc[0]
                         
-                        if len(account_data) < 2:
+                        # 実績月のデータを抽出
+                        actual_data = []
+                        actual_indices = []
+                        for month in actual_months_with_data:
+                            if month in account_row.index:
+                                value = account_row[month]
+                                if pd.notna(value) and value != 0:
+                                    actual_data.append(float(value))
+                                    actual_indices.append(month_to_index[month])
+                        
+                        if len(actual_data) < 2:
                             continue
                         
-                        # 時系列データ準備
-                        months = account_data['fiscal_month'].values
-                        amounts = account_data['amount'].values
+                        # numpy配列に変換
+                        months_array = np.array(actual_indices)
+                        amounts_array = np.array(actual_data)
                         
-                        # 予測実行
+                        # 予測手法の選択
                         if forecast_method == 'auto':
-                            # R²で最適手法を選択
-                            if len(months) >= 3:
+                            if len(months_array) >= 3:
                                 from sklearn.linear_model import LinearRegression
-                                X = months.reshape(-1, 1)
-                                y = amounts
+                                X = months_array.reshape(-1, 1)
+                                y = amounts_array
                                 model = LinearRegression()
                                 model.fit(X, y)
                                 r2 = model.score(X, y)
@@ -5810,35 +5800,34 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             method = forecast_method
                         
                         # 予測値計算
-                        for target_month in forecast_months:
+                        for forecast_month in forecast_months:
+                            target_index = month_to_index[forecast_month]
+                            
                             if method == 'linear':
-                                # 線形回帰
                                 from sklearn.linear_model import LinearRegression
-                                X = months.reshape(-1, 1)
-                                y = amounts
+                                X = months_array.reshape(-1, 1)
+                                y = amounts_array
                                 model = LinearRegression()
                                 model.fit(X, y)
-                                pred_value = model.predict([[target_month]])[0]
+                                pred_value = model.predict([[target_index]])[0]
                             
                             elif method == 'exponential':
-                                # 指数平滑（alpha=0.3）
                                 alpha = 0.3
-                                s = amounts[0]
-                                for v in amounts[1:]:
+                                s = amounts_array[0]
+                                for v in amounts_array[1:]:
                                     s = alpha * v + (1 - alpha) * s
                                 pred_value = s
                             
                             elif method == 'average':
-                                # 移動平均（直近3ヶ月）
-                                window = min(3, len(amounts))
-                                pred_value = np.mean(amounts[-window:])
+                                window = min(3, len(amounts_array))
+                                pred_value = np.mean(amounts_array[-window:])
                             
                             else:
-                                pred_value = np.mean(amounts)
+                                pred_value = np.mean(amounts_array)
                             
                             predictions_list.append({
                                 'account_name': account,
-                                'fiscal_month': target_month,
+                                'month': forecast_month,
                                 'amount': pred_value,
                                 'method': method
                             })
@@ -5868,7 +5857,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     with col2:
                         st.metric(
                             "予測期間",
-                            f"{min(forecast_months)}月 〜 {max(forecast_months)}月"
+                            f"{forecast_months[0]} 〜 {forecast_months[-1]}"
                         )
                     
                     with col3:
@@ -5886,15 +5875,26 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         
                         # 売上高
                         if '売上高' in predictions_df['account_name'].values:
-                            sales_actual = actuals[actuals['account_name'] == '売上高'].copy()
+                            # 実績データ
+                            sales_row = actuals_raw[actuals_raw['項目名'] == '売上高'].iloc[0]
+                            sales_actual_data = []
+                            sales_actual_months = []
+                            for month in actual_months_with_data:
+                                if month in sales_row.index:
+                                    value = sales_row[month]
+                                    if pd.notna(value):
+                                        sales_actual_data.append(value)
+                                        sales_actual_months.append(month)
+                            
+                            # 予測データ
                             sales_pred = predictions_df[predictions_df['account_name'] == '売上高'].copy()
                             
                             fig = go.Figure()
                             
                             # 実績
                             fig.add_trace(go.Scatter(
-                                x=sales_actual['fiscal_month'],
-                                y=sales_actual['amount'],
+                                x=sales_actual_months,
+                                y=sales_actual_data,
                                 mode='lines+markers',
                                 name='実績',
                                 line=dict(color='#1f77b4', width=3),
@@ -5903,7 +5903,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             
                             # 予測
                             fig.add_trace(go.Scatter(
-                                x=sales_pred['fiscal_month'],
+                                x=sales_pred['month'],
                                 y=sales_pred['amount'],
                                 mode='lines+markers',
                                 name='予測',
@@ -5913,7 +5913,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                             
                             fig.update_layout(
                                 title='売上高の予測',
-                                xaxis_title='会計月',
+                                xaxis_title='月',
                                 yaxis_title='金額（円）',
                                 hovermode='x unified',
                                 height=400
@@ -5930,9 +5930,12 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         # ピボットテーブル
                         pivot_df = predictions_df.pivot(
                             index='account_name',
-                            columns='fiscal_month',
+                            columns='month',
                             values='amount'
                         )
+                        
+                        # 月の順序を保持
+                        pivot_df = pivot_df[forecast_months]
                         
                         # フォーマット
                         st.dataframe(
