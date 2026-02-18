@@ -1301,6 +1301,15 @@ def render_status_bar():
     header[data-testid="stHeader"] { display: none !important; }
     .main .block-container { padding-top: 3rem !important; }
     [data-testid="stSidebar"] > div:first-child { padding-top: 48px !important; }
+    /* サイドバーが折りたたまれたときの再展開ボタンを常に表示 */
+    [data-testid="stSidebarCollapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+        position: fixed !important;
+        top: 0.5rem !important;
+        left: 0.5rem !important;
+        z-index: 999999 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
