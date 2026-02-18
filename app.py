@@ -1418,16 +1418,37 @@ def render_status_bar():
     <script>
     function toggleSidebar() {{
         var doc = window.parent.document;
-        // サイドバーが折りたたまれているとき → 展開ボタンをクリック
-        var expandBtn = doc.querySelector('[data-testid="stSidebarCollapsedControl"] button');
-        if (expandBtn) {{ expandBtn.click(); return; }}
-        // サイドバーが開いているとき → 折りたたみボタンをクリック
-        var collapseBtn = doc.querySelector('[data-testid="stSidebarNavCollapseButton"] button, [data-testid="stSidebarNavCloseButton"] button');
-        if (collapseBtn) {{ collapseBtn.click(); return; }}
-        // フォールバック: サイドバーの表示/非表示をCSSで直接切り替え
-        var sb = doc.querySelector('[data-testid="stSidebar"]');
-        if (sb) {{
-            sb.style.display = (sb.style.display === 'none') ? '' : 'none';
+        var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+        if (!sidebar) return;
+
+        // サイドバーが画面内にあるかを位置で判定
+        var rect = sidebar.getBoundingClientRect();
+        var isVisible = rect.left > -100 && rect.width > 50;
+
+        // まずStreamlit標準ボタンを試みる
+        if (isVisible) {{
+            var btns = ['[data-testid="stSidebarNavCollapseButton"] button',
+                        '[data-testid="collapsedControl"] button',
+                        '[data-testid="stSidebarNavCloseButton"] button'];
+            for (var i = 0; i < btns.length; i++) {{
+                var b = doc.querySelector(btns[i]);
+                if (b) {{ b.click(); return; }}
+            }}
+            // フォールバック: CSSで直接隠す
+            sidebar.style.transform = 'translateX(-110%)';
+            sidebar.style.transition = 'transform 0.3s ease';
+            sidebar.style.visibility = 'hidden';
+        }} else {{
+            var exBtns = ['[data-testid="stSidebarCollapsedControl"] button',
+                          '[data-testid="collapsedControl"] button'];
+            for (var i = 0; i < exBtns.length; i++) {{
+                var b = doc.querySelector(exBtns[i]);
+                if (b) {{ b.click(); return; }}
+            }}
+            // フォールバック: CSSで直接表示
+            sidebar.style.transform = 'translateX(0)';
+            sidebar.style.transition = 'transform 0.3s ease';
+            sidebar.style.visibility = 'visible';
         }}
     }}
     function scrollSidebar(pos) {{
