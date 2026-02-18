@@ -349,10 +349,10 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
-# freee風カスタムCSS
+# Linear/Notion スタイル カスタムCSS
 st.markdown("""
 <style>
-    /* ===== freee Design System ===== */
+    /* ===== Linear/Notion Design System ===== */
 
     /* フォント */
     * {
@@ -362,24 +362,24 @@ st.markdown("""
     }
 
     /* 全体背景 */
-    .stApp { background-color: #F5F7FA !important; }
-    .main  { background-color: #F5F7FA !important; padding: 0 1.5rem; }
+    .stApp { background-color: #FAFAFA !important; }
+    .main  { background-color: #FAFAFA !important; padding: 0 1.5rem; }
     .main .block-container {
-        background-color: #F5F7FA !important;
+        background-color: #FAFAFA !important;
         padding: 1.5rem 2rem 2rem 2rem !important;
         max-width: 100% !important;
     }
 
     /* ===== サイドバー ===== */
     section[data-testid="stSidebar"] {
-        background-color: #FFFFFF !important;
-        border-right: 1px solid #E5E7EB !important;
+        background-color: #F7F7F7 !important;
+        border-right: 1px solid #E4E4E7 !important;
     }
     section[data-testid="stSidebar"] > div:first-child {
-        background-color: #FFFFFF !important;
+        background-color: #F7F7F7 !important;
         padding: 0 !important;
     }
-    section[data-testid="stSidebar"] * { color: #374151 !important; }
+    section[data-testid="stSidebar"] * { color: #3F3F46 !important; }
 
     /* サイドバー内の通常ボタン → ナビリンク風 */
     [data-testid="stSidebar"] .stButton > button {
@@ -398,8 +398,8 @@ st.markdown("""
         box-shadow: none !important;
     }
     [data-testid="stSidebar"] .stButton > button:hover {
-        background-color: #EBF3FF !important;
-        color: #2563EB !important;
+        background-color: #EDEDEF !important;
+        color: #18181B !important;
         transform: none !important;
         box-shadow: none !important;
     }
@@ -409,12 +409,12 @@ st.markdown("""
         display: block;
         padding: 9px 16px;
         margin: 1px 0;
-        background-color: #EBF3FF;
+        background-color: #EEF0FF;
         border-radius: 6px;
-        color: #2563EB !important;
+        color: #5E6AD2 !important;
         font-size: 13.5px;
         font-weight: 600;
-        border-left: 3px solid #2563EB;
+        border-left: 3px solid #5E6AD2;
         cursor: default;
     }
     /* 非アクティブのナビラベル（HTMLレンダリング） */
@@ -448,7 +448,7 @@ st.markdown("""
     }
     [data-testid="stSidebar"] .stSelectbox > div > div {
         background-color: #F9FAFB !important;
-        border: 1px solid #E5E7EB !important;
+        border: 1px solid #E4E4E7 !important;
         border-radius: 6px !important;
         font-size: 13px !important;
         color: #374151 !important;
@@ -456,22 +456,24 @@ st.markdown("""
 
     /* ===== 見出し ===== */
     h1 {
-        color: #111827 !important;
-        font-size: 20px !important;
+        color: #18181B !important;
+        font-size: 22px !important;
         font-weight: 700 !important;
         margin: 0 0 20px 0 !important;
         padding-bottom: 14px !important;
-        border-bottom: 1px solid #E5E7EB !important;
+        border-bottom: 1px solid #E4E4E7 !important;
+        letter-spacing: -0.3px !important;
     }
     h2 {
-        color: #1F2937 !important;
+        color: #18181B !important;
         font-size: 15px !important;
         font-weight: 600 !important;
         margin-top: 24px !important;
         margin-bottom: 12px !important;
+        letter-spacing: -0.2px !important;
     }
     h3 {
-        color: #374151 !important;
+        color: #3F3F46 !important;
         font-size: 13px !important;
         font-weight: 600 !important;
     }
@@ -490,36 +492,37 @@ st.markdown("""
     }
     .main .stButton > button:hover {
         border-color: #93C5FD !important;
-        background-color: #EFF6FF !important;
+        background-color: #EEF0FF !important;
         transform: none !important;
     }
     .main .stButton > button[kind="primary"] {
-        background-color: #2563EB !important;
+        background-color: #5E6AD2 !important;
         color: #FFFFFF !important;
         border: none !important;
-        box-shadow: 0 1px 3px rgba(37,99,235,0.3) !important;
+        box-shadow: 0 1px 3px rgba(94,106,210,0.2) !important;
     }
     .main .stButton > button[kind="primary"]:hover {
-        background-color: #1D4ED8 !important;
+        background-color: #4F5BC4 !important;
     }
 
     /* ===== メトリクス ===== */
     [data-testid="stMetric"] {
         background-color: #FFFFFF !important;
-        border: 1px solid #E5E7EB !important;
+        border: 1px solid #E4E4E7 !important;
         border-radius: 8px !important;
-        padding: 16px 20px !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+        padding: 20px 24px !important;
+        box-shadow: none !important;
     }
     [data-testid="stMetricValue"] {
-        font-size: 24px !important;
+        font-size: 28px !important;
         font-weight: 700 !important;
-        color: #111827 !important;
+        color: #18181B !important;
+        letter-spacing: -0.5px !important;
     }
     [data-testid="stMetricLabel"] {
         font-size: 11px !important;
-        font-weight: 700 !important;
-        color: #6B7280 !important;
+        font-weight: 600 !important;
+        color: #71717A !important;
         text-transform: uppercase !important;
         letter-spacing: 0.5px !important;
     }
@@ -527,7 +530,7 @@ st.markdown("""
     /* ===== タブ ===== */
     .stTabs [data-baseweb="tab-list"] {
         background-color: transparent !important;
-        border-bottom: 2px solid #E5E7EB !important;
+        border-bottom: 2px solid #E4E4E7 !important;
         gap: 0 !important;
         padding: 0 !important;
     }
@@ -542,8 +545,8 @@ st.markdown("""
         margin-bottom: -2px !important;
     }
     .stTabs [aria-selected="true"] {
-        color: #2563EB !important;
-        border-bottom: 2px solid #2563EB !important;
+        color: #5E6AD2 !important;
+        border-bottom: 2px solid #5E6AD2 !important;
         font-weight: 600 !important;
     }
 
@@ -557,8 +560,8 @@ st.markdown("""
     }
     .stTextInput > div > div:focus-within,
     .stNumberInput > div > div:focus-within {
-        border-color: #2563EB !important;
-        box-shadow: 0 0 0 3px rgba(37,99,235,0.12) !important;
+        border-color: #5E6AD2 !important;
+        box-shadow: 0 0 0 3px rgba(94,106,210,0.15) !important;
     }
     .stSelectbox > div > div {
         background-color: #FFFFFF !important;
@@ -569,14 +572,14 @@ st.markdown("""
     }
 
     /* ===== アラート ===== */
-    .stInfo    { background-color: #EFF6FF !important; border-left: 4px solid #2563EB !important; color: #1E40AF !important; border-radius: 0 6px 6px 0 !important; }
+    .stInfo    { background-color: #EEF0FF !important; border-left: 4px solid #5E6AD2 !important; color: #3730A3 !important; border-radius: 0 6px 6px 0 !important; }
     .stWarning { background-color: #FFFBEB !important; border-left: 4px solid #F59E0B !important; color: #92400E !important; border-radius: 0 6px 6px 0 !important; }
     .stSuccess { background-color: #F0FDF4 !important; border-left: 4px solid #22C55E !important; color: #166534 !important; border-radius: 0 6px 6px 0 !important; }
     .stError   { background-color: #FEF2F2 !important; border-left: 4px solid #EF4444 !important; color: #991B1B !important; border-radius: 0 6px 6px 0 !important; }
 
     /* ===== テーブル・データフレーム ===== */
     .dataframe, [data-testid="stDataFrameResizable"] {
-        border: 1px solid #E5E7EB !important;
+        border: 1px solid #E4E4E7 !important;
         border-radius: 8px !important;
         font-size: 13px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
@@ -588,7 +591,7 @@ st.markdown("""
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.5px !important;
-        border-bottom: 1px solid #E5E7EB !important;
+        border-bottom: 1px solid #E4E4E7 !important;
         padding: 10px 14px !important;
     }
     .dataframe tbody td {
@@ -601,7 +604,7 @@ st.markdown("""
     /* ===== エクスパンダー ===== */
     .streamlit-expanderHeader {
         background-color: #F9FAFB !important;
-        border: 1px solid #E5E7EB !important;
+        border: 1px solid #E4E4E7 !important;
         border-radius: 6px !important;
         color: #374151 !important;
         font-weight: 500 !important;
@@ -609,79 +612,74 @@ st.markdown("""
     }
     .streamlit-expanderContent {
         background-color: #FFFFFF !important;
-        border: 1px solid #E5E7EB !important;
+        border: 1px solid #E4E4E7 !important;
         border-top: none !important;
         border-radius: 0 0 6px 6px !important;
     }
 
     /* ===== セパレーター ===== */
-    hr { border: none !important; border-top: 1px solid #E5E7EB !important; margin: 16px 0 !important; }
+    hr { border: none !important; border-top: 1px solid #E4E4E7 !important; margin: 16px 0 !important; }
 
     /* ===== カスタムカード（既存クラスを維持・更新） ===== */
     .amount-card, .summary-card {
         background: #FFFFFF;
         padding: 20px 24px;
         border-radius: 8px;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border: 1px solid #E4E4E7;
         margin-bottom: 16px;
     }
-    .amount-card:hover, .summary-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    }
     .amount-card-label, .card-title {
-        font-size: 11px; color: #6B7280; font-weight: 700;
+        font-size: 11px; color: #71717A; font-weight: 600;
         text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px;
     }
     .amount-card-value, .card-value {
-        font-size: 26px; font-weight: 700; color: #111827; margin-bottom: 4px;
+        font-size: 26px; font-weight: 700; color: #18181B; margin-bottom: 4px; letter-spacing: -0.3px;
     }
-    .amount-card-sub, .card-subtitle { font-size: 12px; color: #9CA3AF; }
+    .amount-card-sub, .card-subtitle { font-size: 12px; color: #A1A1AA; }
 
-    .summary-card-blue   { background:#FFFFFF; border-left:3px solid #2563EB; padding:20px 24px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
-    .summary-card-green  { background:#FFFFFF; border-left:3px solid #22C55E; padding:20px 24px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
-    .summary-card-orange { background:#FFFFFF; border-left:3px solid #F59E0B; padding:20px 24px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
-    .summary-card-purple { background:#FFFFFF; border-left:3px solid #8B5CF6; padding:20px 24px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
+    .summary-card-blue   { background:#FFFFFF; border-left:3px solid #5E6AD2; padding:20px 24px; border-radius:8px; border:1px solid #E4E4E7; margin-bottom:16px; }
+    .summary-card-green  { background:#FFFFFF; border-left:3px solid #16A34A; padding:20px 24px; border-radius:8px; border:1px solid #E4E4E7; margin-bottom:16px; }
+    .summary-card-orange { background:#FFFFFF; border-left:3px solid #D97706; padding:20px 24px; border-radius:8px; border:1px solid #E4E4E7; margin-bottom:16px; }
+    .summary-card-purple { background:#FFFFFF; border-left:3px solid #9333EA; padding:20px 24px; border-radius:8px; border:1px solid #E4E4E7; margin-bottom:16px; }
 
-    .info-box    { background:#EFF6FF; border-left:3px solid #2563EB; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#1E40AF; }
-    .warning-box { background:#FFFBEB; border-left:3px solid #F59E0B; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#92400E; }
-    .success-box { background:#F0FDF4; border-left:3px solid #22C55E; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#065F46; }
+    .info-box    { background:#EEF0FF; border-left:3px solid #5E6AD2; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#3730A3; }
+    .warning-box { background:#FFFBEB; border-left:3px solid #D97706; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#92400E; }
+    .success-box { background:#F0FDF4; border-left:3px solid #16A34A; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#14532D; }
 
-    /* ===== KPIカード（グラデーション） ===== */
+    /* ===== KPIカード（Linear フラットスタイル） ===== */
     .kpi-card {
-        border-radius: 10px; padding: 24px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-        color: white; position: relative; overflow: hidden;
-        transition: box-shadow 0.2s ease; margin-bottom: 20px;
+        background: #FFFFFF;
+        border-radius: 8px; padding: 24px;
+        border: 1px solid #E4E4E7;
+        position: relative;
+        transition: border-color 0.12s ease; margin-bottom: 20px;
     }
-    .kpi-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
-    .kpi-card-title    { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85; margin-bottom: 10px; }
-    .kpi-card-value    { font-size: 28px; font-weight: 700; margin-bottom: 6px; line-height: 1.1; }
-    .kpi-card-subtitle { font-size: 13px; opacity: 0.75; margin-bottom: 10px; }
-    .kpi-card-trend    { display:inline-block; background:rgba(255,255,255,0.2); border-radius:20px; padding:4px 10px; font-size:12px; font-weight:600; }
-    .kpi-card-decoration { position:absolute; right:-20px; bottom:-20px; width:120px; height:120px; background:rgba(255,255,255,0.08); border-radius:50%; }
+    .kpi-card:hover { border-color: #C7C7CC; }
+    .kpi-card-title    { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #71717A; margin-bottom: 10px; }
+    .kpi-card-value    { font-size: 30px; font-weight: 700; color: #18181B; margin-bottom: 6px; line-height: 1.1; letter-spacing: -0.5px; }
+    .kpi-card-subtitle { font-size: 12px; color: #A1A1AA; margin-bottom: 12px; }
+    .kpi-card-trend    { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; color: #3F3F46; }
+    .kpi-card-trend-up   { color: #16A34A; }
+    .kpi-card-trend-down { color: #DC2626; }
 
-    .dashboard-header {
-        background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
-        padding: 24px 32px; border-radius: 10px;
-        margin-bottom: 28px; color: white;
-    }
-    .dashboard-title    { margin:0; font-size:22px; font-weight:700; }
-    .dashboard-subtitle { margin:6px 0 0 0; font-size:13px; opacity:0.8; }
+    /* ダッシュボードページヘッダー（グラデーション廃止） */
+    .dashboard-page-header { margin-bottom: 24px; }
+    .dashboard-page-header h2 { font-size: 20px !important; font-weight: 700 !important; color: #18181B !important; margin: 0 0 4px 0 !important; letter-spacing: -0.3px !important; }
+    .dashboard-page-header p { font-size: 13px; color: #71717A; margin: 0; }
 
-    .section-card  { background:#FFFFFF; border-radius:10px; padding:20px 24px; box-shadow:0 1px 3px rgba(0,0,0,0.07); margin-bottom:20px; border:1px solid #E5E7EB; }
-    .section-title { margin:0 0 14px 0; font-size:15px; font-weight:600; color:#1F2937; }
+    .section-card  { background:#FFFFFF; border-radius:8px; padding:24px; border:1px solid #E4E4E7; margin-bottom:20px; }
+    .section-title { margin:0 0 16px 0; font-size:14px; font-weight:600; color:#18181B; letter-spacing:-0.1px; }
 
-    .metric-row         { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #F3F4F6; }
+    .metric-row         { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #F4F4F5; }
     .metric-row:last-child { border-bottom:none; }
-    .metric-name        { font-size:13px; color:#6B7280; font-weight:500; }
-    .metric-value       { font-size:15px; font-weight:600; color:#1F2937; }
+    .metric-name        { font-size:13px; color:#71717A; font-weight:500; }
+    .metric-value       { font-size:14px; font-weight:600; color:#18181B; }
     .metric-change      { font-size:12px; font-weight:600; margin-left:6px; }
-    .metric-up          { color:#22C55E; }
-    .metric-down        { color:#EF4444; }
+    .metric-up          { color:#16A34A; }
+    .metric-down        { color:#DC2626; }
 
-    @keyframes fadeInUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-    .fade-in { animation: fadeInUp 0.5s ease-out; }
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .fade-in { animation: fadeInUp 0.3s ease-out; }
 
     /* ===== ラジオボタン（サイドバー内） ===== */
     [data-testid="stSidebar"] [data-testid="stRadio"] > div {
@@ -693,7 +691,7 @@ st.markdown("""
         color: #374151 !important;
         padding: 6px 12px !important;
         border-radius: 6px !important;
-        border: 1px solid #E5E7EB !important;
+        border: 1px solid #E4E4E7 !important;
         background-color: #F9FAFB !important;
     }
 
@@ -703,7 +701,7 @@ st.markdown("""
     /* フォーム */
     [data-testid="stForm"] {
         background-color: #FFFFFF !important;
-        border: 1px solid #E5E7EB !important;
+        border: 1px solid #E4E4E7 !important;
         border-radius: 8px !important;
         padding: 20px !important;
     }
@@ -918,22 +916,22 @@ def _nav_cat(label: str):
 # ── ロゴ / ヘッダー ──────────────────────────────────────
 st.sidebar.markdown("""
 <div style="
-    padding: 20px 16px 16px 16px;
-    border-bottom: 1px solid #E5E7EB;
-    margin-bottom: 8px;
+    padding: 18px 12px 14px 12px;
+    border-bottom: 1px solid #E4E4E7;
+    margin-bottom: 6px;
 ">
     <div style="display:flex; align-items:center; gap:10px;">
         <div style="
-            width:32px; height:32px;
-            background: linear-gradient(135deg,#2563EB,#3B82F6);
-            border-radius:8px;
+            width:30px; height:30px;
+            background: #5E6AD2;
+            border-radius:7px;
             display:flex; align-items:center; justify-content:center;
-            color:white; font-size:16px; font-weight:700;
+            color:white; font-size:14px; font-weight:700;
             flex-shrink:0;
         ">財</div>
         <div>
-            <div style="font-size:14px; font-weight:700; color:#111827; line-height:1.2;">財務予測</div>
-            <div style="font-size:11px; color:#6B7280; line-height:1.2;">シミュレーター</div>
+            <div style="font-size:14px; font-weight:700; color:#18181B; line-height:1.2;">財務予測</div>
+            <div style="font-size:11px; color:#71717A; line-height:1.2;">シミュレーター</div>
         </div>
     </div>
 </div>
@@ -1040,7 +1038,7 @@ else:
         key="display_mode_radio",
     )
 
-    st.sidebar.markdown('<hr style="margin:8px 0; border-color:#E5E7EB;">', unsafe_allow_html=True)
+    st.sidebar.markdown('<hr style="margin:8px 0; border-color:#E4E4E7;">', unsafe_allow_html=True)
 
     # ── ナビゲーションメニュー ────────────────────────────
     _nav_cat("ダッシュボード")
@@ -1071,7 +1069,7 @@ else:
     _nav("💳 運転資本分析", "運転資本分析",        "nav_working_capital")
     _nav("📊 収益構造分析", "収益構造分析",        "nav_profitability")
 
-    st.sidebar.markdown('<hr style="margin:8px 0; border-color:#E5E7EB;">', unsafe_allow_html=True)
+    st.sidebar.markdown('<hr style="margin:8px 0; border-color:#E4E4E7;">', unsafe_allow_html=True)
     _nav_cat("設定")
     _nav("⚙️ システム設定", "システム設定", "nav_settings")
 
@@ -1085,7 +1083,7 @@ else:
 <div style="
     padding: 12px 16px;
     margin-top: 8px;
-    border-top: 1px solid #E5E7EB;
+    border-top: 1px solid #E4E4E7;
     font-size: 11px;
     color: #6B7280;
 ">
@@ -1578,14 +1576,14 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 font-weight: 600;
                 color: #2c3e50;
                 padding: 1rem 0;
-                border-top: 3px solid #667eea;
-                border-bottom: 3px solid #667eea;
+                border-top: 3px solid #5E6AD2;
+                border-bottom: 3px solid #5E6AD2;
                 margin-bottom: 1.5rem;
                 background: linear-gradient(to right, #f8f9fa 0%, #ffffff 50%, #f8f9fa 100%);
                 text-align: center;
             }
             .status-separator {
-                color: #667eea;
+                color: #5E6AD2;
                 margin: 0 1rem;
                 font-weight: 700;
             }
@@ -1840,9 +1838,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     st.write("  ❌ 売上高の実績データなし")
 
             st.markdown(f"""
-            <div class="dashboard-header fade-in">
-                <h1 class="dashboard-title">📊 財務予測ダッシュボード</h1>
-                <p class="dashboard-subtitle">{st.session_state.selected_comp_name} | 第{st.session_state.selected_period_num}期 | {st.session_state.start_date} 〜 {st.session_state.end_date} | シナリオ: {st.session_state.scenario}</p>
+            <div class="dashboard-page-header fade-in">
+                <h2>財務予測ダッシュボード</h2>
+                <p>{st.session_state.selected_comp_name} &nbsp;·&nbsp; 第{st.session_state.selected_period_num}期 &nbsp;·&nbsp; {st.session_state.start_date} 〜 {st.session_state.end_date} &nbsp;·&nbsp; {st.session_state.scenario}シナリオ</p>
             </div>
             """, unsafe_allow_html=True)
             
@@ -1890,52 +1888,47 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             # KPIカード表示（マネージボード風）
             with col1:
-                trend_icon = "▲" if sales_achievement >= 0 else "▼"
+                sales_trend_class = "kpi-card-trend-up" if sales_achievement >= 0 else "kpi-card-trend-down"
+                sales_trend_icon = "▲" if sales_achievement >= 0 else "▼"
                 st.markdown(f"""
-                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);">
+                <div class="kpi-card fade-in" style="border-top: 3px solid #5E6AD2;">
                     <div class="kpi-card-title">売上高</div>
                     <div class="kpi-card-value">¥{safe_int(sales_forecast):,}</div>
                     <div class="kpi-card-subtitle">通期予測</div>
                     <div class="kpi-card-trend">
-                        <span>{trend_icon}</span>
-                        <span>実績: ¥{safe_int(sales_actual):,}</span>
-                        <span style="margin-left: 8px;">({sales_achievement:.1f}%)</span>
+                        <span class="{sales_trend_class}">{sales_trend_icon}</span>
+                        <span>実績: ¥{safe_int(sales_actual):,} ({sales_achievement:.1f}%)</span>
                     </div>
-                    <div class="kpi-card-decoration"></div>
                 </div>
                 """, unsafe_allow_html=True)
-            
+
             with col2:
-                trend_icon = "▲" if op_achievement >= 0 else "▼"
-                trend_color = "#10B981" if op_forecast >= 0 else "#EF4444"
+                op_trend_class = "kpi-card-trend-up" if op_forecast >= 0 else "kpi-card-trend-down"
+                op_trend_icon = "▲" if op_achievement >= 0 else "▼"
                 st.markdown(f"""
-                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #10B981 0%, #34D399 100%);">
+                <div class="kpi-card fade-in" style="border-top: 3px solid #16A34A;">
                     <div class="kpi-card-title">営業利益</div>
                     <div class="kpi-card-value">¥{safe_int(op_forecast):,}</div>
                     <div class="kpi-card-subtitle">通期予測</div>
                     <div class="kpi-card-trend">
-                        <span>{trend_icon}</span>
-                        <span>実績: ¥{safe_int(op_actual):,}</span>
-                        <span style="margin-left: 8px;">({op_achievement:.1f}%)</span>
+                        <span class="{op_trend_class}">{op_trend_icon}</span>
+                        <span>実績: ¥{safe_int(op_actual):,} ({op_achievement:.1f}%)</span>
                     </div>
-                    <div class="kpi-card-decoration"></div>
                 </div>
                 """, unsafe_allow_html=True)
-            
+
             with col3:
-                trend_icon = "▲" if ord_achievement >= 0 else "▼"
-                trend_color = "#10B981" if ord_forecast >= 0 else "#EF4444"
+                ord_trend_class = "kpi-card-trend-up" if ord_forecast >= 0 else "kpi-card-trend-down"
+                ord_trend_icon = "▲" if ord_achievement >= 0 else "▼"
                 st.markdown(f"""
-                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);">
+                <div class="kpi-card fade-in" style="border-top: 3px solid #D97706;">
                     <div class="kpi-card-title">経常利益</div>
                     <div class="kpi-card-value">¥{safe_int(ord_forecast):,}</div>
                     <div class="kpi-card-subtitle">通期予測</div>
                     <div class="kpi-card-trend">
-                        <span>{trend_icon}</span>
-                        <span>実績: ¥{safe_int(ord_actual):,}</span>
-                        <span style="margin-left: 8px;">({ord_achievement:.1f}%)</span>
+                        <span class="{ord_trend_class}">{ord_trend_icon}</span>
+                        <span>実績: ¥{safe_int(ord_actual):,} ({ord_achievement:.1f}%)</span>
                     </div>
-                    <div class="kpi-card-decoration"></div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -2047,7 +2040,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                         showgrid=False,
                         showline=True,
                         linewidth=1,
-                        linecolor='#E5E7EB',
+                        linecolor='#E4E4E7',
                         tickfont=dict(color='#6B7280', size=12)
                     ),
                     yaxis=dict(
@@ -2072,7 +2065,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     ),
                     legend=dict(
                         bgcolor='rgba(255, 255, 255, 0.8)',
-                        bordercolor='#E5E7EB',
+                        bordercolor='#E4E4E7',
                         borderwidth=1,
                         font=dict(size=12, color='#1F2937'),
                         orientation="h",
@@ -2240,9 +2233,9 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
         elif st.session_state.page == "CFO意思決定支援ダッシュボード":
             # ダッシュボードヘッダー
             st.markdown(f"""
-            <div class="dashboard-header fade-in">
-                <h1 class="dashboard-title">💰 CFO意思決定支援ダッシュボード</h1>
-                <p class="dashboard-subtitle">{st.session_state.selected_comp_name} | 第{st.session_state.selected_period_num}期 | {st.session_state.start_date} 〜 {st.session_state.end_date}</p>
+            <div class="dashboard-page-header fade-in">
+                <h2>CFO意思決定支援ダッシュボード</h2>
+                <p>{st.session_state.selected_comp_name} &nbsp;·&nbsp; 第{st.session_state.selected_period_num}期 &nbsp;·&nbsp; {st.session_state.start_date} 〜 {st.session_state.end_date}</p>
             </div>
             """, unsafe_allow_html=True)
             
@@ -2414,47 +2407,47 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
             
             # KPIカード表示（実データまたはサンプル）
             with col1:
-                trend_icon = "▲" if cf_growth >= 0 else "▼"
+                cf_trend_class = "kpi-card-trend-up" if cf_growth >= 0 else "kpi-card-trend-down"
+                cf_trend_icon = "▲" if cf_growth >= 0 else "▼"
                 st.markdown(f"""
-                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);">
+                <div class="kpi-card fade-in" style="border-top: 3px solid #5E6AD2;">
                     <div class="kpi-card-title">税引後キャッシュフロー</div>
                     <div class="kpi-card-value">¥{safe_int(operating_cf):,}</div>
                     <div class="kpi-card-subtitle">当月実績</div>
                     <div class="kpi-card-trend">
-                        <span>{trend_icon}</span>
+                        <span class="{cf_trend_class}">{cf_trend_icon}</span>
                         <span>前月比: {cf_growth:+.1f}%</span>
                     </div>
-                    <div class="kpi-card-decoration"></div>
                 </div>
                 """, unsafe_allow_html=True)
-            
+
             with col2:
                 forecast_change = ((forecast_3months - cash_balance) / cash_balance * 100) if cash_balance != 0 else 0
-                trend_icon = "▲" if forecast_change >= 0 else "▼"
+                fc_trend_class = "kpi-card-trend-up" if forecast_change >= 0 else "kpi-card-trend-down"
+                fc_trend_icon = "▲" if forecast_change >= 0 else "▼"
                 st.markdown(f"""
-                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #10B981 0%, #34D399 100%);">
+                <div class="kpi-card fade-in" style="border-top: 3px solid #16A34A;">
                     <div class="kpi-card-title">3ヶ月後現金残高（予測）</div>
                     <div class="kpi-card-value">¥{safe_int(forecast_3months):,}</div>
                     <div class="kpi-card-subtitle">標準シナリオ</div>
                     <div class="kpi-card-trend">
-                        <span>{trend_icon}</span>
+                        <span class="{fc_trend_class}">{fc_trend_icon}</span>
                         <span>現在比: {forecast_change:+.1f}%</span>
                     </div>
-                    <div class="kpi-card-decoration"></div>
                 </div>
                 """, unsafe_allow_html=True)
-            
+
             with col3:
+                runway_color = "#D97706" if 6 <= cash_runway < 12 else ("#DC2626" if cash_runway < 6 else "#16A34A")
                 runway_status = "⚠️ 注意" if 6 <= cash_runway < 12 else ("🚨 危険" if cash_runway < 6 else "✅ 安全")
                 st.markdown(f"""
-                <div class="kpi-card fade-in" style="background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);">
+                <div class="kpi-card fade-in" style="border-top: 3px solid {runway_color};">
                     <div class="kpi-card-title">資金耐久月数</div>
                     <div class="kpi-card-value">{cash_runway:.1f}ヶ月</div>
                     <div class="kpi-card-subtitle">現金残高 ÷ 月間固定費</div>
                     <div class="kpi-card-trend">
-                        <span style="color: #F59E0B;">{runway_status}</span>
+                        <span style="color: {runway_color}; font-weight:600;">{runway_status}</span>
                     </div>
-                    <div class="kpi-card-decoration"></div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -2570,7 +2563,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                     showgrid=False,
                     showline=True,
                     linewidth=1,
-                    linecolor='#E5E7EB',
+                    linecolor='#E4E4E7',
                     tickfont=dict(color='#6B7280', size=12)
                 ),
                 yaxis=dict(
@@ -2585,7 +2578,7 @@ if 'selected_period_id' in st.session_state and st.session_state.selected_period
                 ),
                 legend=dict(
                     bgcolor='rgba(255, 255, 255, 0.8)',
-                    bordercolor='#E5E7EB',
+                    bordercolor='#E4E4E7',
                     borderwidth=1,
                     font=dict(size=12, color='#1F2937'),
                     orientation="h",
