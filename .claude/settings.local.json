@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /c/Users/user/Documents/financial_forecast_simulator status)",
+      "Bash(gh:*)",
+      "Bash(git -C /c/Users/user/Documents/financial_forecast_simulator init:*)",
+      "Bash(git -C /c/Users/user/Documents/financial_forecast_simulator remote add origin https://github.com/konosukeokazaki-eng/financial_forecast_simulator.git)",
+      "Bash(git -C /c/Users/user/Documents/financial_forecast_simulator remote -v)",
+      "Bash(git -C /c/Users/user/Documents/financial_forecast_simulator branch -M main)",
+      "Bash(git -C /c/Users/user/Documents/financial_forecast_simulator add .)"
+    ]
+  }
+}
