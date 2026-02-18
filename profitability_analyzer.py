@@ -1,0 +1,340 @@
+"""
+収益性分析モジュール
+損益分岐点分析、限界利益率分析を実施
+"""
+
+import pandas as pd
+import numpy as np
+from typing import Dict, Optional
+import sys
+
+
+class ProfitabilityAnalyzer:
+    """収益性分析クラス"""
+    
+    def __init__(self, processor=None):
+        """
+        初期化
+        
+        Args:
+            processor: DataProcessorインスタンス
+        """
+        self.processor = processor
+    
+    def analyze_from_db(self, period_id: int) -> Optional[Dict]:
+        """
+        データベースから実績データを取得して収益性分析を実行
+        
+        Args:
+            period_id: 会計期間ID
+            
+        Returns:
+            Dict: 分析結果
+        """
+        if not self.processor:
+            return None
+        
+        conn = self.processor._get_connection()
+        return analyze_profitability_from_db(conn, period_id)
+    
+    def analyze_from_dataframe(self, df: pd.DataFrame) -> Optional[Dict]:
+        """
+        DataFrameから収益性分析を実行
+        
+        Args:
+            df: 月次PL/BSデータ
+            
+        Returns:
+            Dict: 分析結果
+        """
+        return self._calculate_profitability_metrics(df)
+    
+    def _calculate_profitability_metrics(self, df: pd.DataFrame) -> Dict:
+        """
+        収益性指標を計算
+        
+        Args:
+            df: 月次財務データ
+            
+        Returns:
+            Dict: 各種指標
+        """
+        monthly_data = []
+        
+        for _, row in df.iterrows():
+            sales = row.get('売上高', 0)
+            cogs = row.get('売上原価', 0)
+            sg_expenses = row.get('販売費及び一般管理費', 0)
+            
+            marginal_profit = sales - cogs
+            marginal_profit_rate = marginal_profit / sales if sales > 0 else 0
+            fixed_costs = sg_expenses
+            operating_profit = marginal_profit - fixed_costs
+            breakeven_sales = fixed_costs / marginal_profit_rate if marginal_profit_rate > 0 else 0
+            safety_rate = (sales - breakeven_sales) / sales if sales > 0 else 0
+            
+            monthly_data.append({
+                'month': row.get('month', 0),
+                'sales': float(sales),
+                'cogs': float(cogs),
+                'marginal_profit': float(marginal_profit),
+                'marginal_profit_rate': float(marginal_profit_rate),
+                'fixed_costs': float(fixed_costs),
+                'operating_profit': float(operating_profit),
+                'breakeven_sales': float(breakeven_sales),
+                'safety_rate': float(safety_rate)
+            })
+        
+        df_monthly = pd.DataFrame(monthly_data)
+        
+        return {
+            'monthly_data': df_monthly,
+            'average_marginal_profit_rate': df_monthly['marginal_profit_rate'].mean() if not df_monthly.empty else 0
+        }
+
+
+def analyze_profitability_from_db(conn, period_id: int) -> Optional[Dict]:
+    """
+    データベースから実績データを取得して収益性分析を実行（実績締月のみ）
+    
+    Args:
+        conn: データベース接続
+        period_id: 会計期間ID
+        
+    Returns:
+        Dict: 分析結果（実績データのみで計算）
+    """
+    try:
+        import sqlite3
+        is_sqlite = isinstance(conn, sqlite3.Connection)
+        placeholder = '?' if is_sqlite else '%s'
+
+        query = f"""
+            SELECT item_name, month, amount
+            FROM actual_data
+            WHERE fiscal_period_id = {placeholder}
+            ORDER BY month, item_name
+        """
+
+        df = pd.read_sql_query(query, conn, params=(period_id,))
+        
+        # 後続処理との互換性のため、カラム名を'value'にリネーム
+        df = df.rename(columns={'amount': 'value'})
+        
+        if df.empty:
+            print(f"⚠️  実績データが見つかりません")
+            return None
+        
+        print(f"✅ データ取得成功: {len(df)}行")
+        print(f"   monthカラムのサンプル: {df['month'].head(3).tolist()}")
+        print(f"   monthカラムの型: {df['month'].dtype}")
+        
+        # month列が文字列（YYYY-MM形式）の場合、月の部分のみを抽出
+        if df['month'].dtype == 'object' or isinstance(df['month'].iloc[0], str):
+            # 'YYYY-MM' 形式から月番号を抽出
+            df['month_num'] = df['month'].apply(lambda x: int(str(x).split('-')[1]) if '-' in str(x) else int(x))
+            print(f"   月番号変換: {df[['month', 'month_num']].head(3).to_dict('records')}")
+        else:
+            df['month_num'] = df['month']
+        
+        # 最新実績締月を取得
+        latest_actual_month = df['month_num'].max()
+        print(f"   最新実績締月: {latest_actual_month}月")
+        print(f"   ⚠️ 収益構造分析は実績締月({latest_actual_month}月)までのデータのみで計算します")
+        
+        # ピボットして月次×科目の形式に変換
+        df_pivot = df.pivot(index='month_num', columns='item_name', values='value').fillna(0)
+        
+        print(f"   ピボット後の形状: {df_pivot.shape}")
+        print(f"   科目: {list(df_pivot.columns)}")
+        print(f"   月: {df_pivot.index.tolist()}")
+        
+        # 必要な科目が存在するか確認
+        required_items = ['売上高', '売上原価', '販売費及び一般管理費']
+        missing_items = [item for item in required_items if item not in df_pivot.columns]
+        
+        if missing_items:
+            print(f"⚠️  必須科目が不足: {missing_items}")
+            # 不足している科目は0で補完
+            for item in missing_items:
+                df_pivot[item] = 0
+        
+        # 月次分析データを作成
+        monthly_data = []
+        
+        for month_num in df_pivot.index:
+            sales = df_pivot.loc[month_num, '売上高'] if '売上高' in df_pivot.columns else 0
+            cogs = df_pivot.loc[month_num, '売上原価'] if '売上原価' in df_pivot.columns else 0
+            sg_expenses = df_pivot.loc[month_num, '販売費及び一般管理費'] if '販売費及び一般管理費' in df_pivot.columns else 0
+            
+            # 限界利益 = 売上 - 変動費（ここでは売上原価を変動費と仮定）
+            marginal_profit = sales - cogs
+            marginal_profit_rate = marginal_profit / sales if sales > 0 else 0
+            
+            # 固定費（販管費を固定費と仮定）
+            fixed_costs = sg_expenses
+            
+            # 営業利益
+            operating_profit = marginal_profit - fixed_costs
+            
+            # 損益分岐点売上高 = 固定費 / 限界利益率
+            breakeven_sales = fixed_costs / marginal_profit_rate if marginal_profit_rate > 0 else 0
+            
+            # 安全余裕率 = (実際の売上 - 損益分岐点売上高) / 実際の売上
+            safety_rate = (sales - breakeven_sales) / sales if sales > 0 else 0
+            
+            monthly_data.append({
+                'month': int(month_num),
+                'sales': float(sales),
+                'cogs': float(cogs),
+                'marginal_profit': float(marginal_profit),
+                'marginal_profit_rate': float(marginal_profit_rate),
+                'fixed_costs': float(fixed_costs),
+                'operating_profit': float(operating_profit),
+                'breakeven_sales': float(breakeven_sales),
+                'safety_rate': float(safety_rate)
+            })
+        
+        df_monthly = pd.DataFrame(monthly_data)
+        
+        if df_monthly.empty:
+            print(f"⚠️  月次データの生成に失敗")
+            return None
+        
+        print(f"   月次データサンプル:\n{df_monthly.head()}")
+        
+        # トレンド分析
+        if len(df_monthly) >= 3:
+            # 最近3ヶ月の平均と最初3ヶ月の平均を比較
+            recent_avg = df_monthly.tail(3)['marginal_profit_rate'].mean()
+            initial_avg = df_monthly.head(3)['marginal_profit_rate'].mean()
+            
+            if recent_avg > initial_avg * 1.05:
+                trend = 'improving'
+            elif recent_avg < initial_avg * 0.95:
+                trend = 'deteriorating'
+            else:
+                trend = 'stable'
+        else:
+            trend = 'insufficient_data'
+        
+        # 全体の平均限界利益率
+        avg_marginal_rate = df_monthly['marginal_profit_rate'].mean()
+        
+        result = {
+            'monthly_data': df_monthly,
+            'trend': trend,
+            'average_marginal_profit_rate': float(avg_marginal_rate),
+            'latest_month': int(df_monthly.iloc[-1]['month']),
+            'total_months': len(df_monthly)
+        }
+        
+        print(f"✅ 分析完了")
+        print(f"   トレンド: {trend}")
+        print(f"   平均限界利益率: {avg_marginal_rate*100:.2f}%")
+        print(f"   対象月数: {len(df_monthly)}ヶ月")
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ analyze_profitability_from_dbエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def calculate_cost_structure(df: pd.DataFrame) -> Dict:
+    """
+    費用構造を分析
+    
+    Args:
+        df: 月次PL/BSデータ
+        
+    Returns:
+        Dict: 変動費率、固定費などの分析結果
+    """
+    try:
+        # 売上と原価の関係から変動費率を推定
+        if 'sales' not in df.columns or 'cogs' not in df.columns:
+            return {}
+        
+        # 線形回帰で変動費率を推定
+        from sklearn.linear_model import LinearRegression
+        
+        X = df[['sales']].values
+        y = df['cogs'].values
+        
+        model = LinearRegression()
+        model.fit(X, y)
+        
+        variable_cost_rate = model.coef_[0]
+        fixed_cost_intercept = model.intercept_
+        
+        return {
+            'variable_cost_rate': float(variable_cost_rate),
+            'estimated_fixed_costs': float(fixed_cost_intercept),
+            'r_squared': float(model.score(X, y))
+        }
+        
+    except Exception as e:
+        print(f"❌ 費用構造分析エラー: {e}")
+        return {}
+
+
+def identify_improvement_opportunities(monthly_data: pd.DataFrame) -> list:
+    """
+    改善機会を特定
+    
+    Args:
+        monthly_data: 月次分析データ
+        
+    Returns:
+        list: 改善提案のリスト
+    """
+    opportunities = []
+    
+    if monthly_data.empty:
+        return opportunities
+    
+    latest = monthly_data.iloc[-1]
+    
+    # 限界利益率が低い
+    if latest['marginal_profit_rate'] < 0.30:
+        opportunities.append({
+            'category': 'profitability',
+            'severity': 'high',
+            'message': '限界利益率が30%を下回っています',
+            'suggestions': [
+                '値上げの検討',
+                '仕入先との価格交渉',
+                '高粗利商品へのシフト'
+            ]
+        })
+    
+    # 安全余裕率が低い
+    if latest['safety_rate'] < 0.20:
+        opportunities.append({
+            'category': 'risk',
+            'severity': 'high',
+            'message': '安全余裕率が20%を下回っています',
+            'suggestions': [
+                '固定費の削減',
+                '売上の増加施策',
+                '損益分岐点の引き下げ'
+            ]
+        })
+    
+    # 赤字
+    if latest['operating_profit'] < 0:
+        opportunities.append({
+            'category': 'urgent',
+            'severity': 'critical',
+            'message': '営業赤字です',
+            'suggestions': [
+                '緊急の固定費削減',
+                '不採算事業の見直し',
+                '価格改定の即時実行'
+            ]
+        })
+    
+    return opportunities
