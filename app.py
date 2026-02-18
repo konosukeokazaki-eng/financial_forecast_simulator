@@ -1342,10 +1342,21 @@ def render_status_bar():
         box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         z-index: 9999;
     }}
+    .hamburger {{
+        display: flex; align-items: center; justify-content: center;
+        width: 44px; flex-shrink: 0;
+        background: #141828;
+        border-right: 1px solid #2d3561;
+        cursor: pointer;
+        font-size: 18px; color: #8b9cc8;
+        transition: background 0.15s;
+        user-select: none;
+    }}
+    .hamburger:hover {{ background: #1e2540; color: #ffffff; }}
     .logo {{
         display: flex; align-items: center;
         padding: 0 20px;
-        min-width: 200px;
+        min-width: 160px;
         background: #141828;
         border-right: 1px solid #2d3561;
         color: #6b7a9e;
@@ -1385,6 +1396,7 @@ def render_status_bar():
     </head>
     <body>
     <div id="bar">
+        <div class="hamburger" onclick="toggleSidebar()" title="メニュー開閉">☰</div>
         <div class="logo">財務予測シミュレーター</div>
         <div class="item" onclick="scrollSidebar(0)">
             <span class="lbl">会社</span>
@@ -1404,6 +1416,20 @@ def render_status_bar():
         </div>
     </div>
     <script>
+    function toggleSidebar() {{
+        var doc = window.parent.document;
+        // サイドバーが折りたたまれているとき → 展開ボタンをクリック
+        var expandBtn = doc.querySelector('[data-testid="stSidebarCollapsedControl"] button');
+        if (expandBtn) {{ expandBtn.click(); return; }}
+        // サイドバーが開いているとき → 折りたたみボタンをクリック
+        var collapseBtn = doc.querySelector('[data-testid="stSidebarNavCollapseButton"] button, [data-testid="stSidebarNavCloseButton"] button');
+        if (collapseBtn) {{ collapseBtn.click(); return; }}
+        // フォールバック: サイドバーの表示/非表示をCSSで直接切り替え
+        var sb = doc.querySelector('[data-testid="stSidebar"]');
+        if (sb) {{
+            sb.style.display = (sb.style.display === 'none') ? '' : 'none';
+        }}
+    }}
     function scrollSidebar(pos) {{
         var sb = window.parent.document.querySelector('[data-testid="stSidebar"]');
         if (sb) sb.scrollTop = pos;
