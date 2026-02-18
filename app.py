@@ -1310,7 +1310,7 @@ def render_status_bar():
     [data-testid="stDecoration"] { display: none !important; }
     [data-testid="stToolbar"] { display: none !important; }
     .main .block-container { padding-top: 3rem !important; }
-    [data-testid="stSidebar"] > div:first-child { padding-top: 48px !important; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 48px !important; padding-left: 12px !important; padding-right: 12px !important; }
     /* サイドバーが折りたたまれたときの再展開ボタンを常に前面表示 */
     [data-testid="stSidebarCollapsedControl"] {
         position: fixed !important;
