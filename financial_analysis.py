@@ -34,14 +34,15 @@ class FinancialAnalyzer:
         
         try:
             conn = _self.data_handler._get_connection()
-            
-            query = """
+            placeholder = '%s' if _self.data_handler.use_postgres else '?'
+
+            query = f"""
                 SELECT item_name, month, amount
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month, item_name
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
             df = df.rename(columns={'amount': 'value'})
             

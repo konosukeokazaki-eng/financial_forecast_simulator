@@ -119,16 +119,17 @@ class AdvancedForecastEngine:
         try:
             if not self.data_handler:
                 return pd.DataFrame()
-            
+
             conn = self.data_handler._get_connection()
-            
-            query = """
+            placeholder = '%s' if self.data_handler.use_postgres else '?'
+
+            query = f"""
                 SELECT item_name, month, amount
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month, item_name
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
             
             # month列を数値に変換

@@ -105,23 +105,17 @@ def analyze_profitability_from_db(conn, period_id: int) -> Optional[Dict]:
         Dict: 分析結果（実績データのみで計算）
     """
     try:
-        print(f"🚀 analyze_profitability_from_db開始")
-        print(f"   期間ID: {period_id}")
-        
-        # プレースホルダーの判定
-        placeholder = '%s'  # PostgreSQL用
-        print(f"   プレースホルダー: {placeholder}")
-        
-        # actual_dataテーブルから実績データを取得（amountカラムを使用）
-        # 実績データのみを対象
-        query = """
+        import sqlite3
+        is_sqlite = isinstance(conn, sqlite3.Connection)
+        placeholder = '?' if is_sqlite else '%s'
+
+        query = f"""
             SELECT item_name, month, amount
             FROM actual_data
-            WHERE fiscal_period_id = %s
+            WHERE fiscal_period_id = {placeholder}
             ORDER BY month, item_name
         """
-        
-        print(f"   SQL実行中...")
+
         df = pd.read_sql_query(query, conn, params=(period_id,))
         
         # 後続処理との互換性のため、カラム名を'value'にリネーム

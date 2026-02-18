@@ -887,15 +887,15 @@ class CashFlowAnalyzer:
             dict: CFデータ
         """
         try:
-            import sqlite3
             import pandas as pd
-            
+
             conn = self.processor._get_connection()
-            
+            placeholder = '%s' if self.processor.use_postgres else '?'
+
             # CFデータを読み込み
-            query = """
-                SELECT * FROM cash_flow_statement 
-                WHERE fiscal_period_id = ? 
+            query = f"""
+                SELECT * FROM cash_flow_statement
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month
             """
             df = pd.read_sql_query(query, conn, params=(period_id,))

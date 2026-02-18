@@ -393,29 +393,40 @@ def save_forecast_to_db(data_handler, period_id: int, forecast_df: pd.DataFrame)
     try:
         conn = data_handler._get_connection()
         cursor = conn.cursor()
-        
+
+        if data_handler.use_postgres:
+            query = """
+                INSERT INTO forecast_data
+                (fiscal_period_id, item_name, month, forecast_value, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (fiscal_period_id, item_name, month)
+                DO UPDATE SET
+                    forecast_value = EXCLUDED.forecast_value,
+                    updated_at = CURRENT_TIMESTAMP
+            """
+        else:
+            query = """
+                INSERT INTO forecast_data
+                (fiscal_period_id, item_name, month, forecast_value, created_at, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (fiscal_period_id, item_name, month)
+                DO UPDATE SET
+                    forecast_value = excluded.forecast_value,
+                    updated_at = CURRENT_TIMESTAMP
+            """
+
         item_col = forecast_df.columns[0]
         items = forecast_df[item_col].tolist()
-        
+
         month_cols = [col for col in forecast_df.columns if '月' in col]
-        
+
         for month_col in month_cols:
             month = int(month_col.replace('月', ''))
-            
+
             for idx, item_name in enumerate(items):
                 value = forecast_df.loc[idx, month_col]
-                
+
                 if pd.notna(value):
-                    query = """
-                        INSERT INTO forecast_data 
-                        (fiscal_period_id, item_name, month, forecast_value, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        ON CONFLICT (fiscal_period_id, item_name, month) 
-                        DO UPDATE SET 
-                            forecast_value = EXCLUDED.forecast_value,
-                            updated_at = CURRENT_TIMESTAMP
-                    """
-                    
                     cursor.execute(query, (period_id, item_name, month, float(value)))
         
         conn.commit()

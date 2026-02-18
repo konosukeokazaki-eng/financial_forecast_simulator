@@ -23,25 +23,25 @@ class ActualPeriodManager:
     def get_latest_actual_month(self, period_id: int) -> Optional[int]:
         """
         指定会計期間の最新実績締月を取得
-        
+
         Args:
             period_id: 会計期間ID
-            
+
         Returns:
             int: 最新締月（1-12）、データがなければNone
         """
         try:
             conn = self.processor._get_connection()
-            
-            # PostgreSQL用のクエリ
-            query = """
+            placeholder = '%s' if self.processor.use_postgres else '?'
+
+            query = f"""
                 SELECT DISTINCT month
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month DESC
                 LIMIT 1
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
             
             if df.empty:
@@ -81,16 +81,17 @@ class ActualPeriodManager:
         """
         try:
             conn = self.processor._get_connection()
-            
-            query = """
+            placeholder = '%s' if self.processor.use_postgres else '?'
+
+            query = f"""
                 SELECT DISTINCT month
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month ASC
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
-            
+
             if df.empty:
                 return []
             
@@ -122,17 +123,17 @@ class ActualPeriodManager:
         """
         try:
             conn = self.processor._get_connection()
-            
-            # month列の形式に応じてクエリを調整
-            query = """
+            placeholder = '%s' if self.processor.use_postgres else '?'
+
+            query = f"""
                 SELECT item_name, month, amount
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month, item_name
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
-            
+
             if df.empty:
                 return pd.DataFrame()
             
@@ -169,16 +170,17 @@ class ActualPeriodManager:
         """
         try:
             conn = self.processor._get_connection()
-            
-            query = """
+            placeholder = '%s' if self.processor.use_postgres else '?'
+
+            query = f"""
                 SELECT item_name, month, amount
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month, item_name
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
-            
+
             if df.empty:
                 return {}
             

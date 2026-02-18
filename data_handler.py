@@ -61,17 +61,13 @@ class DataHandler:
         """データベース初期化（省略 - 既存のコードと同じ）"""
         pass
     
-    @st.cache_resource
-    def _get_connection(_self):
-        """
-        データベース接続を取得（キャッシュ付き）
-        接続をリソースとしてキャッシュ
-        """
-        if _self.use_postgres:
+    def _get_connection(self):
+        """データベース接続を取得"""
+        if self.use_postgres:
             import psycopg2
             from urllib.parse import urlparse
-            
-            result = urlparse(_self.conn_string)
+
+            result = urlparse(self.conn_string)
             return psycopg2.connect(
                 database=result.path[1:],
                 user=result.username,
@@ -81,7 +77,7 @@ class DataHandler:
             )
         else:
             import sqlite3
-            return sqlite3.connect(_self.db_path, check_same_thread=False)
+            return sqlite3.connect(self.db_path, check_same_thread=False)
     
     # ============ 実績締月管理（キャッシュ付き） ============
     
@@ -98,17 +94,18 @@ class DataHandler:
         """
         try:
             conn = _self._get_connection()
-            
-            query = """
+            placeholder = '%s' if _self.use_postgres else '?'
+
+            query = f"""
                 SELECT DISTINCT month
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month DESC
                 LIMIT 1
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
-            
+
             if df.empty:
                 return None
             
@@ -130,14 +127,15 @@ class DataHandler:
         """実績月リストを取得（キャッシュ付き）"""
         try:
             conn = _self._get_connection()
-            
-            query = """
+            placeholder = '%s' if _self.use_postgres else '?'
+
+            query = f"""
                 SELECT DISTINCT month
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month ASC
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
             
             if df.empty:
@@ -184,14 +182,15 @@ class DataHandler:
         """累計実績データを取得（キャッシュ付き）"""
         try:
             conn = _self._get_connection()
-            
-            query = """
+            placeholder = '%s' if _self.use_postgres else '?'
+
+            query = f"""
                 SELECT item_name, month, amount
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month, item_name
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
             
             if df.empty:
@@ -223,18 +222,19 @@ class DataHandler:
         """PLデータを取得（キャッシュ付き）"""
         try:
             conn = _self._get_connection()
-            
-            query = """
+            placeholder = '%s' if _self.use_postgres else '?'
+
+            query = f"""
                 SELECT item_name, month, amount
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
                 ORDER BY month, item_name
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
             return df
-            
-        except:
+
+        except Exception:
             return pd.DataFrame()
     
     @st.cache_data(ttl=600)
@@ -282,29 +282,41 @@ class DataHandler:
             # データベース接続
             conn = self._get_connection()
             cursor = conn.cursor()
-            
+            placeholder = '%s' if self.use_postgres else '?'
+
             # 既存データを削除
-            delete_query = """
-                DELETE FROM actual_data 
-                WHERE fiscal_period_id = %s
+            delete_query = f"""
+                DELETE FROM actual_data
+                WHERE fiscal_period_id = {placeholder}
             """
-            
+
             cursor.execute(delete_query, (period_id,))
             deleted_count = cursor.rowcount
-            
+
             sys.stderr.write(f"   既存データ削除: {deleted_count}件\n")
             sys.stderr.flush()
-            
+
             # 新しいデータを挿入
-            insert_query = """
-                INSERT INTO actual_data 
-                (fiscal_period_id, item_name, month, amount, created_at)
-                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
-                ON CONFLICT (fiscal_period_id, item_name, month) 
-                DO UPDATE SET 
-                    amount = EXCLUDED.amount,
-                    created_at = CURRENT_TIMESTAMP
-            """
+            if self.use_postgres:
+                insert_query = """
+                    INSERT INTO actual_data
+                    (fiscal_period_id, item_name, month, amount, created_at)
+                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (fiscal_period_id, item_name, month)
+                    DO UPDATE SET
+                        amount = EXCLUDED.amount,
+                        created_at = CURRENT_TIMESTAMP
+                """
+            else:
+                insert_query = """
+                    INSERT INTO actual_data
+                    (fiscal_period_id, item_name, month, amount, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (fiscal_period_id, item_name, month)
+                    DO UPDATE SET
+                        amount = excluded.amount,
+                        created_at = CURRENT_TIMESTAMP
+                """
             
             records_imported = 0
             
@@ -392,9 +404,10 @@ class DataHandler:
         """
         try:
             conn = self._get_connection()
-            
-            query = """
-                SELECT 
+            placeholder = '%s' if self.use_postgres else '?'
+
+            query = f"""
+                SELECT
                     COUNT(*) as total_records,
                     COUNT(DISTINCT item_name) as item_count,
                     COUNT(DISTINCT month) as month_count,
@@ -402,9 +415,9 @@ class DataHandler:
                     MAX(month) as last_month,
                     SUM(amount) as total_amount
                 FROM actual_data
-                WHERE fiscal_period_id = %s
+                WHERE fiscal_period_id = {placeholder}
             """
-            
+
             df = pd.read_sql_query(query, conn, params=(period_id,))
             
             if df.empty or df.iloc[0]['total_records'] == 0:
