@@ -1298,16 +1298,24 @@ def render_status_bar():
     # CSS: Streamlit標準ヘッダー非表示 + 余白確保（st.markdownで先に適用）
     st.markdown("""
     <style>
-    header[data-testid="stHeader"] { display: none !important; }
+    /* headerをdisplay:noneにすると子要素のサイドバー展開ボタンも消えるため
+       高さ0・透明にして視覚的に非表示にする */
+    header[data-testid="stHeader"] {
+        height: 0 !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        background: transparent !important;
+    }
+    /* ヘッダー内の装飾・ツールバーのみ非表示 */
+    [data-testid="stDecoration"] { display: none !important; }
+    [data-testid="stToolbar"] { display: none !important; }
     .main .block-container { padding-top: 3rem !important; }
     [data-testid="stSidebar"] > div:first-child { padding-top: 48px !important; }
-    /* サイドバーが折りたたまれたときの再展開ボタンを常に表示 */
+    /* サイドバーが折りたたまれたときの再展開ボタンを常に前面表示 */
     [data-testid="stSidebarCollapsedControl"] {
-        display: flex !important;
-        visibility: visible !important;
         position: fixed !important;
-        top: 0.5rem !important;
-        left: 0.5rem !important;
+        top: 0.4rem !important;
+        left: 0.4rem !important;
         z-index: 999999 !important;
     }
     </style>
