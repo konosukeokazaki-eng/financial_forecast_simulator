@@ -1416,24 +1416,40 @@ def render_status_bar():
         </div>
     </div>
     <script>
+    function setSidebarStyle(doc, css) {{
+        var styleId = 'custom-sidebar-style';
+        var el = doc.getElementById(styleId);
+        if (el) el.remove();
+        var s = doc.createElement('style');
+        s.id = styleId;
+        s.textContent = css;
+        doc.head.appendChild(s);
+    }}
     function toggleSidebar() {{
         var doc = window.parent.document;
-        // <style>タグの有無でサイドバーの状態を管理（React再レンダリングに影響されない）
-        var styleId = 'custom-sidebar-hidden';
-        var existing = doc.getElementById(styleId);
-        if (existing) {{
-            // 非表示 → 表示に戻す
-            existing.remove();
+        var sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+        if (!sidebar) return;
+        // getComputedStyleでStreamlit側の状態も含めた実際の表示状態を取得
+        var isVisible = window.parent.getComputedStyle(sidebar).display !== 'none';
+        if (isVisible) {{
+            setSidebarStyle(doc,
+                'section[data-testid="stSidebar"]{{display:none!important}}' +
+                '[data-testid="stSidebarCollapsedControl"]{{display:none!important}}');
         }} else {{
-            // 表示 → 非表示にする
-            var style = doc.createElement('style');
-            style.id = styleId;
-            style.textContent =
-                'section[data-testid="stSidebar"] {{ display: none !important; }}' +
-                '[data-testid="stSidebarCollapsedControl"] {{ display: none !important; }}';
-            doc.head.appendChild(style);
+            setSidebarStyle(doc,
+                'section[data-testid="stSidebar"]{{display:flex!important;' +
+                'transform:none!important;visibility:visible!important;min-width:244px!important}}');
         }}
     }}
+    // ページ読み込み時にサイドバーを強制表示（Streamlitが折りたたんでいても開く）
+    window.addEventListener('load', function() {{
+        var doc = window.parent.document;
+        if (!doc.getElementById('custom-sidebar-style')) {{
+            setSidebarStyle(doc,
+                'section[data-testid="stSidebar"]{{display:flex!important;' +
+                'transform:none!important;visibility:visible!important;min-width:244px!important}}');
+        }}
+    }});
     function scrollSidebar(pos) {{
         var sb = window.parent.document.querySelector('[data-testid="stSidebar"]');
         if (sb) sb.scrollTop = pos;
