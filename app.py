@@ -14,123 +14,7 @@ from profitability_analyzer import ProfitabilityAnalyzer, analyze_profitability_
 from cfo_advisor import CFOAdvisor
 from profitability_analysis_ui import show_profitability_analysis_page
 
-# ==================== 完全ライトモード設定 ====================
-st.markdown("""
-<style>
-    /* 全体の背景を白に統一 */
-    .stApp {
-        background-color: #FFFFFF !important;
-        color: #262730 !important;
-    }
-    
-    /* メインコンテンツエリア */
-    .main {
-        background-color: #FFFFFF !important;
-    }
-    
-    .main .block-container {
-        background-color: #FFFFFF !important;
-    }
-    
-    /* すべての要素の背景 */
-    .element-container {
-        background-color: transparent !important;
-    }
-    
-    /* カード・パネル */
-    .stAlert, .stInfo, .stWarning, .stError, .stSuccess {
-        background-color: #F0F2F6 !important;
-        color: #262730 !important;
-    }
-    
-    /* データフレーム */
-    .dataframe {
-        background-color: #FFFFFF !important;
-        color: #262730 !important;
-    }
-    
-    /* エクスパンダー */
-    .streamlit-expanderHeader {
-        background-color: #F0F2F6 !important;
-        color: #262730 !important;
-    }
-    
-    .streamlit-expanderContent {
-        background-color: #FFFFFF !important;
-        color: #262730 !important;
-    }
-    
-    /* メトリクス */
-    .stMetric {
-        background-color: #F0F2F6 !important;
-    }
-    
-    /* タブ */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #F0F2F6 !important;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background-color: #FFFFFF !important;
-        color: #262730 !important;
-    }
-    
-    /* テキスト入力 */
-    .stTextInput > div > div {
-        background-color: #FFFFFF !important;
-        color: #262730 !important;
-    }
-    
-    /* セレクトボックス */
-    .stSelectbox > div > div {
-        background-color: #FFFFFF !important;
-        color: #262730 !important;
-    }
-    
-    /* コードブロック */
-    .stCodeBlock {
-        background-color: #F0F2F6 !important;
-    }
-    
-    code {
-        background-color: #F0F2F6 !important;
-        color: #262730 !important;
-    }
-    
-    /* マークダウン */
-    .stMarkdown {
-        color: #262730 !important;
-    }
-    
-    /* ボタン */
-    .stButton > button {
-        background-color: #FFFFFF !important;
-        color: #262730 !important;
-        border: 1px solid #E0E0E0 !important;
-    }
-    
-    .stButton > button:hover {
-        background-color: #F0F2F6 !important;
-        border-color: #1f77b4 !important;
-    }
-    
-    /* プライマリボタン */
-    .stButton > button[kind="primary"] {
-        background-color: #1f77b4 !important;
-        color: #FFFFFF !important;
-    }
-    
-    /* チェックボックス・ラジオボタン */
-    .stCheckbox, .stRadio {
-        color: #262730 !important;
-    }
-    
-    /* サイドバーのテキスト */
-    section[data-testid="stSidebar"] * {
-        color: #262730 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# freeeライクなデザイン設定は後述のCSSブロックで一括定義
 
 
 
@@ -465,532 +349,365 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
-# カスタムCSS - Manageboard風デザイン（実際のUIに準拠）
+# freee風カスタムCSS
 st.markdown("""
 <style>
-    /* 全体背景 - Manageboardの明るいグレー */
-    .main {
-        padding: 0rem 1rem;
-        background-color: #fafbfc;
+    /* ===== freee Design System ===== */
+
+    /* フォント */
+    * {
+        font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans',
+                     'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+                     'Segoe UI', sans-serif !important;
     }
-    
-    /* タイトル - よりシンプルに */
-    h1 {
-        color: #2c3e50;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 1.75rem;
+
+    /* 全体背景 */
+    .stApp { background-color: #F5F7FA !important; }
+    .main  { background-color: #F5F7FA !important; padding: 0 1.5rem; }
+    .main .block-container {
+        background-color: #F5F7FA !important;
+        padding: 1.5rem 2rem 2rem 2rem !important;
+        max-width: 100% !important;
     }
-    
-    h2 {
-        color: #34495e;
-        font-weight: 600;
-        margin-top: 2rem;
-        margin-bottom: 1rem;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 1.25rem;
+
+    /* ===== サイドバー ===== */
+    section[data-testid="stSidebar"] {
+        background-color: #FFFFFF !important;
+        border-right: 1px solid #E5E7EB !important;
     }
-    
-    h3 {
-        color: #5a6c7d;
-        font-weight: 600;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 1rem;
+    section[data-testid="stSidebar"] > div:first-child {
+        background-color: #FFFFFF !important;
+        padding: 0 !important;
     }
-    
-    /* 金額カード - Manageboardスタイル */
-    .amount-card {
-        background: #ffffff;
-        padding: 1.25rem 1.5rem;
-        border-radius: 6px;
-        border: 1px solid #e1e8ed;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        margin-bottom: 1rem;
-        transition: all 0.2s ease;
-    }
-    
-    .amount-card:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-    
-    .amount-card-label {
-        font-size: 0.75rem;
-        color: #8a9ba8;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .amount-card-value {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: #2c3e50;
-        margin-bottom: 0.5rem;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
-    
-    .amount-card-sub {
-        font-size: 0.8rem;
-        color: #8a9ba8;
-        margin-top: 0.3rem;
-    }
-    
-    /* サマリーカード - よりフラットに */
-    .summary-card {
-        background: #ffffff;
-        padding: 1.25rem 1.5rem;
-        border-radius: 6px;
-        border: 1px solid #e1e8ed;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        margin-bottom: 1rem;
-    }
-    
-    .summary-card-blue {
-        background: #ffffff;
-        padding: 1.25rem 1.5rem;
-        border-radius: 6px;
-        border-left: 3px solid #3b82f6;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        margin-bottom: 1rem;
-    }
-    
-    .summary-card-green {
-        background: #ffffff;
-        padding: 1.25rem 1.5rem;
-        border-radius: 6px;
-        border-left: 3px solid #10b981;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        margin-bottom: 1rem;
-    }
-    
-    .summary-card-orange {
-        background: #ffffff;
-        padding: 1.25rem 1.5rem;
-        border-radius: 6px;
-        border-left: 3px solid #f59e0b;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        margin-bottom: 1rem;
-    }
-    
-    .summary-card-purple {
-        background: #ffffff;
-        padding: 1.25rem 1.5rem;
-        border-radius: 6px;
-        border-left: 3px solid #8b5cf6;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        margin-bottom: 1rem;
-    }
-    
-    .card-title {
-        font-size: 0.75rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        color: #8a9ba8;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .card-value {
-        font-size: 1.75rem;
-        font-weight: 700;
-        margin-bottom: 0.3rem;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        color: #2c3e50;
-    }
-    
-    .card-subtitle {
-        font-size: 0.8rem;
-        color: #8a9ba8;
-        font-weight: 400;
-    }
-    
-    /* インフォボックス */
-    .info-box {
-        background-color: #f0f9ff;
-        border-left: 3px solid #3b82f6;
-        padding: 0.875rem 1.25rem;
-        border-radius: 6px;
-        margin-bottom: 1.5rem;
-        font-size: 0.875rem;
-        color: #1e40af;
-    }
-    
-    .warning-box {
-        background-color: #fffbeb;
-        border-left: 3px solid #f59e0b;
-        padding: 0.875rem 1.25rem;
-        border-radius: 6px;
-        margin-bottom: 1.5rem;
-        font-size: 0.875rem;
-        color: #92400e;
-    }
-    
-    .success-box {
-        background-color: #f0fdf4;
-        border-left: 3px solid #10b981;
-        padding: 0.875rem 1.25rem;
-        border-radius: 6px;
-        margin-bottom: 1.5rem;
-        font-size: 0.875rem;
-        color: #065f46;
-    }
-    
-    /* テーブルスタイル */
-    .dataframe {
-        border: 1px solid #e1e8ed !important;
-        border-radius: 6px;
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        font-size: 0.875rem;
-    }
-    
-    .dataframe thead tr th {
-        background-color: #f8fafc !important;
-        color: #475569 !important;
-        font-weight: 600 !important;
-        padding: 12px 16px !important;
-        border-bottom: 2px solid #e1e8ed !important;
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 0.5px;
-    }
-    
-    .dataframe tbody tr {
-        border-bottom: 1px solid #f1f5f9 !important;
-    }
-    
-    .dataframe tbody tr:hover {
-        background-color: #f8fafc !important;
-    }
-    
-    .dataframe tbody td {
-        padding: 12px 16px !important;
-        color: #334155;
-    }
-    
-    /* マネージボード風スタイル */
-    .kpi-card {
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        color: white;
-        position: relative;
-        overflow: hidden;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        margin-bottom: 24px;
-    }
-    
-    .kpi-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
-    }
-    
-    .kpi-card-title {
-        font-size: 0.875rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        opacity: 0.9;
-        margin-bottom: 12px;
-    }
-    
-    .kpi-card-value {
-        font-size: 2.5rem;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
-        margin-bottom: 8px;
-        line-height: 1.1;
-    }
-    
-    .kpi-card-subtitle {
-        font-size: 0.875rem;
-        opacity: 0.8;
-        margin-bottom: 12px;
-    }
-    
-    .kpi-card-trend {
-        display: inline-block;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 20px;
-        padding: 6px 12px;
-        font-size: 0.875rem;
-        font-weight: 600;
-    }
-    
-    .kpi-card-decoration {
-        position: absolute;
-        right: -30px;
-        bottom: -30px;
-        width: 150px;
-        height: 150px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 50%;
-    }
-    
-    .dashboard-header {
-        background: linear-gradient(90deg, #1F2937 0%, #374151 100%);
-        padding: 24px 32px;
-        border-radius: 12px;
-        margin-bottom: 32px;
-        color: white;
-    }
-    
-    .dashboard-title {
-        margin: 0;
-        font-size: 2rem;
-        font-weight: 700;
-    }
-    
-    .dashboard-subtitle {
-        margin: 8px 0 0 0;
-        opacity: 0.8;
-        font-size: 0.875rem;
-    }
-    
-    .section-card {
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        margin-bottom: 24px;
-    }
-    
-    .section-title {
-        margin: 0 0 16px 0;
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #1F2937;
-    }
-    
-    .metric-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 0;
-        border-bottom: 1px solid #F3F4F6;
-    }
-    
-    .metric-row:last-child {
-        border-bottom: none;
-    }
-    
-    .metric-name {
-        font-size: 0.875rem;
-        color: #6B7280;
-        font-weight: 500;
-    }
-    
-    .metric-value {
-        font-size: 1.125rem;
-        font-weight: 600;
-        color: #1F2937;
-        font-variant-numeric: tabular-nums;
-    }
-    
-    .metric-change {
-        font-size: 0.875rem;
-        font-weight: 600;
-        margin-left: 8px;
-    }
-    
-    .metric-up {
-        color: #10B981;
-    }
-    
-    .metric-down {
-        color: #EF4444;
-    }
-    
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    .fade-in {
-        animation: fadeInUp 0.6s ease-out;
-    }
-    
-    @media (max-width: 768px) {
-        .kpi-card-value {
-            font-size: 2rem;
-        }
-        .dashboard-title {
-            font-size: 1.5rem;
-        }
-    }
-    
-    /* ボタンスタイル */
-    .stButton > button {
-        border-radius: 6px;
-        font-weight: 500;
-        font-size: 0.875rem;
-        padding: 0.5rem 1rem;
-        transition: all 0.2s ease;
-        border: 1px solid #e1e8ed;
-        background-color: #ffffff;
-        color: #475569;
-    }
-    
-    .stButton > button:hover {
-        background-color: #f8fafc;
-        border-color: #cbd5e1;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-    }
-    
-    .stButton > button[kind="primary"] {
-        background-color: #3b82f6;
-        color: white;
-        border: none;
-    }
-    
-    .stButton > button[kind="primary"]:hover {
-        background-color: #2563eb;
-    }
-    
-    /* サイドバー - 完全ライトモード */
-    [data-testid="stSidebar"] {
-        background-color: #f8fafc !important;
-        border-right: 1px solid #e1e8ed;
-    }
-    
-    [data-testid="stSidebar"] * {
-        color: #1e293b !important;
-    }
-    
-    [data-testid="stSidebar"] .stMarkdown {
-        color: #1e293b !important;
-    }
-    
-    [data-testid="stSidebar"] p {
-        color: #1e293b !important;
-    }
-    
-    /* セクション見出し（サイドバー内） */
-    [data-testid="stSidebar"] h3 {
-        color: #0f172a !important;
-        font-size: 0.7rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1.2px;
-        margin-top: 1.5rem;
-        margin-bottom: 0.75rem;
-        padding-left: 0.5rem;
-        background-color: transparent !important;
-    }
-    
-    /* サイドバーのボタン - 見やすく改善 */
+    section[data-testid="stSidebar"] * { color: #374151 !important; }
+
+    /* サイドバー内の通常ボタン → ナビリンク風 */
     [data-testid="stSidebar"] .stButton > button {
-        width: 100%;
-        text-align: left;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-        background-color: #ffffff !important;  /* 白背景で目立たせる */
-        border: 1px solid #cbd5e1 !important;  /* 枠線を追加 */
-        color: #1e293b !important;
-        font-weight: 600;  /* 太字に */
-        font-size: 0.9rem;  /* 少し大きく */
-        border-radius: 8px;  /* 角丸を大きく */
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);  /* 軽い影 */
-        transition: all 0.2s ease;
+        width: 100% !important;
+        text-align: left !important;
+        padding: 9px 16px !important;
+        margin: 1px 0 !important;
+        background-color: transparent !important;
+        border: none !important;
+        border-radius: 6px !important;
+        color: #374151 !important;
+        font-size: 13.5px !important;
+        font-weight: 500 !important;
+        line-height: 1.4 !important;
+        transition: background-color 0.15s ease, color 0.15s ease !important;
+        box-shadow: none !important;
     }
-    
     [data-testid="stSidebar"] .stButton > button:hover {
-        background-color: #3b82f6 !important;  /* ホバー時は青 */
-        color: #ffffff !important;  /* ホバー時は白文字 */
-        border-color: #3b82f6 !important;
-        transform: translateX(4px);  /* 右に少し移動 */
-        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);  /* 青い影 */
+        background-color: #EBF3FF !important;
+        color: #2563EB !important;
+        transform: none !important;
+        box-shadow: none !important;
     }
-    
-    /* セレクトボックスの文字色 */
-    .stSelectbox label {
-        color: #1e293b !important;
+
+    /* アクティブなナビアイテム（HTML div で描画） */
+    .nav-item-active {
+        display: block;
+        padding: 9px 16px;
+        margin: 1px 0;
+        background-color: #EBF3FF;
+        border-radius: 6px;
+        color: #2563EB !important;
+        font-size: 13.5px;
+        font-weight: 600;
+        border-left: 3px solid #2563EB;
+        cursor: default;
     }
-    
-    .stSelectbox > div > div {
-        background-color: #ffffff !important;
-        color: #1e293b !important;
-    }
-    
-    .stSelectbox [data-baseweb="select"] {
-        background-color: #ffffff !important;
-    }
-    
-    .stSelectbox [data-baseweb="select"] > div {
-        color: #1e293b !important;
-        background-color: #ffffff !important;
-    }
-    
-    /* タブスタイル */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
-        background-color: transparent;
-        padding: 0;
-        border-bottom: 2px solid #e1e8ed;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
+    /* 非アクティブのナビラベル（HTMLレンダリング） */
+    .nav-item {
+        display: block;
+        padding: 9px 16px;
+        margin: 1px 0;
+        border-radius: 6px;
+        color: #374151;
+        font-size: 13.5px;
         font-weight: 500;
-        color: #64748b;
-        border-radius: 0;
-        padding: 0.75rem 1.5rem;
-        border-bottom: 2px solid transparent;
-        margin-bottom: -2px;
-        background-color: transparent;
-        font-size: 0.875rem;
     }
-    
-    .stTabs [aria-selected="true"] {
-        background-color: transparent;
-        color: #3b82f6;
-        border-bottom: 2px solid #3b82f6;
-        font-weight: 600;
-    }
-    
-    /* セレクトボックス */
-    .stSelectbox > div > div {
-        background-color: #ffffff;
-        border: 1px solid #e1e8ed;
-        border-radius: 6px;
-        font-size: 0.875rem;
-    }
-    
-    /* データエディタ */
-    [data-testid="stDataFrameResizable"] {
-        border: 1px solid #e1e8ed;
-        border-radius: 6px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-    
-    /* メトリクス */
-    [data-testid="stMetricValue"] {
-        font-size: 1.75rem;
+
+    /* カテゴリ見出し */
+    .nav-category {
+        padding: 16px 16px 4px 16px;
+        font-size: 10.5px;
         font-weight: 700;
-        color: #2c3e50;
-    }
-    
-    [data-testid="stMetricLabel"] {
-        font-size: 0.75rem;
-        color: #8a9ba8;
-        font-weight: 600;
+        color: #9CA3AF !important;
         text-transform: uppercase;
+        letter-spacing: 0.8px;
     }
-    
-    /* セパレーター */
-    hr {
-        border: none;
-        border-top: 1px solid #e1e8ed;
-        margin: 1.5rem 0;
+
+    /* セレクトボックス（サイドバー内） */
+    [data-testid="stSidebar"] .stSelectbox label {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #9CA3AF !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.6px !important;
     }
+    [data-testid="stSidebar"] .stSelectbox > div > div {
+        background-color: #F9FAFB !important;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 6px !important;
+        font-size: 13px !important;
+        color: #374151 !important;
+    }
+
+    /* ===== 見出し ===== */
+    h1 {
+        color: #111827 !important;
+        font-size: 20px !important;
+        font-weight: 700 !important;
+        margin: 0 0 20px 0 !important;
+        padding-bottom: 14px !important;
+        border-bottom: 1px solid #E5E7EB !important;
+    }
+    h2 {
+        color: #1F2937 !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        margin-top: 24px !important;
+        margin-bottom: 12px !important;
+    }
+    h3 {
+        color: #374151 !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+    }
+
+    /* ===== ボタン（メインエリア） ===== */
+    .main .stButton > button {
+        border-radius: 6px !important;
+        font-size: 13.5px !important;
+        font-weight: 500 !important;
+        padding: 7px 14px !important;
+        border: 1px solid #D1D5DB !important;
+        background-color: #FFFFFF !important;
+        color: #374151 !important;
+        transition: all 0.15s ease !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+    }
+    .main .stButton > button:hover {
+        border-color: #93C5FD !important;
+        background-color: #EFF6FF !important;
+        transform: none !important;
+    }
+    .main .stButton > button[kind="primary"] {
+        background-color: #2563EB !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        box-shadow: 0 1px 3px rgba(37,99,235,0.3) !important;
+    }
+    .main .stButton > button[kind="primary"]:hover {
+        background-color: #1D4ED8 !important;
+    }
+
+    /* ===== メトリクス ===== */
+    [data-testid="stMetric"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 8px !important;
+        padding: 16px 20px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+    }
+    [data-testid="stMetricValue"] {
+        font-size: 24px !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+    }
+    [data-testid="stMetricLabel"] {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #6B7280 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    /* ===== タブ ===== */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: transparent !important;
+        border-bottom: 2px solid #E5E7EB !important;
+        gap: 0 !important;
+        padding: 0 !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent !important;
+        color: #6B7280 !important;
+        font-size: 13.5px !important;
+        font-weight: 500 !important;
+        padding: 10px 20px !important;
+        border-radius: 0 !important;
+        border-bottom: 2px solid transparent !important;
+        margin-bottom: -2px !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #2563EB !important;
+        border-bottom: 2px solid #2563EB !important;
+        font-weight: 600 !important;
+    }
+
+    /* ===== フォーム部品 ===== */
+    .stTextInput > div > div,
+    .stNumberInput > div > div {
+        background-color: #FFFFFF !important;
+        border: 1px solid #D1D5DB !important;
+        border-radius: 6px !important;
+        color: #374151 !important;
+    }
+    .stTextInput > div > div:focus-within,
+    .stNumberInput > div > div:focus-within {
+        border-color: #2563EB !important;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.12) !important;
+    }
+    .stSelectbox > div > div {
+        background-color: #FFFFFF !important;
+        border: 1px solid #D1D5DB !important;
+        border-radius: 6px !important;
+        color: #374151 !important;
+        font-size: 13.5px !important;
+    }
+
+    /* ===== アラート ===== */
+    .stInfo    { background-color: #EFF6FF !important; border-left: 4px solid #2563EB !important; color: #1E40AF !important; border-radius: 0 6px 6px 0 !important; }
+    .stWarning { background-color: #FFFBEB !important; border-left: 4px solid #F59E0B !important; color: #92400E !important; border-radius: 0 6px 6px 0 !important; }
+    .stSuccess { background-color: #F0FDF4 !important; border-left: 4px solid #22C55E !important; color: #166534 !important; border-radius: 0 6px 6px 0 !important; }
+    .stError   { background-color: #FEF2F2 !important; border-left: 4px solid #EF4444 !important; color: #991B1B !important; border-radius: 0 6px 6px 0 !important; }
+
+    /* ===== テーブル・データフレーム ===== */
+    .dataframe, [data-testid="stDataFrameResizable"] {
+        border: 1px solid #E5E7EB !important;
+        border-radius: 8px !important;
+        font-size: 13px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+    }
+    .dataframe thead tr th {
+        background-color: #F9FAFB !important;
+        color: #6B7280 !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        border-bottom: 1px solid #E5E7EB !important;
+        padding: 10px 14px !important;
+    }
+    .dataframe tbody td {
+        color: #374151 !important;
+        border-bottom: 1px solid #F3F4F6 !important;
+        padding: 10px 14px !important;
+    }
+    .dataframe tbody tr:hover td { background-color: #F9FAFB !important; }
+
+    /* ===== エクスパンダー ===== */
+    .streamlit-expanderHeader {
+        background-color: #F9FAFB !important;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 6px !important;
+        color: #374151 !important;
+        font-weight: 500 !important;
+        font-size: 13.5px !important;
+    }
+    .streamlit-expanderContent {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        border-top: none !important;
+        border-radius: 0 0 6px 6px !important;
+    }
+
+    /* ===== セパレーター ===== */
+    hr { border: none !important; border-top: 1px solid #E5E7EB !important; margin: 16px 0 !important; }
+
+    /* ===== カスタムカード（既存クラスを維持・更新） ===== */
+    .amount-card, .summary-card {
+        background: #FFFFFF;
+        padding: 20px 24px;
+        border-radius: 8px;
+        border: 1px solid #E5E7EB;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        margin-bottom: 16px;
+    }
+    .amount-card:hover, .summary-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .amount-card-label, .card-title {
+        font-size: 11px; color: #6B7280; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px;
+    }
+    .amount-card-value, .card-value {
+        font-size: 26px; font-weight: 700; color: #111827; margin-bottom: 4px;
+    }
+    .amount-card-sub, .card-subtitle { font-size: 12px; color: #9CA3AF; }
+
+    .summary-card-blue   { background:#FFFFFF; border-left:3px solid #2563EB; padding:20px 24px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
+    .summary-card-green  { background:#FFFFFF; border-left:3px solid #22C55E; padding:20px 24px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
+    .summary-card-orange { background:#FFFFFF; border-left:3px solid #F59E0B; padding:20px 24px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
+    .summary-card-purple { background:#FFFFFF; border-left:3px solid #8B5CF6; padding:20px 24px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
+
+    .info-box    { background:#EFF6FF; border-left:3px solid #2563EB; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#1E40AF; }
+    .warning-box { background:#FFFBEB; border-left:3px solid #F59E0B; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#92400E; }
+    .success-box { background:#F0FDF4; border-left:3px solid #22C55E; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#065F46; }
+
+    /* ===== KPIカード（グラデーション） ===== */
+    .kpi-card {
+        border-radius: 10px; padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        color: white; position: relative; overflow: hidden;
+        transition: box-shadow 0.2s ease; margin-bottom: 20px;
+    }
+    .kpi-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+    .kpi-card-title    { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85; margin-bottom: 10px; }
+    .kpi-card-value    { font-size: 28px; font-weight: 700; margin-bottom: 6px; line-height: 1.1; }
+    .kpi-card-subtitle { font-size: 13px; opacity: 0.75; margin-bottom: 10px; }
+    .kpi-card-trend    { display:inline-block; background:rgba(255,255,255,0.2); border-radius:20px; padding:4px 10px; font-size:12px; font-weight:600; }
+    .kpi-card-decoration { position:absolute; right:-20px; bottom:-20px; width:120px; height:120px; background:rgba(255,255,255,0.08); border-radius:50%; }
+
+    .dashboard-header {
+        background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
+        padding: 24px 32px; border-radius: 10px;
+        margin-bottom: 28px; color: white;
+    }
+    .dashboard-title    { margin:0; font-size:22px; font-weight:700; }
+    .dashboard-subtitle { margin:6px 0 0 0; font-size:13px; opacity:0.8; }
+
+    .section-card  { background:#FFFFFF; border-radius:10px; padding:20px 24px; box-shadow:0 1px 3px rgba(0,0,0,0.07); margin-bottom:20px; border:1px solid #E5E7EB; }
+    .section-title { margin:0 0 14px 0; font-size:15px; font-weight:600; color:#1F2937; }
+
+    .metric-row         { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #F3F4F6; }
+    .metric-row:last-child { border-bottom:none; }
+    .metric-name        { font-size:13px; color:#6B7280; font-weight:500; }
+    .metric-value       { font-size:15px; font-weight:600; color:#1F2937; }
+    .metric-change      { font-size:12px; font-weight:600; margin-left:6px; }
+    .metric-up          { color:#22C55E; }
+    .metric-down        { color:#EF4444; }
+
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .fade-in { animation: fadeInUp 0.5s ease-out; }
+
+    /* ===== ラジオボタン（サイドバー内） ===== */
+    [data-testid="stSidebar"] [data-testid="stRadio"] > div {
+        gap: 6px !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label {
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        color: #374151 !important;
+        padding: 6px 12px !important;
+        border-radius: 6px !important;
+        border: 1px solid #E5E7EB !important;
+        background-color: #F9FAFB !important;
+    }
+
+    /* コードブロック */
+    code { background-color: #F3F4F6 !important; color: #374151 !important; border-radius: 4px; padding: 2px 5px; }
+
+    /* フォーム */
+    [data-testid="stForm"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 8px !important;
+        padding: 20px !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1160,152 +877,140 @@ def generate_scenario_data(base_data, scenario_type):
     return result
 
 
-# サイドバー
-st.sidebar.markdown("""
-<div style='text-align: center; padding: 1rem 0;'>
-    <h1 style='color: #1f77b4; margin: 0; font-size: 1.8rem;'>📊</h1>
-    <h2 style='color: #2c3e50; margin: 0.5rem 0 0 0; font-size: 1.3rem;'>財務予測<br>シミュレーター</h2>
-</div>
-""", unsafe_allow_html=True)
-
-st.sidebar.markdown("---")
+# ==================== サイドバー ====================
 
 # セッション状態の初期化
 if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = True  # ログイン機能を一時的に無効化
+    st.session_state.authenticated = True
 if 'username' not in st.session_state:
     st.session_state.username = "ユーザー"
-
-# ユーザー情報とログアウト
-st.sidebar.markdown(f"**👤 {st.session_state.username}**")
-if st.sidebar.button("ログアウト", type="secondary"):
-    st.session_state.authenticated = False
-    st.session_state.username = ""
-    st.rerun()
-
-st.sidebar.markdown("---")
-
-# 🎛️ 分析モード切替
-st.sidebar.markdown("### 🎛️ 分析モード")
 if 'analysis_mode' not in st.session_state:
     st.session_state.analysis_mode = "📊 簡易モード"
+if 'page' not in st.session_state:
+    st.session_state.page = "着地予測ダッシュボード"
+if 'scenario' not in st.session_state:
+    st.session_state.scenario = "現実"
+if 'scenario_rates' not in st.session_state:
+    st.session_state.scenario_rates = {"現実": 0.0, "楽観": 0.1, "悲観": -0.1}
 
-# カスタムCSS（ラジオボタンを見やすく）
+
+def _nav(label: str, page_name: str, key: str):
+    """freee風ナビゲーションアイテム（アクティブ状態対応）"""
+    if st.session_state.page == page_name:
+        st.sidebar.markdown(
+            f'<div class="nav-item-active">{label}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        if st.sidebar.button(label, key=key, use_container_width=True):
+            st.session_state.page = page_name
+            st.rerun()
+
+
+def _nav_cat(label: str):
+    """ナビゲーションカテゴリ見出し"""
+    st.sidebar.markdown(
+        f'<div class="nav-category">{label}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ── ロゴ / ヘッダー ──────────────────────────────────────
 st.sidebar.markdown("""
-<style>
-div[data-testid="stRadio"] > label {
-    color: #000000 !important;
-    font-weight: 600 !important;
-    font-size: 14px !important;
-}
-div[data-testid="stRadio"] label[data-baseweb="radio"] {
-    color: #000000 !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-}
-</style>
+<div style="
+    padding: 20px 16px 16px 16px;
+    border-bottom: 1px solid #E5E7EB;
+    margin-bottom: 8px;
+">
+    <div style="display:flex; align-items:center; gap:10px;">
+        <div style="
+            width:32px; height:32px;
+            background: linear-gradient(135deg,#2563EB,#3B82F6);
+            border-radius:8px;
+            display:flex; align-items:center; justify-content:center;
+            color:white; font-size:16px; font-weight:700;
+            flex-shrink:0;
+        ">財</div>
+        <div>
+            <div style="font-size:14px; font-weight:700; color:#111827; line-height:1.2;">財務予測</div>
+            <div style="font-size:11px; color:#6B7280; line-height:1.2;">シミュレーター</div>
+        </div>
+    </div>
+</div>
 """, unsafe_allow_html=True)
 
-st.session_state.analysis_mode = st.sidebar.radio(
-    "",
-    ["📊 簡易モード", "🔬 高度モード"],
-    index=0 if st.session_state.analysis_mode == "📊 簡易モード" else 1,
-    horizontal=True,
-    key="analysis_mode_radio"
-)
-
-# モード説明
-if st.session_state.analysis_mode == "📊 簡易モード":
-    st.sidebar.caption("💡 基本的な分析のみ表示")
-else:
-    st.sidebar.caption("🔬 全ての分析機能を表示")
-
-st.sidebar.markdown("---")
-
-# データベース接続状態の表示
-if processor.use_postgres:
-    st.sidebar.success("🌐 Supabase接続中")
-else:
-    st.sidebar.warning("💾 SQLite使用中")
-    st.sidebar.caption("⚠️ データは一時的です")
-
-st.sidebar.markdown("---")
-
-# 会社選択
+# ── 会社・期間選択 ──────────────────────────────────────
 companies = get_companies_cached(processor)
+
 if companies.empty:
-    st.sidebar.info("🏢 会社を登録してください")
-    st.sidebar.markdown("👉 システム設定から会社を追加")
-    # 強制的にシステム設定ページに
+    st.sidebar.markdown("""
+<div style="padding:12px 16px; background:#FEF3C7; border-radius:6px; margin:8px 12px; font-size:12px; color:#92400E;">
+    ⚠️ 会社が未登録です
+</div>
+""", unsafe_allow_html=True)
     st.session_state.page = "システム設定"
     selected_comp_name = ""
     selected_comp_id = None
-    
-    # メニューを表示（システム設定のみ使用可能）
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📋 メニュー")
-    st.sidebar.markdown("⚙️ システム設定")
-    
+    selected_period_id = None
+
+    _nav_cat("設定")
+    _nav("⚙️ システム設定", "システム設定", "nav_settings_empty")
+
 else:
     comp_names = companies['name'].tolist()
-    
-    # 前回の選択を保存
     prev_comp_id = st.session_state.get('selected_comp_id', None)
-    
-    selected_comp_name = st.sidebar.selectbox(
-        "🏢 会社を選択",
-        comp_names,
-        key="comp_select"
-    )
+
+    with st.sidebar.container():
+        selected_comp_name = st.sidebar.selectbox(
+            "会社",
+            comp_names,
+            key="comp_select",
+            label_visibility="visible",
+        )
+
     selected_comp_id = int(companies[companies['name'] == selected_comp_name]['id'].iloc[0])
-    
-    # 会社が変更された場合、データをリフレッシュ
     if prev_comp_id != selected_comp_id:
-        # session_stateをクリア（データ再読み込み用）
         for key in ['actuals_df', 'forecasts_df', 'imported_df', 'show_import_button']:
             if key in st.session_state:
                 del st.session_state[key]
-    
     st.session_state.selected_comp_id = selected_comp_id
     st.session_state.selected_comp_name = selected_comp_name
 
     # 期選択
     periods = get_company_periods_cached(selected_comp_id, processor)
     if periods.empty:
-        st.sidebar.info("📅 会計期間を登録してください")
-        st.sidebar.markdown("👉 システム設定から期を追加")
+        st.sidebar.markdown("""
+<div style="padding:10px 16px; background:#FEF3C7; border-radius:6px; margin:4px 12px; font-size:12px; color:#92400E;">
+    ⚠️ 会計期間が未登録です
+</div>
+""", unsafe_allow_html=True)
         selected_period_num = 0
         selected_period_id = None
     else:
-        # 前回の選択を保存
         prev_period_id = st.session_state.get('selected_period_id', None)
-        
         period_options = [
-            f"第{row['period_num']}期 ({row['start_date']} 〜 {row['end_date']})"
+            f"第{row['period_num']}期 ({row['start_date']}〜{row['end_date']})"
             for _, row in periods.iterrows()
         ]
         selected_period_str = st.sidebar.selectbox(
-            "📅 期を選択",
+            "会計期間",
             period_options,
-            key="period_select"
+            key="period_select",
+            label_visibility="visible",
         )
         selected_period_num = int(selected_period_str.split('第')[1].split('期')[0])
         periods.columns = [c.lower() for c in periods.columns]
-        
         period_match = periods[periods['period_num'] == selected_period_num]
         if not period_match.empty:
-            if 'id' in period_match.columns:
-                selected_period_id = int(period_match['id'].iloc[0])
-            else:
-                selected_period_id = int(period_match.iloc[0, 0])
-            
-            # 期が変更された場合、データをリフレッシュ
+            selected_period_id = (
+                int(period_match['id'].iloc[0])
+                if 'id' in period_match.columns
+                else int(period_match.iloc[0, 0])
+            )
             if prev_period_id != selected_period_id:
-                # session_stateをクリア（データ再読み込み用）
                 for key in ['actuals_df', 'forecasts_df', 'imported_df', 'show_import_button']:
                     if key in st.session_state:
                         del st.session_state[key]
-                
             st.session_state.selected_period_id = selected_period_id
             st.session_state.selected_period_num = selected_period_num
             st.session_state.start_date = period_match['start_date'].iloc[0]
@@ -1314,140 +1019,87 @@ else:
             st.error("選択された期が見つかりません")
             selected_period_id = None
 
+    # 実績締月
+    if selected_period_id:
+        months = get_fiscal_months_cached(selected_comp_id, selected_period_id, processor)
+        if 'current_month' not in st.session_state or st.session_state.current_month not in months:
+            st.session_state.current_month = months[0]
+        st.session_state.current_month = st.sidebar.selectbox(
+            "実績締月",
+            months,
+            index=months.index(st.session_state.current_month) if st.session_state.current_month in months else 0,
+            key="current_month_select",
+            label_visibility="visible",
+        )
 
-    # シナリオはデフォルト「現実」（着地予測ページ内で切替）
-    if 'scenario' not in st.session_state:
-        st.session_state.scenario = "現実"
-    if 'scenario_rates' not in st.session_state:
-        st.session_state.scenario_rates = {
-            "現実": 0.0,
-            "楽観": 0.1,
-            "悲観": -0.1
-        }
-    
-    # 表示設定
-    st.sidebar.markdown("### ⚙️ 表示設定")
+    # 表示モード
     st.session_state.display_mode = st.sidebar.radio(
         "表示モード",
         ["要約", "詳細"],
-        horizontal=True
+        horizontal=True,
+        key="display_mode_radio",
     )
-    
-    # 月次リスト取得
-    if selected_period_id:
-        months = get_fiscal_months_cached(selected_comp_id, selected_period_id, processor)
-        
-        # 実績締月の選択
-        if 'current_month' not in st.session_state or st.session_state.current_month not in months:
-            st.session_state.current_month = months[0]
-            
-        st.session_state.current_month = st.sidebar.selectbox(
-            "実績締月を選択",
-            months,
-            index=months.index(st.session_state.current_month) if st.session_state.current_month in months else 0
-        )
 
-    # メニュー
-    st.sidebar.markdown("---")
-    
-    # 🎛️ モードによってメニューを切り替え
-    if st.session_state.analysis_mode == "📊 簡易モード":
-        # ========== 簡易モード ==========
-        st.sidebar.markdown("### 📊 基本メニュー")
-        
-        # ダッシュボード
-        st.sidebar.markdown("#### ダッシュボード")
-        if st.sidebar.button("📊 CFO意思決定支援", width="stretch", key="nav_cfo_dashboard"):
-            st.session_state.page = "CFO意思決定支援ダッシュボード"
-        if st.sidebar.button("着地予測（PL）", width="stretch", key="nav_dashboard"):
-            st.session_state.page = "着地予測ダッシュボード"
-        
-        # AI予測
-        st.sidebar.markdown("#### AI予測")
-        if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_ai_forecast_simple"):
-            st.session_state.page = "AI自動予測"
-        
-        # データ入力
-        st.sidebar.markdown("#### データ入力")
-        if st.sidebar.button("データ取込", width="stretch", key="nav_import"):
-            st.session_state.page = "データインポート"
-        
-        # 財務諸表（基本のみ）
-        st.sidebar.markdown("#### 財務諸表")
-        if st.sidebar.button("損益計算書 (PL)", width="stretch", key="nav_pl"):
-            st.session_state.page = "損益計算書 (PL)"
-        if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
-            st.session_state.page = "貸借対照表 (BS)"
-        if st.sidebar.button("CF計算書", width="stretch", key="nav_cf"):
-            st.session_state.page = "キャッシュフロー計算書 (CF)"
-        
-    else:
-        # ========== 高度モード（全機能） ==========
-        # 階層型ナビゲーション（アイコンなし）
-        st.sidebar.markdown("### ダッシュボード")
-        if st.sidebar.button("📊 CFO意思決定支援", width="stretch", key="nav_cfo_dashboard"):
-            st.session_state.page = "CFO意思決定支援ダッシュボード"
-        if st.sidebar.button("着地予測（PL）", width="stretch", key="nav_dashboard"):
-            st.session_state.page = "着地予測ダッシュボード"
-        
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### データ入力")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            if st.button("実績", width="stretch", key="nav_actual"):
-                st.session_state.page = "実績データ入力"
-        with col2:
-            if st.button("予測", width="stretch", key="nav_forecast"):
-                st.session_state.page = "予測データ入力"
-        
-        if st.sidebar.button("データ取込", width="stretch", key="nav_import"):
-            st.session_state.page = "データインポート"
-        
-        if st.sidebar.button("シナリオ一括設定", width="stretch", key="nav_scenario"):
-            st.session_state.page = "シナリオ一括設定"
-        
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### 財務諸表")
-        if st.sidebar.button("損益計算書 (PL)", width="stretch", key="nav_pl"):
-            st.session_state.page = "損益計算書 (PL)"
-        if st.sidebar.button("貸借対照表 (BS)", width="stretch", key="nav_bs"):
-            st.session_state.page = "貸借対照表 (BS)"
-        if st.sidebar.button("CF計算書", width="stretch", key="nav_cf"):
-            st.session_state.page = "キャッシュフロー計算書 (CF)"
-        if st.sidebar.button("CF詳細分析", width="stretch", key="nav_cf_detail"):
-            st.session_state.page = "CF詳細分析"
-        
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### 分析レポート")
-        if st.sidebar.button("予実比較", width="stretch", key="nav_comparison"):
-            st.session_state.page = "予測 VS 実績比較"
-        if st.sidebar.button("シナリオ比較", width="stretch", key="nav_scenario_comp"):
-            st.session_state.page = "シナリオ比較"
-        if st.sidebar.button("期間比較", width="stretch", key="nav_period"):
-            st.session_state.page = "期間比較分析"
-        if st.sidebar.button("経営指標", width="stretch", key="nav_metrics"):
-            st.session_state.page = "経営指標ダッシュボード"
-        if st.sidebar.button("損益分岐点", width="stretch", key="nav_breakeven"):
-            st.session_state.page = "損益分岐点分析"
-        if st.sidebar.button("運転資本分析", width="stretch", key="nav_working_capital"):
-            st.session_state.page = "運転資本分析"
-        if st.sidebar.button("収益構造分析", width="stretch", key="nav_profitability"):
-            st.session_state.page = "収益構造分析"
-        
-        # AI自動予測
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### AI予測")
-        if st.sidebar.button("🔮 AI自動予測", width="stretch", key="nav_ai_forecast"):
-            st.session_state.page = "AI自動予測"
-    
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 設定")
-    if st.sidebar.button("システム設定", width="stretch", key="nav_settings"):
-        st.session_state.page = "システム設定"
-    
-    # ページ情報を保持（後方互換性のため）
-    if 'page' not in st.session_state:
-        st.session_state.page = "着地予測ダッシュボード"
+    st.sidebar.markdown('<hr style="margin:8px 0; border-color:#E5E7EB;">', unsafe_allow_html=True)
+
+    # ── ナビゲーションメニュー ────────────────────────────
+    _nav_cat("ダッシュボード")
+    _nav("📊 CFO意思決定支援", "CFO意思決定支援ダッシュボード", "nav_cfo")
+    _nav("📈 着地予測（PL）",  "着地予測ダッシュボード",          "nav_dash")
+
+    _nav_cat("AI予測")
+    _nav("🤖 AI自動予測", "AI自動予測", "nav_ai")
+
+    _nav_cat("データ入力")
+    _nav("📥 実績データ入力",   "実績データ入力", "nav_actual")
+    _nav("📤 予測データ入力",   "予測データ入力", "nav_forecast")
+    _nav("📋 データ取込",       "データインポート", "nav_import")
+    _nav("🎯 シナリオ一括設定", "シナリオ一括設定", "nav_scenario")
+
+    _nav_cat("財務諸表")
+    _nav("📑 損益計算書 (PL)",  "損益計算書 (PL)",           "nav_pl")
+    _nav("🏦 貸借対照表 (BS)",  "貸借対照表 (BS)",           "nav_bs")
+    _nav("💰 CF計算書",         "キャッシュフロー計算書 (CF)", "nav_cf")
+    _nav("💹 CF詳細分析",       "CF詳細分析",                "nav_cf_detail")
+
+    _nav_cat("分析レポート")
+    _nav("🔀 予実比較",     "予測 VS 実績比較",    "nav_comparison")
+    _nav("📊 シナリオ比較", "シナリオ比較",        "nav_scenario_comp")
+    _nav("📅 期間比較",     "期間比較分析",        "nav_period")
+    _nav("📈 経営指標",     "経営指標ダッシュボード", "nav_metrics")
+    _nav("📉 損益分岐点",   "損益分岐点分析",      "nav_breakeven")
+    _nav("💳 運転資本分析", "運転資本分析",        "nav_working_capital")
+    _nav("📊 収益構造分析", "収益構造分析",        "nav_profitability")
+
+    st.sidebar.markdown('<hr style="margin:8px 0; border-color:#E5E7EB;">', unsafe_allow_html=True)
+    _nav_cat("設定")
+    _nav("⚙️ システム設定", "システム設定", "nav_settings")
+
+    # ── フッター（DB状態 + ユーザー情報） ────────────────
+    db_badge = (
+        '<span style="color:#16A34A;">● Supabase</span>'
+        if processor.use_postgres
+        else '<span style="color:#D97706;">● SQLite</span>'
+    )
+    st.sidebar.markdown(f"""
+<div style="
+    padding: 12px 16px;
+    margin-top: 8px;
+    border-top: 1px solid #E5E7EB;
+    font-size: 11px;
+    color: #6B7280;
+">
+    <div style="margin-bottom:6px;">{db_badge}</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span>👤 {st.session_state.username}</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+    if st.sidebar.button("ログアウト", key="logout_btn", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.username = ""
+        st.rerun()
 
 # --------------------------------------------------------------------------------
 # ヘルパー関数
