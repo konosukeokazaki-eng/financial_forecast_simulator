@@ -1418,37 +1418,20 @@ def render_status_bar():
     <script>
     function toggleSidebar() {{
         var doc = window.parent.document;
-        var sidebar = doc.querySelector('[data-testid="stSidebar"]');
-        if (!sidebar) return;
-
-        // サイドバーが画面内にあるかを位置で判定
-        var rect = sidebar.getBoundingClientRect();
-        var isVisible = rect.left > -100 && rect.width > 50;
-
-        // まずStreamlit標準ボタンを試みる
-        if (isVisible) {{
-            var btns = ['[data-testid="stSidebarNavCollapseButton"] button',
-                        '[data-testid="collapsedControl"] button',
-                        '[data-testid="stSidebarNavCloseButton"] button'];
-            for (var i = 0; i < btns.length; i++) {{
-                var b = doc.querySelector(btns[i]);
-                if (b) {{ b.click(); return; }}
-            }}
-            // フォールバック: CSSで直接隠す
-            sidebar.style.transform = 'translateX(-110%)';
-            sidebar.style.transition = 'transform 0.3s ease';
-            sidebar.style.visibility = 'hidden';
+        // <style>タグの有無でサイドバーの状態を管理（React再レンダリングに影響されない）
+        var styleId = 'custom-sidebar-hidden';
+        var existing = doc.getElementById(styleId);
+        if (existing) {{
+            // 非表示 → 表示に戻す
+            existing.remove();
         }} else {{
-            var exBtns = ['[data-testid="stSidebarCollapsedControl"] button',
-                          '[data-testid="collapsedControl"] button'];
-            for (var i = 0; i < exBtns.length; i++) {{
-                var b = doc.querySelector(exBtns[i]);
-                if (b) {{ b.click(); return; }}
-            }}
-            // フォールバック: CSSで直接表示
-            sidebar.style.transform = 'translateX(0)';
-            sidebar.style.transition = 'transform 0.3s ease';
-            sidebar.style.visibility = 'visible';
+            // 表示 → 非表示にする
+            var style = doc.createElement('style');
+            style.id = styleId;
+            style.textContent =
+                'section[data-testid="stSidebar"] {{ display: none !important; }}' +
+                '[data-testid="stSidebarCollapsedControl"] {{ display: none !important; }}';
+            doc.head.appendChild(style);
         }}
     }}
     function scrollSidebar(pos) {{
